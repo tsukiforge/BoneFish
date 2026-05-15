@@ -8,7 +8,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
       with:
-        submodules: recursive
+        submodules: 'true'
+    
+    - name: Initialize submodules
+      run: git submodule update --init --recursive
 
     - uses: actions/setup-dotnet@v5
       with:
@@ -24,11 +27,10 @@ jobs:
       run: dotnet publish -p:PublishSingleFile=true -p:CommitHash=${{ github.sha }} -p:CommitRef=${{ github.ref_type }}/${{ github.ref_name }} -r win-x64 -c Release --self-contained false .\Bloxstrap\Bloxstrap.csproj
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
         name: BoneFish-Release
         path: .\Bloxstrap\bin\Release\net6.0-windows\win-x64\publish\BoneFish.exe
-        archive: false
 
   release:
     needs: build
@@ -39,7 +41,7 @@ jobs:
 
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: BoneFish-Release
           path: release
@@ -64,7 +66,7 @@ jobs:
 
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: BoneFish-Release
           path: release
@@ -100,7 +102,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Download artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: BoneFish-Release
           path: release
