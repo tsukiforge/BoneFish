@@ -1567,6 +1567,34 @@ namespace Bloxstrap
                 Directory.Delete(modFontFamiliesFolder, true);
             }
 
+            // check custom background
+            if (File.Exists(Paths.CustomBackground))
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Applying custom background");
+                string backgroundDir = Path.GetDirectoryName(Paths.CustomBackground)!;
+                Directory.CreateDirectory(backgroundDir);
+            }
+            else
+            {
+                string backgroundPath = Path.Combine(Paths.Modifications, "content\\textures\\ui\\Shell\\CustomBackground.png");
+                if (File.Exists(backgroundPath))
+                    File.Delete(backgroundPath);
+            }
+
+            // check custom loading screen
+            if (File.Exists(Paths.CustomLoadingScreen))
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Applying custom loading screen");
+                string loadingDir = Path.GetDirectoryName(Paths.CustomLoadingScreen)!;
+                Directory.CreateDirectory(loadingDir);
+            }
+            else
+            {
+                string loadingPath = Path.Combine(Paths.Modifications, "content\\textures\\loading\\CustomLoading.png");
+                if (File.Exists(loadingPath))
+                    File.Delete(loadingPath);
+            }
+
             // we apply it here since RobloxDomain could be changed by the user
             App.Logger.WriteLine(LOG_IDENT, "Writing AppSettings.xml...");
             if (!File.Exists(Paths.Modifications + "\\AppSettings.xml"))

@@ -34,6 +34,8 @@
         public static string Application { get; private set; } = "";
 
         public static string CustomFont => Path.Combine(Modifications, "content\\fonts\\CustomFont.ttf");
+        public static string CustomBackground => Path.Combine(Modifications, "content\\textures\\ui\\Shell\\CustomBackground.png");
+        public static string CustomLoadingScreen => Path.Combine(Modifications, "content\\textures\\loading\\CustomLoading.png");
 
         public static bool Initialized => !String.IsNullOrEmpty(Base);
 

@@ -4579,6 +4579,96 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Use custom background.
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomBackground_Title {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomBackground.Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Replace the default Roblox menu background with your own image..
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomBackground_Description {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomBackground.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Choose image....
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomBackground_Choose {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomBackground.Choose", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Remove custom background.
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomBackground_Remove {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomBackground.Remove", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The file you have chosen does not appear to be a valid image file..
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomBackground_Invalid {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomBackground.Invalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Use custom loading screen.
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomLoadingScreen_Title {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomLoadingScreen.Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Replace the default loading screen with your own image..
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomLoadingScreen_Description {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomLoadingScreen.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Choose image....
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomLoadingScreen_Choose {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomLoadingScreen.Choose", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Remove custom loading screen.
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomLoadingScreen_Remove {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomLoadingScreen.Remove", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The file you have chosen does not appear to be a valid image file..
+        /// </summary>
+        public static string Menu_Mods_Misc_CustomLoadingScreen_Invalid {
+            get {
+                return ResourceManager.GetString("Menu.Mods.Misc.CustomLoadingScreen.Invalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Manage custom Roblox mods here..
         /// </summary>
         public static string Menu_Mods_OpenModsFolder_Description {

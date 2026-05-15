@@ -96,5 +96,23 @@
                 <ui:Button Icon="Delete16" Content="{x:Static resources:Strings.Menu_Mods_Misc_CustomFont_Remove}" Appearance="Danger" Command="{Binding ManageCustomFontCommand}" Visibility="{Binding DeleteCustomFontVisibility, Mode=OneWay}" />
             </StackPanel>
         </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Title}" 
+            Description="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Description}">
+            <StackPanel>
+                <ui:Button Icon="Image16" Content="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Choose}" Command="{Binding ManageCustomBackgroundCommand}" Visibility="{Binding ChooseCustomBackgroundVisibility, Mode=OneWay}" />
+                <ui:Button Icon="Delete16" Content="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Remove}" Appearance="Danger" Command="{Binding ManageCustomBackgroundCommand}" Visibility="{Binding DeleteCustomBackgroundVisibility, Mode=OneWay}" />
+            </StackPanel>
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="{x:Static resources:Strings.Menu_Mods_Misc_CustomLoadingScreen_Title}" 
+            Description="{x:Static resources:Strings.Menu_Mods_Misc_CustomLoadingScreen_Description}">
+            <StackPanel>
+                <ui:Button Icon="Image16" Content="{x:Static resources:Strings.Menu_Mods_Misc_CustomLoadingScreen_Choose}" Command="{Binding ManageCustomLoadingScreenCommand}" Visibility="{Binding ChooseCustomLoadingScreenVisibility, Mode=OneWay}" />
+                <ui:Button Icon="Delete16" Content="{x:Static resources:Strings.Menu_Mods_Misc_CustomLoadingScreen_Remove}" Appearance="Danger" Command="{Binding ManageCustomLoadingScreenCommand}" Visibility="{Binding DeleteCustomLoadingScreenVisibility, Mode=OneWay}" />
+            </StackPanel>
+        </controls:OptionControl>
     </StackPanel>
 </ui:UiPage>

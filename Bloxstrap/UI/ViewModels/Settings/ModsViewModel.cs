@@ -65,6 +65,81 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand ManageCustomFontCommand => new RelayCommand(ManageCustomFont);
 
+        private void ManageCustomBackground()
+        {
+            if (!String.IsNullOrEmpty(BackgroundTask.NewState))
+            {
+                BackgroundTask.NewState = "";
+            }
+            else
+            {
+                var dialog = new OpenFileDialog
+                {
+                    Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp"
+                };
+
+                if (dialog.ShowDialog() != true)
+                    return;
+
+                try
+                {
+                    using var img = System.Drawing.Image.FromFile(dialog.FileName);
+                    BackgroundTask.NewState = dialog.FileName;
+                }
+                catch
+                {
+                    Frontend.ShowMessageBox(Strings.Menu_Mods_Misc_CustomBackground_Invalid, MessageBoxImage.Error);
+                    return;
+                }
+            }
+
+            OnPropertyChanged(nameof(ChooseCustomBackgroundVisibility));
+            OnPropertyChanged(nameof(DeleteCustomBackgroundVisibility));
+        }
+
+        private void ManageCustomLoadingScreen()
+        {
+            if (!String.IsNullOrEmpty(LoadingScreenTask.NewState))
+            {
+                LoadingScreenTask.NewState = "";
+            }
+            else
+            {
+                var dialog = new OpenFileDialog
+                {
+                    Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp"
+                };
+
+                if (dialog.ShowDialog() != true)
+                    return;
+
+                try
+                {
+                    using var img = System.Drawing.Image.FromFile(dialog.FileName);
+                    LoadingScreenTask.NewState = dialog.FileName;
+                }
+                catch
+                {
+                    Frontend.ShowMessageBox(Strings.Menu_Mods_Misc_CustomLoadingScreen_Invalid, MessageBoxImage.Error);
+                    return;
+                }
+            }
+
+            OnPropertyChanged(nameof(ChooseCustomLoadingScreenVisibility));
+            OnPropertyChanged(nameof(DeleteCustomLoadingScreenVisibility));
+        }
+
+        public Visibility ChooseCustomBackgroundVisibility => !String.IsNullOrEmpty(BackgroundTask.NewState) ? Visibility.Collapsed : Visibility.Visible;
+        public Visibility DeleteCustomBackgroundVisibility => !String.IsNullOrEmpty(BackgroundTask.NewState) ? Visibility.Visible : Visibility.Collapsed;
+        public ICommand ManageCustomBackgroundCommand => new RelayCommand(ManageCustomBackground);
+
+        public Visibility ChooseCustomLoadingScreenVisibility => !String.IsNullOrEmpty(LoadingScreenTask.NewState) ? Visibility.Collapsed : Visibility.Visible;
+        public Visibility DeleteCustomLoadingScreenVisibility => !String.IsNullOrEmpty(LoadingScreenTask.NewState) ? Visibility.Visible : Visibility.Collapsed;
+        public ICommand ManageCustomLoadingScreenCommand => new RelayCommand(ManageCustomLoadingScreen);
+
+        public BackgroundModPresetTask BackgroundTask { get; } = new();
+        public LoadingScreenModPresetTask LoadingScreenTask { get; } = new();
+
         public ICommand OpenCompatSettingsCommand => new RelayCommand(OpenCompatSettings);
 
         public ModPresetTask OldAvatarBackgroundTask { get; } = new("OldAvatarBackground", @"ExtraContent\places\Mobile.rbxl", "OldAvatarBackground.rbxl");
