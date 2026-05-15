@@ -7,14 +7,18 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
     <ApplicationIcon>BoneFish.ico</ApplicationIcon>
-    <Version>3.0.6</Version>
-    <FileVersion>3.0.6</FileVersion>
+    <Version>3.0.8</Version>
+    <FileVersion>3.0.8</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 	<AssemblyName>BoneFish</AssemblyName>
     <Product>BoneFish</Product>
     <RootNamespace>Bloxstrap</RootNamespace>
+    
+    <!-- Publish Optimization -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
     
   <ItemGroup>
