@@ -752,6 +752,36 @@ Selecting 'No' will ignore this warning and continue installation.</value>
   <data name="Menu.Mods.Misc.CustomFont.Title" xml:space="preserve">
     <value>Use custom font</value>
   </data>
+  <data name="Menu.Mods.Misc.CustomBackground.Title" xml:space="preserve">
+    <value>Use custom background</value>
+  </data>
+  <data name="Menu.Mods.Misc.CustomBackground.Description" xml:space="preserve">
+    <value>Replace the default Roblox menu background with your own image.</value>
+  </data>
+  <data name="Menu.Mods.Misc.CustomBackground.Choose" xml:space="preserve">
+    <value>Choose image...</value>
+  </data>
+  <data name="Menu.Mods.Misc.CustomBackground.Remove" xml:space="preserve">
+    <value>Remove custom background</value>
+  </data>
+  <data name="Menu.Mods.Misc.CustomBackground.Invalid" xml:space="preserve">
+    <value>The file you have chosen does not appear to be a valid image file.</value>
+  </data>
+  <data name="Menu.Mods.Misc.CustomLoadingScreen.Title" xml:space="preserve">
+    <value>Use custom loading screen</value>
+  </data>
+  <data name="Menu.Mods.Misc.CustomLoadingScreen.Description" xml:space="preserve">
+    <value>Replace the default loading screen with your own image.</value>
+  </data>
+  <data name="Menu.Mods.Misc.CustomLoadingScreen.Choose" xml:space="preserve">
+    <value>Choose image...</value>
+  </data>
+  <data name="Menu.Mods.Misc.CustomLoadingScreen.Remove" xml:space="preserve">
+    <value>Remove custom loading screen</value>
+  </data>
+  <data name="Menu.Mods.Misc.CustomLoadingScreen.Invalid" xml:space="preserve">
+    <value>The file you have chosen does not appear to be a valid image file.</value>
+  </data>
   <data name="Menu.Mods.OpenModsFolder.Description" xml:space="preserve">
     <value>Manage custom Roblox mods here.</value>
   </data>
