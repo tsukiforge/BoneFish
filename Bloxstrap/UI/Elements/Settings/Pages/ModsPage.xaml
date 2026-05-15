@@ -103,6 +103,9 @@
             <StackPanel>
                 <ui:Button Icon="Image16" Content="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Choose}" Command="{Binding ManageCustomBackgroundCommand}" Visibility="{Binding ChooseCustomBackgroundVisibility, Mode=OneWay}" />
                 <ui:Button Icon="Delete16" Content="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Remove}" Appearance="Danger" Command="{Binding ManageCustomBackgroundCommand}" Visibility="{Binding DeleteCustomBackgroundVisibility, Mode=OneWay}" />
+                <Border Margin="0,8,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Visibility="{Binding BackgroundPreviewVisibility, Mode=OneWay}">
+                    <Image Source="{Binding BackgroundPreview, Mode=OneWay}" MaxHeight="200" Stretch="Uniform" />
+                </Border>
             </StackPanel>
         </controls:OptionControl>
 
@@ -112,6 +115,9 @@
             <StackPanel>
                 <ui:Button Icon="Image16" Content="{x:Static resources:Strings.Menu_Mods_Misc_CustomLoadingScreen_Choose}" Command="{Binding ManageCustomLoadingScreenCommand}" Visibility="{Binding ChooseCustomLoadingScreenVisibility, Mode=OneWay}" />
                 <ui:Button Icon="Delete16" Content="{x:Static resources:Strings.Menu_Mods_Misc_CustomLoadingScreen_Remove}" Appearance="Danger" Command="{Binding ManageCustomLoadingScreenCommand}" Visibility="{Binding DeleteCustomLoadingScreenVisibility, Mode=OneWay}" />
+                <Border Margin="0,8,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Visibility="{Binding LoadingScreenPreviewVisibility, Mode=OneWay}">
+                    <Image Source="{Binding LoadingScreenPreview, Mode=OneWay}" MaxHeight="200" Stretch="Uniform" />
+                </Border>
             </StackPanel>
         </controls:OptionControl>
     </StackPanel>

@@ -8,6 +8,11 @@ namespace Bloxstrap.Extensions
     {
         private static readonly ConcurrentDictionary<BootstrapperIcon, ImageSource> ImageSourceCache = new();
 
+        public static void ClearCache(BootstrapperIcon icon)
+        {
+            ImageSourceCache.TryRemove(icon, out _);
+        }
+
         public static ImageSource GetImageSource(this BootstrapperIcon icon)
         {
             return ImageSourceCache.GetOrAdd(icon, key =>
