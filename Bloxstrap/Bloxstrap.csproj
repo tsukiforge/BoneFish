@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
-    <ApplicationIcon>Bloxstrap.ico</ApplicationIcon>
+    <ApplicationIcon>BoneFish.ico</ApplicationIcon>
     <Version>3.0.6</Version>
     <FileVersion>3.0.6</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -18,7 +18,7 @@
   </PropertyGroup>
     
   <ItemGroup>
-    <Resource Include="Bloxstrap.ico" />
+    <Resource Include="BoneFish.ico" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\PlayerLogo.png" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Roblox.png" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Studio.png" />

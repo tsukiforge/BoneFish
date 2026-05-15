@@ -8,8 +8,7 @@
 
 <div align="center">
 
-![][banner-light]
-![][banner-dark]
+<img src="Images/BoneFish.png" alt="BoneFish Logo" width="200"/>
 
 ![][badge-license]
 ![][badge-actions]

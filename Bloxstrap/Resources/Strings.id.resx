@@ -118,7 +118,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>Fishstrap tidak dapat diperbarui secara otomatis ke versi {0}. Mohon perbarui secara manual dengan mengunduh dari website kemudian menjalankannya.</value>
+    <value>BoneFish tidak dapat diperbarui secara otomatis ke versi {0}. Mohon perbarui secara manual dengan mengunduh dari website kemudian menjalankannya.</value>
   </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Roblox sedang berjalan saat ini, dan menjalankan instansi Roblox baru akan menutup instansi Roblox yang sedang berjalan, apakah Anda yakin ingin tetap menjalankannya?</value>
@@ -127,13 +127,13 @@
     <value>Roblox mungkin sedang mengalami gangguan saat ini. Lihat {0} untuk informasi lebih lanjut.</value>
   </data>
   <data name="Dialog.Connectivity.BadConnection" xml:space="preserve">
-    <value>Koneksi tidak dapat dibuat, yang berarti adanya koneksi internet buruk atau pemblokiran tembok api. Jika koneksi tidak bermasalah, pastikan antivirus tidak memblokir Fishstrap.</value>
+    <value>Koneksi tidak dapat dibuat, yang berarti adanya koneksi internet buruk atau pemblokiran tembok api. Jika koneksi tidak bermasalah, pastikan antivirus tidak memblokir BoneFish.</value>
   </data>
   <data name="Bootstrapper.FirstRunUninstall" xml:space="preserve">
-    <value>Anda harus menginstal Fishstrap terlebih dahulu sebelum menghapus.</value>
+    <value>Anda harus menginstal BoneFish terlebih dahulu sebelum menghapus.</value>
   </data>
   <data name="Bootstrapper.NotEnoughSpace" xml:space="preserve">
-    <value>Fishstrap tidak memiliki ruang penyimpanan yang cukup untuk mengunduh dan menginstal Roblox. Tolong kosongkan beberapa ruang penyimpanan dan coba kembali.</value>
+    <value>BoneFish tidak memiliki ruang penyimpanan yang cukup untuk mengunduh dan menginstal Roblox. Tolong kosongkan beberapa ruang penyimpanan dan coba kembali.</value>
   </data>
   <data name="Bootstrapper.Status.ApplyingModifications" xml:space="preserve">
     <value>Menerapkan modifikasi Roblox...</value>
@@ -169,10 +169,10 @@
     <comment>Text for style previews that use text button that says "Cancel"</comment>
   </data>
   <data name="Bootstrapper.SuccessfullyUninstalled" xml:space="preserve">
-    <value>Fishstrap berhasil dihapus</value>
+    <value>BoneFish berhasil dihapus</value>
   </data>
   <data name="Bootstrapper.Uninstall.RobloxRunning" xml:space="preserve">
-    <value>Roblox sedang berjalan saat ini, namun harus ditutup sebelum menghapus Fishstrap. Apakah Anda yakin untuk menutup Roblox sekarang?</value>
+    <value>Roblox sedang berjalan saat ini, namun harus ditutup sebelum menghapus BoneFish. Apakah Anda yakin untuk menutup Roblox sekarang?</value>
   </data>
   <data name="Bootstrapper.WMFNotFound" xml:space="preserve">
     <value>Roblox membutuhkan penggunaan komponen Windows Media Foundation. Anda sepertinya tidak memilikinya, kemungkinan karena anda menggunakan edisi Windows N. Tolong install komponen tersebut, dan mulai Roblox kembali.</value>
@@ -276,14 +276,14 @@ Tekan untuk informasi lebih lanjut.</value>
     <value>Kesalahan koneksi</value>
   </data>
   <data name="Dialog.Connectivity.UnableToConnect" xml:space="preserve">
-    <value>Fishstrap gagal menghubungkan ke {0}</value>
+    <value>BoneFish gagal menghubungkan ke {0}</value>
     <comment>{0} is the name of a service (i.e. Roblox, GitHub)</comment>
   </data>
   <data name="Dialog.Exception.CopyLogContents" xml:space="preserve">
     <value>Salin isi log</value>
   </data>
   <data name="Dialog.Exception.Info.1" xml:space="preserve">
-    <value>Sebuah eror telah terjadi ketika menjalankan Fishstrap</value>
+    <value>Sebuah eror telah terjadi ketika menjalankan BoneFish</value>
   </data>
   <data name="Dialog.Exception.Info.2" xml:space="preserve">
     <value>Periksa [Bloxstrap Wiki]({0}) terlebih dahulu jika masalah ini sudah diperbaiki
@@ -291,7 +291,7 @@ Tekan untuk informasi lebih lanjut.</value>
 Jika belym, Mohon laporkan masalah ini melalui [GitHub issue]({1}) bersama file log yang dibuat.</value>
   </data>
   <data name="Dialog.Exception.Title" xml:space="preserve">
-    <value>Error Fishstrap</value>
+    <value>Error BoneFish</value>
   </data>
   <data name="Common.Custom" xml:space="preserve">
     <value>Kustom</value>
@@ -306,10 +306,10 @@ Jika belym, Mohon laporkan masalah ini melalui [GitHub issue]({1}) bersama file 
     <value>Byfron Palsu (2023)</value>
   </data>
   <data name="Enums.BootstrapperStyle.ClassicFluentDialog" xml:space="preserve">
-    <value>Fishstrap (Klasik)</value>
+    <value>BoneFish (Klasik)</value>
   </data>
   <data name="Enums.BootstrapperStyle.FluentAeroDialog" xml:space="preserve">
-    <value>Fishstrap (Kaca)</value>
+    <value>BoneFish (Kaca)</value>
   </data>
   <data name="Enums.BootstrapperStyle.LegacyDialog2008" xml:space="preserve">
     <value>Jadul (2008 - 2011)</value>
@@ -387,10 +387,10 @@ Jika belym, Mohon laporkan masalah ini melalui [GitHub issue]({1}) bersama file 
     <value>Terang</value>
   </data>
   <data name="InstallChecker.Updated" xml:space="preserve">
-    <value>Fishstrap telah diperbarui ke v{0}</value>
+    <value>BoneFish telah diperbarui ke v{0}</value>
   </data>
   <data name="InstallChecker.VersionDifferentThanInstalled" xml:space="preserve">
-    <value>Versi Fishstrap yang Anda luncurkan sepertinya berbeda dengan versi yang Anda pasang sekarang.
+    <value>Versi BoneFish yang Anda luncurkan sepertinya berbeda dengan versi yang Anda pasang sekarang.
 Apakah Anda ingin memperbarui versi yang sudah Anda install?</value>
   </data>
   <data name="Menu.About.Contributors" xml:space="preserve">
@@ -400,7 +400,7 @@ Apakah Anda ingin memperbarui versi yang sudah Anda install?</value>
     <value>Kode</value>
   </data>
   <data name="Menu.About.Contributors.Description" xml:space="preserve">
-    <value>Mereka adalah orang-orang yang telah memberikan kontribusi penting pada Fishstrap, membantu mewujudkannya sampai saat ini.</value>
+    <value>Mereka adalah orang-orang yang telah memberikan kontribusi penting pada BoneFish, membantu mewujudkannya sampai saat ini.</value>
   </data>
   <data name="Menu.About.Contributors.FeatureIdeas" xml:space="preserve">
     <value>Ide fitur</value>
@@ -446,7 +446,7 @@ Apakah Anda ingin memperbarui versi yang sudah Anda install?</value>
     <value>Harap dicatat bahwa perubahan akan segera di terapkan sampai Anda menutup semua instansi Roblox yang terbuka.</value>
   </data>
   <data name="Menu.AlreadyRunning.Title" xml:space="preserve">
-    <value>Fishstrap sudah berjalan</value>
+    <value>BoneFish sudah berjalan</value>
   </data>
   <data name="Menu.Appearance.Bootstrapper.Description" xml:space="preserve">
     <value>Anda bisa membuatnya terlihat berbeda, jadul, atau bahkan seperti Roblox.</value>
@@ -474,7 +474,7 @@ Apakah Anda ingin memperbarui versi yang sudah Anda install?</value>
     <value>Judul</value>
   </data>
   <data name="Menu.Appearance.Description" xml:space="preserve">
-    <value>Konfigurasikan bagaimana tampilan Fishstrap.</value>
+    <value>Konfigurasikan bagaimana tampilan BoneFish.</value>
   </data>
   <data name="Menu.Appearance.Global.Theme.Title" xml:space="preserve">
     <value>Tema Global</value>
@@ -498,10 +498,10 @@ Apakah Anda ingin memperbarui versi yang sudah Anda install?</value>
     <value>Penampilan</value>
   </data>
   <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>Fishstrap akan otomatis mengecek dan memperbarui saat memulai Roblox.</value>
+    <value>BoneFish akan otomatis mengecek dan memperbarui saat memulai Roblox.</value>
   </data>
   <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>Perbarui Fishstrap secara otomatis</value>
+    <value>Perbarui BoneFish secara otomatis</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>Mencegah menutup sebuah game yang telah dibuka dari membuka game lagi secara tidak sengaja.</value>
@@ -510,7 +510,7 @@ Apakah Anda ingin memperbarui versi yang sudah Anda install?</value>
     <value>Berikan pesan untuk mengkonfirmasi ketika membuka instansi Roblox yang lain</value>
   </data>
   <data name="Menu.Behaviour.Description" xml:space="preserve">
-    <value>Atur apa yang Fishstrap lakukan saat menjalankan Roblox.</value>
+    <value>Atur apa yang BoneFish lakukan saat menjalankan Roblox.</value>
   </data>
   <data name="Menu.Behaviour.ForceRobloxReinstall.Description" xml:space="preserve">
     <value>Roblox akan di instal ulang di peluncuran berikutnya.</value>
@@ -630,10 +630,10 @@ JANGAN gunakan ini untuk mengimpor kumpulan "flag lists" yang dibuat orang lain 
     <value>File ikon</value>
   </data>
   <data name="Menu.InstallLocation.CantInstall" xml:space="preserve">
-    <value>Fishstrap tidak bisa di instal di sini. Mohon untuk memilih lokasi pemasangan yang berbeda, atau gunakan lokasi instal bawaan dengan memilih tombol Reset.</value>
+    <value>BoneFish tidak bisa di instal di sini. Mohon untuk memilih lokasi pemasangan yang berbeda, atau gunakan lokasi instal bawaan dengan memilih tombol Reset.</value>
   </data>
   <data name="Menu.InstallLocation.NotEmpty" xml:space="preserve">
-    <value>Folder yang Anda pilih untuk menginstal Fishstrap sudah ada dan TIDAK kosong. Sangat disarankan agar Fishstrap diinstal ke folder independennya sendiri.
+    <value>Folder yang Anda pilih untuk menginstal BoneFish sudah ada dan TIDAK kosong. Sangat disarankan agar BoneFish diinstal ke folder independennya sendiri.
 
 Disarankan untuk pindah ke lokasi ini:
 {0}
@@ -646,7 +646,7 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
     <value>Kamu harus memilih lokasi instalasi</value>
   </data>
   <data name="Menu.InstallLocation.NoWritePerms" xml:space="preserve">
-    <value>Fishstrap tidak mempunyai akses write ke lokasi instalasi yang anda pilih. Mohon pilih lokasi yang lain.</value>
+    <value>BoneFish tidak mempunyai akses write ke lokasi instalasi yang anda pilih. Mohon pilih lokasi yang lain.</value>
   </data>
   <data name="Menu.Integrations.ActivityTracking" xml:space="preserve">
     <value>Pelacak aktifitas</value>
@@ -697,7 +697,7 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
     <value>Jangan keluar ke aplikasi desktop</value>
   </data>
   <data name="Menu.Integrations.EnableActivityTracking.Description" xml:space="preserve">
-    <value>Izinkan Fishstrap untuk mendeteksi permainan Roblox apa yang Anda mainkan. Beberapa fitur mungkin membutuhkan ini.</value>
+    <value>Izinkan BoneFish untuk mendeteksi permainan Roblox apa yang Anda mainkan. Beberapa fitur mungkin membutuhkan ini.</value>
   </data>
   <data name="Menu.Integrations.EnableActivityTracking.Title" xml:space="preserve">
     <value>Nyalakan pelacak aktifitas</value>
@@ -788,7 +788,7 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
     <value>Setelan tersimpan!</value>
   </data>
   <data name="Menu.Title" xml:space="preserve">
-    <value>Setelan Fishstrap</value>
+    <value>Setelan BoneFish</value>
   </data>
   <data name="Dialog.LanguageSelector.Header" xml:space="preserve">
     <value>Pilih bahasa yang di inginkan</value>
@@ -818,7 +818,7 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
     <value>Interface pengguna dan layout</value>
   </data>
   <data name="Menu.FastFlags.ManagerEnabled.Title" xml:space="preserve">
-    <value>Biarkan Fishstrap untuk mengelola Fast Flags</value>
+    <value>Biarkan BoneFish untuk mengelola Fast Flags</value>
   </data>
   <data name="Menu.FastFlags.ManagerEnabled.Description" xml:space="preserve">
     <value>Menonaktifkan ini akan mencegah apapun yang dikonfigurasikan disini agar diterapkan ke Roblox.</value>
@@ -845,7 +845,7 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
     <value>Level 3 (Paling tinggi)</value>
   </data>
   <data name="Dialog.Connectivity.UnableToDownload" xml:space="preserve">
-    <value>Fishstrap gagal untuk mengunduh Roblox</value>
+    <value>BoneFish gagal untuk mengunduh Roblox</value>
   </data>
   <data name="Dialog.Connectivity.UnableToDownloadReason" xml:space="preserve">
     <value>Roblox tidak dapat diunduh pada saat ini. Tolong baca halaman bantuan berikut untuk informasi lebih lanjut: {0}</value>
@@ -866,7 +866,7 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
     <value>Entri untuk '{0}' tidak valid karena harus berupa angka</value>
   </data>
   <data name="Logger.NoWriteMode" xml:space="preserve">
-    <value>Tidak ada file log yang akan dibuat untuk peluncuran ini karena Fishstrap tidak bisa menulis file pada folder '{0}'</value>
+    <value>Tidak ada file log yang akan dibuat untuk peluncuran ini karena BoneFish tidak bisa menulis file pada folder '{0}'</value>
   </data>
   <data name="Common.Default" xml:space="preserve">
     <value>Bawaan</value>
@@ -881,7 +881,7 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
     <value>Entri untuk '{0}' tidak valid karena filter tempat tidak diformat dengan benar.</value>
   </data>
   <data name="Installer.Title" xml:space="preserve">
-    <value>Pemasang Fishstrap</value>
+    <value>Pemasang BoneFish</value>
   </data>
   <data name="Installer.Welcome.Title" xml:space="preserve">
     <value>Selamat datang</value>
@@ -900,18 +900,18 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
     <value>Lanjut</value>
   </data>
   <data name="Installer.Welcome.MainText" xml:space="preserve">
-    <value>Terima kasih telah mengunduh Fishstrap. 
+    <value>Terima kasih telah mengunduh BoneFish. 
 
-Situs resmi untuk mengunduh Fishstrap ada di {0} dan {1}, Jadi tolong diverifikasi jika Anda mendapatnya dari situs yang resmi
+Situs resmi untuk mengunduh BoneFish ada di {0} dan {1}, Jadi tolong diverifikasi jika Anda mendapatnya dari situs yang resmi
 
-Proses pemasangan akan cepat dan mudah, Anda dapat mengatur setelan Fishstrap setelah pemasangan selesai.</value>
+Proses pemasangan akan cepat dan mudah, Anda dapat mengatur setelan BoneFish setelah pemasangan selesai.</value>
     <comment>{0} and {1} are URLs</comment>
   </data>
   <data name="Installer.Welcome.NextToContinue" xml:space="preserve">
     <value>Mohon klik 'Lanjut' untuk melanjutkan.</value>
   </data>
   <data name="Installer.Welcome.UpdateNotice" xml:space="preserve">
-    <value>Anda sedang mencoba memasang Fishstrap versi {0}, tetapi versi yang terbaru adalah {1}. Apakah Anda ingin memasangnya?</value>
+    <value>Anda sedang mencoba memasang BoneFish versi {0}, tetapi versi yang terbaru adalah {1}. Apakah Anda ingin memasangnya?</value>
   </data>
   <data name="Installer.Install.Location.Title" xml:space="preserve">
     <value>Pilih lokasi instalasi</value>
@@ -932,16 +932,16 @@ Proses pemasangan akan cepat dan mudah, Anda dapat mengatur setelan Fishstrap se
     <value>Ikon Start Menu</value>
   </data>
   <data name="Installer.Completion.Text" xml:space="preserve">
-    <value>Fishstrap berhasil dipasang.
+    <value>BoneFish berhasil dipasang.
 
-Roblox belum terpasang, itu akan terjadi saat Anda menjalankannya dengan Fishstrap untuk pertama kalinya. Namun, sebelum Anda melakukannya, munkin Anda mau mengkonfigurasikan pengaturan Fishstrap terlebih dahulu.
+Roblox belum terpasang, itu akan terjadi saat Anda menjalankannya dengan BoneFish untuk pertama kalinya. Namun, sebelum Anda melakukannya, munkin Anda mau mengkonfigurasikan pengaturan BoneFish terlebih dahulu.
 
-Juga, hindari menggunakan pintasan "Roblox Player" untuk menjalankan Roblox, karena Fishstrap tidak akan berjalan dengan roblox. Jika Anda tidak melihat Fishstrap saat menjalankannya menggunakan situs web, jalankan Roblox dengan Fishstrap sekali untuk memperbaikinya
+Juga, hindari menggunakan pintasan "Roblox Player" untuk menjalankan Roblox, karena BoneFish tidak akan berjalan dengan roblox. Jika Anda tidak melihat BoneFish saat menjalankannya menggunakan situs web, jalankan Roblox dengan BoneFish sekali untuk memperbaikinya
 
 Apa yang ingin Anda lakukan?</value>
   </data>
   <data name="Installer.Completion.Settings.Title" xml:space="preserve">
-    <value>Atur setelan Fishstrap</value>
+    <value>Atur setelan BoneFish</value>
   </data>
   <data name="Installer.Completion.Settings.Description" xml:space="preserve">
     <value>Sesuaikan dengan semua fitur yang dimilikinya</value>
@@ -953,22 +953,22 @@ Apa yang ingin Anda lakukan?</value>
     <value>Akan membawa Anda ke aplikasi desktop setelah semuanya selesai</value>
   </data>
   <data name="Uninstaller.Title" xml:space="preserve">
-    <value>Hapus Fishstrap</value>
+    <value>Hapus BoneFish</value>
   </data>
   <data name="Uninstaller.Text" xml:space="preserve">
-    <value>Mencopot pemasangan akan menghapus Fishstrap dari sistem Anda, dan secara otomatis mengatur ulang peluncur Roblox bawaan jika masih terpasang.
+    <value>Mencopot pemasangan akan menghapus BoneFish dari sistem Anda, dan secara otomatis mengatur ulang peluncur Roblox bawaan jika masih terpasang.
 
 Jika Anda mencopot pemasangan atau memasang ulang karena mengalami masalah dengan Roblox, baca [halaman bantuan ini]({0}) terlebih dahulu.
 
-Proses pencopotan mungkin tidak dapat sepenuhnya membersihkan dirinya sendiri, jadi Anda mungkin perlu membersihkan sisa berkas di tempat pemasangan Fishstrap secara mandiri.
+Proses pencopotan mungkin tidak dapat sepenuhnya membersihkan dirinya sendiri, jadi Anda mungkin perlu membersihkan sisa berkas di tempat pemasangan BoneFish secara mandiri.
 
-Fishstrap terpasang di "{1}".</value>
+BoneFish terpasang di "{1}".</value>
   </data>
   <data name="Uninstaller.KeepData.Label" xml:space="preserve">
     <value>Simpan pengaturan dan mod saya</value>
   </data>
   <data name="Uninstaller.KeepData.Description" xml:space="preserve">
-    <value>File-file tersebut akan disimpan di lokasi tempat Fishstrap diinstal, dan akan secara otomatis dipulihkan saat diinstal ulang.</value>
+    <value>File-file tersebut akan disimpan di lokasi tempat BoneFish diinstal, dan akan secara otomatis dipulihkan saat diinstal ulang.</value>
   </data>
   <data name="Uninstaller.Uninstall" xml:space="preserve">
     <value>Hapus Instalasi</value>
@@ -989,19 +989,19 @@ Fishstrap terpasang di "{1}".</value>
     <value>Saat ini Anda belum menginstal runtime WebView2. Beberapa fitur Roblox tidak akan berfungsi dengan baik tanpanya, seperti aplikasi desktop. Apakah Anda ingin mengunduhnya sekarang?</value>
   </data>
   <data name="Dialog.CannotCreateShortcuts" xml:space="preserve">
-    <value>Fishstrap tidak dapat membuat pintasan untuk Desktop dan Start menu. Coba membuatnya nanti melalui pengaturan.</value>
+    <value>BoneFish tidak dapat membuat pintasan untuk Desktop dan Start menu. Coba membuatnya nanti melalui pengaturan.</value>
   </data>
   <data name="Dialog.Exception.Info.2.Alt" xml:space="preserve">
     <value>Periksa [Wiki Bloxstrap]({0}) terlebih dahulu untuk melihat apakah masalah ini telah ditangani dengan solusi.
 
-Jika tidak, harap laporkan pengecualian ini kepada pengelola fork ini. JANGAN laporkan ini ke masalah GitHub Fishstrap, karena ini adalah versi yang tidak resmi.</value>
+Jika tidak, harap laporkan pengecualian ini kepada pengelola fork ini. JANGAN laporkan ini ke masalah GitHub BoneFish, karena ini adalah versi yang tidak resmi.</value>
     <comment>"fork" in general means "a variation of" or "a different version of". You can alternatively write the first sentence as "...to the maintainers of this version."</comment>
   </data>
   <data name="Installer.Install.Shortcuts.Description" xml:space="preserve">
     <value>Ini adalah pintasan umum yang memunculkan banyak pilihan menu peluncuran. Pintasan untuk fungsi khusus dapat dibuat nanti di pengaturan.</value>
   </data>
   <data name="Menu.Shortcuts.Description" xml:space="preserve">
-    <value>Atur bagaimana Fishstrap telah siap untuk diluncurkan.</value>
+    <value>Atur bagaimana BoneFish telah siap untuk diluncurkan.</value>
   </data>
   <data name="Menu.Shortcuts.General.Title" xml:space="preserve">
     <value>Umum</value>
@@ -1041,7 +1041,7 @@ Jika tidak, harap laporkan pengecualian ini kepada pengelola fork ini. JANGAN la
     <value>Anda memiliki perubahan yang belum disimpan. Apakah Anda yakin ingin menutup tanpa menyimpan?</value>
   </data>
   <data name="InstallChecker.VersionLessThanInstalled" xml:space="preserve">
-    <value>Versi Fishstrap yang kamu jalankan adalah versi lama dari versi yang Anda sudah pasang.
+    <value>Versi BoneFish yang kamu jalankan adalah versi lama dari versi yang Anda sudah pasang.
 Masalah mungkin terjadi dan pengaturan Anda mungkin dapat berubah. Melakukan pemasangan ulang direkomendasikan.
 Apakah Anda yakin untuk melanjutkan?</value>
   </data>
@@ -1054,7 +1054,7 @@ Apakah Anda yakin untuk melanjutkan?</value>
   <data name="Dialog.PlayerError.HelpInformation" xml:space="preserve">
     <value>Untuk informasi lebih lanjut mengapa ini dapat terjadi dan cara memperbaikinya, silakan baca [artikel bantuan ini]({0}).
 
-Periksa jika Roblox bekerja dengan [peluncur aslinya]({1}). Jika tidak, berarti bukan masalah Fishstrap. Jika ya, rujuklah pada artikel bantuan.</value>
+Periksa jika Roblox bekerja dengan [peluncur aslinya]({1}). Jika tidak, berarti bukan masalah BoneFish. Jika ya, rujuklah pada artikel bantuan.</value>
   </data>
   <data name="Common.NetworkError" xml:space="preserve">
     <value>Tidak dapat memuat data karena suatu masalah koneksi.</value>
@@ -1066,7 +1066,7 @@ Periksa jika Roblox bekerja dengan [peluncur aslinya]({1}). Jika tidak, berarti 
     <value>Pendukung</value>
   </data>
   <data name="About.Supporters.Description" xml:space="preserve">
-    <value>Mereka merupakan orang-orang yang telah mendukung Fishstrap melalui Ko-fi. Terima kasih sebesar-besarnya kepada semua orang di sini! Setiap orang di sini diberi peringkat berdasarkan pemberiannya.</value>
+    <value>Mereka merupakan orang-orang yang telah mendukung BoneFish melalui Ko-fi. Terima kasih sebesar-besarnya kepada semua orang di sini! Setiap orang di sini diberi peringkat berdasarkan pemberiannya.</value>
   </data>
   <data name="JsonManager.SettingsLoadFailed" xml:space="preserve">
     <value>Pengaturan Anda tidak dapat dimuat. Mereka telah diatur ulang ke setelan bawaan.</value>
@@ -1096,12 +1096,12 @@ Periksa jika Roblox bekerja dengan [peluncur aslinya]({1}). Jika tidak, berarti 
     <value>Pada peluncuran ini, Roblox tidak akan diperiksa untuk pembaruan, dan perubahan pada modifikasi tidak akan diterapkan.</value>
   </data>
   <data name="Dialog.Connectivity.RobloxUpgradeNeeded" xml:space="preserve">
-    <value>Karena Roblox perlu dipasang atau diperbarui, Fishstrap tidak dapat dilanjutkan.</value>
+    <value>Karena Roblox perlu dipasang atau diperbarui, BoneFish tidak dapat dilanjutkan.</value>
   </data>
   <data name="Installer.Install.CannotOverwrite" xml:space="preserve">
-    <value>Fishstrap sudah pernah dipasang di lokasi ini sebelumnya dan masih ada, tetapi instalasi tidak dapat menulis ulang aplikasi yang lama.
+    <value>BoneFish sudah pernah dipasang di lokasi ini sebelumnya dan masih ada, tetapi instalasi tidak dapat menulis ulang aplikasi yang lama.
 
-Tolong hapus Fishstrap.exe secara manual dari lokasi pemasangan atau coba untuk menyalakan ulang sistem anda, dan coba untuk menjalankan instalasi lagi.</value>
+Tolong hapus BoneFish.exe secara manual dari lokasi pemasangan atau coba untuk menyalakan ulang sistem anda, dan coba untuk menjalankan instalasi lagi.</value>
   </data>
   <data name="Common.NotAvailable" xml:space="preserve">
     <value>Tidak tersedia</value>
@@ -1113,7 +1113,7 @@ Tolong hapus Fishstrap.exe secara manual dari lokasi pemasangan atau coba untuk 
     <value>Atur parameter aplikasi seperti sifat penskalaan DPI dan [optimasi layar penuh]({0}).</value>
   </data>
   <data name="Common.RobloxNotInstalled" xml:space="preserve">
-    <value>Roblox belum dipasang. Tolong jalankan Roblox menggunakan Fishstrap setidaknya sekali sebelum mencoba menggunakan opsi ini.</value>
+    <value>Roblox belum dipasang. Tolong jalankan Roblox menggunakan BoneFish setidaknya sekali sebelum mencoba menggunakan opsi ini.</value>
   </data>
   <data name="Installer.ShouldCancel" xml:space="preserve">
     <value>Apakah Anda yakin ingin membatalkan pemasangan?</value>
@@ -1131,10 +1131,10 @@ Tolong hapus Fishstrap.exe secara manual dari lokasi pemasangan atau coba untuk 
     <value>Ekstrak ikon Roblox ke direktori</value>
   </data>
   <data name="Menu.Shortcuts.ExtractIcons.Description" xml:space="preserve">
-    <value>Memungkinkan Anda untuk menggunakan jangkauan Fishstrap dari simbol Roblox untuk pintasan Anda. [Lihat caranya.]({0})</value>
+    <value>Memungkinkan Anda untuk menggunakan jangkauan BoneFish dari simbol Roblox untuk pintasan Anda. [Lihat caranya.]({0})</value>
   </data>
   <data name="Dialog.RegistryWriteError" xml:space="preserve">
-    <value>Fishstrap gagal menulis ke Registry Windows. Kemungkinan ada antivirus yang menghalangi dan menyebabkan masalah. Mohon dilihat jika ada yang mengganggu operasi Fishstrap.</value>
+    <value>BoneFish gagal menulis ke Registry Windows. Kemungkinan ada antivirus yang menghalangi dan menyebabkan masalah. Mohon dilihat jika ada yang mengganggu operasi BoneFish.</value>
   </data>
   <data name="About.Supporters.Monthly" xml:space="preserve">
     <value>Per bulan</value>
@@ -1163,7 +1163,7 @@ Saat diaktifkan, Roblox akan secara otomatis dijalankan setelah menutup Pengatur
 Apakah Anda ingin mengaktifkan mode uji coba?</value>
   </data>
   <data name="About.Translators.Description" xml:space="preserve">
-    <value>Semua translasi Fishstrap bersumber dari banyak orang menggunakan [Crowdin]({0}). Semua yang ditulis disini adalah orang yang suka rela menawarkan waktu mereka dan upaya untuk membantu melokalkan Fishstrap. Terima kasih sebesar-besarnya untuk semuanya disini!</value>
+    <value>Semua translasi BoneFish bersumber dari banyak orang menggunakan [Crowdin]({0}). Semua yang ditulis disini adalah orang yang suka rela menawarkan waktu mereka dan upaya untuk membantu melokalkan BoneFish. Terima kasih sebesar-besarnya untuk semuanya disini!</value>
   </data>
   <data name="Common.Navigation.Install" xml:space="preserve">
     <value>Pasang</value>
@@ -1183,7 +1183,7 @@ Apakah Anda ingin mengaktifkan mode uji coba?</value>
     <value>Kustom</value>
   </data>
   <data name="Bootstrapper.FilesInUse" xml:space="preserve">
-    <value>Fishstrap mencoba meningkatkan Roblox tetapi tidak bisa karena berkas Roblox masih digunakan.
+    <value>BoneFish mencoba meningkatkan Roblox tetapi tidak bisa karena berkas Roblox masih digunakan.
 
 Silakan tutup aplikasi apa pun yang dapat menggunakan berkas Roblox, lalu luncurkan ulang.</value>
     <comment>This is *not* for when Roblox is still running when trying to upgrade. This applies to files being open (i.e. image assets)</comment>
@@ -1194,35 +1194,35 @@ Silakan tutup aplikasi apa pun yang dapat menggunakan berkas Roblox, lalu luncur
   </data>
   <data name="Common.Export" xml:space="preserve">
     <value>Ekspor</value>
-    <comment>Currently used under the "Fishstrap" settings tab for the button to export diagnostic data</comment>
+    <comment>Currently used under the "BoneFish" settings tab for the button to export diagnostic data</comment>
   </data>
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>Roblox tidak lagi mendukung Windows 7 atau 8,1. Untuk terus memainkan Roblox, harap perbarui ke Windows 10 atau yang lebih baru.</value>
   </data>
   <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>Mengunduh versi Fishstrap terbaru...</value>
+    <value>Mengunduh versi BoneFish terbaru...</value>
   </data>
-  <data name="Menu.Fishstrap.Description" xml:space="preserve">
-    <value>Atur opsi yang terkait dengan perilaku Fishstrap itu sendiri.</value>
+  <data name="Menu.BoneFish.Description" xml:space="preserve">
+    <value>Atur opsi yang terkait dengan perilaku BoneFish itu sendiri.</value>
   </data>
-  <data name="Menu.Fishstrap.Analytics.Title" xml:space="preserve">
+  <data name="Menu.BoneFish.Analytics.Title" xml:space="preserve">
     <value>Aktifkan pengiriman analisa</value>
   </data>
-  <data name="Menu.Fishstrap.Analytics.Description" xml:space="preserve">
+  <data name="Menu.BoneFish.Analytics.Description" xml:space="preserve">
     <value>Ini anonim dan tidak digunakan untuk hal yang jahat, janji. Untuk wawasan tentang apa yang kami kumpulkan dan mengapa, lihat [kebijakan privasi]({0}).</value>
   </data>
-  <data name="Menu.Fishstrap.ExportData.Title" xml:space="preserve">
+  <data name="Menu.BoneFish.ExportData.Title" xml:space="preserve">
     <value>Ekspor data diagnostik</value>
   </data>
-  <data name="Menu.Fishstrap.ExportData.Description" xml:space="preserve">
+  <data name="Menu.BoneFish.ExportData.Description" xml:space="preserve">
     <value>Kumpulkan informasi yang bisa dikirim online untuk pemecahan masalah yang anda miliki.</value>
   </data>
-  <data name="Menu.Fishstrap.ExportData.ExportConfig" xml:space="preserve">
-    <value>Konfigurasi Fishstrap</value>
+  <data name="Menu.BoneFish.ExportData.ExportConfig" xml:space="preserve">
+    <value>Konfigurasi BoneFish</value>
     <comment>Label that appears next to a checkbox</comment>
   </data>
-  <data name="Menu.Fishstrap.ExportData.ExportLogs" xml:space="preserve">
-    <value>Semua log Fishstrap</value>
+  <data name="Menu.BoneFish.ExportData.ExportLogs" xml:space="preserve">
+    <value>Semua log BoneFish</value>
     <comment>Label that appears next to a checkbox</comment>
   </data>
   <data name="Enums.CustomThemeTemplate.Blank" xml:space="preserve">
@@ -1449,7 +1449,7 @@ Beralih ke {1}.</value>
     <value>Ubah</value>
   </data>
   <data name="About.Title" xml:space="preserve">
-    <value>Tentang Fishstrap</value>
+    <value>Tentang BoneFish</value>
   </data>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
   <data name="Enums.BootstrapperStyle.TwentyFiveDialog" type="System.Resources.ResXNullRef, System.Windows.Forms">
@@ -1480,7 +1480,7 @@ Beralih ke {1}.</value>
     <value>Batas framerate</value>
   </data>
   <data name="Menu.FastFlags.Presets.HideGuis.Description" xml:space="preserve">
-    <value>Di aktifkan lewat [shortcut keyboard]({0}). Hanya berfungsi jika Anda ada di [grup Fishstrap]({1}).</value>
+    <value>Di aktifkan lewat [shortcut keyboard]({0}). Hanya berfungsi jika Anda ada di [grup BoneFish]({1}).</value>
   </data>
   <data name="Menu.FastFlags.Presets.HideGuis.Title" xml:space="preserve">
     <value>Nyalakan kemampuan untuk menyembunyikan GUI</value>
