@@ -1,5 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 using Microsoft.Win32;
 
@@ -16,6 +18,34 @@ namespace Bloxstrap.UI.ViewModels.Settings
 {
     public class ModsViewModel : NotifyPropertyChangedViewModel
     {
+        private ImageSource? _backgroundPreview;
+        private ImageSource? _loadingScreenPreview;
+
+        public ImageSource? BackgroundPreview
+        {
+            get => _backgroundPreview;
+            set
+            {
+                _backgroundPreview = value;
+                OnPropertyChanged(nameof(BackgroundPreview));
+                OnPropertyChanged(nameof(BackgroundPreviewVisibility));
+            }
+        }
+
+        public ImageSource? LoadingScreenPreview
+        {
+            get => _loadingScreenPreview;
+            set
+            {
+                _loadingScreenPreview = value;
+                OnPropertyChanged(nameof(LoadingScreenPreview));
+                OnPropertyChanged(nameof(LoadingScreenPreviewVisibility));
+            }
+        }
+
+        public Visibility BackgroundPreviewVisibility => BackgroundPreview != null ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility LoadingScreenPreviewVisibility => LoadingScreenPreview != null ? Visibility.Visible : Visibility.Collapsed;
+
         private void OpenModsFolder() => Process.Start("explorer.exe", Paths.Modifications);
 
         private readonly Dictionary<string, byte[]> FontHeaders = new()
@@ -70,6 +100,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (!String.IsNullOrEmpty(BackgroundTask.NewState))
             {
                 BackgroundTask.NewState = "";
+                BackgroundPreview = null;
             }
             else
             {
@@ -85,6 +116,17 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 {
                     using var img = System.Drawing.Image.FromFile(dialog.FileName);
                     BackgroundTask.NewState = dialog.FileName;
+                    
+                    // Load preview image
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(dialog.FileName);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.DecodePixelWidth = 400; // Resize untuk preview
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    
+                    BackgroundPreview = bitmap;
                 }
                 catch
                 {
@@ -102,6 +144,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (!String.IsNullOrEmpty(LoadingScreenTask.NewState))
             {
                 LoadingScreenTask.NewState = "";
+                LoadingScreenPreview = null;
             }
             else
             {
@@ -117,6 +160,17 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 {
                     using var img = System.Drawing.Image.FromFile(dialog.FileName);
                     LoadingScreenTask.NewState = dialog.FileName;
+                    
+                    // Load preview image
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(dialog.FileName);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.DecodePixelWidth = 400; // Resize untuk preview
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    
+                    LoadingScreenPreview = bitmap;
                 }
                 catch
                 {

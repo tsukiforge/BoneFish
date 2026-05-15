@@ -11,8 +11,22 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
     {
         public AppearancePage()
         {
-            DataContext = new AppearanceViewModel(this);
+            var viewModel = new AppearanceViewModel(this);
+            
+            // Subscribe ke event untuk update icon di title bar
+            viewModel.IconChangedEvent += (sender, e) => UpdateMainWindowIcon();
+            
+            DataContext = viewModel;
             InitializeComponent();
+        }
+
+        private void UpdateMainWindowIcon()
+        {
+            var mainWindow = System.Windows.Window.GetWindow(this) as MainWindow;
+            if (mainWindow != null)
+            {
+                mainWindow.RootTitleBar.Icon = App.Settings.Prop.BootstrapperIcon.GetImageSource();
+            }
         }
 
         public void CustomThemeSelection(object sender, SelectionChangedEventArgs e)

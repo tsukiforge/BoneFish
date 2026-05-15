@@ -17,6 +17,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
     {
         private readonly Page _page;
 
+        public event EventHandler? IconChangedEvent;
+
         public ICommand PreviewBootstrapperCommand => new RelayCommand(PreviewBootstrapper);
         public ICommand BrowseCustomIconLocationCommand => new RelayCommand(BrowseCustomIconLocation);
         public ICommand BrowseCustomRobloxIconLocationCommand => new RelayCommand(BrowseCustomRobloxIconLocation);
@@ -152,6 +154,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
                 App.Settings.Prop.RobloxIconCustomLocation = value;
 
+                // Clear cache dan refresh ImageSource
+                RobloxIconEx.ClearCache(RobloxIcon.IconCustom);
+                
+                // Refresh semua icon entries
+                foreach (var entry in RobloxIcons)
+                {
+                    if (entry.IconType == RobloxIcon.IconCustom)
+                        entry.RefreshImageSource();
+                }
+
                 OnPropertyChanged(nameof(RobloxIcon));
                 OnPropertyChanged(nameof(RobloxIcons));
             }
@@ -186,8 +198,21 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
                 App.Settings.Prop.BootstrapperIconCustomLocation = value;
 
+                // Clear cache dan refresh ImageSource
+                BootstrapperIconEx.ClearCache(BootstrapperIcon.IconCustom);
+                
+                // Refresh semua icon entries
+                foreach (var entry in Icons)
+                {
+                    if (entry.IconType == BootstrapperIcon.IconCustom)
+                        entry.RefreshImageSource();
+                }
+
                 OnPropertyChanged(nameof(Icon));
                 OnPropertyChanged(nameof(Icons));
+                
+                // Notify icon changed untuk update title bar
+                IconChangedEvent?.Invoke(this, EventArgs.Empty);
             }
         }
 
