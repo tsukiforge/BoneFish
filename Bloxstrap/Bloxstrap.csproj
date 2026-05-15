@@ -6,18 +6,18 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
-    <ApplicationIcon>BoneFish.ico</ApplicationIcon>
-    <Version>3.0.8</Version>
-    <FileVersion>3.0.8</FileVersion>
+    <ApplicationIcon>Bloxstrap.ico</ApplicationIcon>
+    <Version>3.0.9</Version>
+    <FileVersion>3.0.9</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-	 <AssemblyName>BoneFish</AssemblyName>
-    <Product>BoneFish</Product>
+	<AssemblyName>Bloxstrap</AssemblyName>
+    <Product>$(AssemblyName)</Product>
     <RootNamespace>Bloxstrap</RootNamespace>
   </PropertyGroup>
-
-<ItemGroup>
+    
+  <ItemGroup>
     <Resource Include="Bloxstrap.ico" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\PlayerLogo.png" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Roblox.png" />
@@ -47,7 +47,7 @@
     <EmbeddedResource Include="Resources\Icon2017.ico" />
     <EmbeddedResource Include="Resources\Icon2019.ico" />
     <EmbeddedResource Include="Resources\Icon2022.ico" />
-	<EmbeddedResource Include="Resources\IconFishstrap.ico" />
+	 <EmbeddedResource Include="Resources\IconFishstrap.ico" />
     <EmbeddedResource Include="Resources\IconEarly2015.ico" />
     <EmbeddedResource Include="Resources\IconLate2015.ico" />
     <EmbeddedResource Include="Resources\Mods\Cursor\From2006\ArrowCursor.png" />
