@@ -26,11 +26,15 @@ jobs:
     - name: Publish
       run: dotnet publish -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:CommitHash=${{ github.sha }} -p:CommitRef=${{ github.ref_type }}/${{ github.ref_name }} -r win-x64 -c Release --self-contained false .\Bloxstrap\Bloxstrap.csproj
 
+    - name: Rename output
+      run: ren .\Bloxstrap\bin\Release\net6.0-windows\win-x64\publish\Fishstrap.exe BoneFish.exe
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: BoneFish-Release
         path: .\Bloxstrap\bin\Release\net6.0-windows\win-x64\publish\BoneFish.exe
+        if-no-files-found: error
 
   release:
     needs: build
