@@ -15,6 +15,7 @@
     <AssemblyName>BoneFish</AssemblyName>
     <Product>$(AssemblyName)</Product>
     <RootNamespace>Bloxstrap</RootNamespace>
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>
