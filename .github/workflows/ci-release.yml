@@ -6,7 +6,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v4
       with:
         submodules: 'true'
     
@@ -26,11 +26,8 @@ jobs:
     - name: Publish
       run: dotnet publish -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:CommitHash=${{ github.sha }} -p:CommitRef=${{ github.ref_type }}/${{ github.ref_name }} -r win-x64 -c Release --self-contained false .\Bloxstrap\Bloxstrap.csproj
 
-    - name: Rename output
-      run: ren .\Bloxstrap\bin\Release\net6.0-windows\win-x64\publish\Fishstrap.exe BoneFish.exe
-
     - name: Upload Artifact
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
         name: BoneFish-Release
         path: .\Bloxstrap\bin\Release\net6.0-windows\win-x64\publish\BoneFish.exe
@@ -45,7 +42,7 @@ jobs:
 
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: BoneFish-Release
           path: release
@@ -70,7 +67,7 @@ jobs:
 
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: BoneFish-Release
           path: release
@@ -95,7 +92,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -106,7 +103,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Download artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: BoneFish-Release
           path: release
