@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -95,12 +95,35 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand ManageCustomFontCommand => new RelayCommand(ManageCustomFont);
 
+        public ModsViewModel()
+        {
+            // Restore custom background from settings if it exists
+            if (!String.IsNullOrEmpty(App.Settings.Prop.CustomBackgroundPath) && File.Exists(App.Settings.Prop.CustomBackgroundPath))
+            {
+                BackgroundTask.NewState = App.Settings.Prop.CustomBackgroundPath;
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(App.Settings.Prop.CustomBackgroundPath);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.DecodePixelWidth = 400;
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    
+                    BackgroundPreview = bitmap;
+                }
+                catch { }
+            }
+        }
+
         private void ManageCustomBackground()
         {
             if (!String.IsNullOrEmpty(BackgroundTask.NewState))
             {
                 BackgroundTask.NewState = "";
                 BackgroundPreview = null;
+                App.Settings.Prop.CustomBackgroundPath = "";
             }
             else
             {
@@ -116,6 +139,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 {
                     using var img = System.Drawing.Image.FromFile(dialog.FileName);
                     BackgroundTask.NewState = dialog.FileName;
+                    App.Settings.Prop.CustomBackgroundPath = dialog.FileName;
                     
                     // Load preview image
                     var bitmap = new BitmapImage();

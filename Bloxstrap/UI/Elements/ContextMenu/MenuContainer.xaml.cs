@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 
@@ -145,6 +145,12 @@ namespace Bloxstrap.UI.Elements.ContextMenu
                 _gameHistoryWindow.ShowDialog();
             else
                 _gameHistoryWindow.Activate();
+        }
+
+        private void ExitBoneFishMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            _watcher.SystemTrayExitSignal.TrySetResult(true);
+            App.Terminate();
         }
     }
 }

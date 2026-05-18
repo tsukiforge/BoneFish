@@ -7,8 +7,8 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
     <ApplicationIcon>BoneFish.ico</ApplicationIcon>
-    <Version>3.0.9</Version>
-    <FileVersion>3.0.9</FileVersion>
+    <Version>3.1.0</Version>
+    <FileVersion>3.1.0</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
@@ -105,7 +105,8 @@
 
   <Target Name="FixMds" BeforeTargets="CoreCompile" Condition="'@(ProjectionMetadataWinmd)'==''">
     <ItemGroup>
-      <ProjectionMetadataWinmd Include="$(UserProfile)\.nuget\packages\microsoft.windows.sdk.win32metadata\55.0.45-preview\Windows.Win32.winmd" />
+      <ProjectionMetadataWinmd
+        Include="$(UserProfile)\.nuget\packages\microsoft.windows.sdk.win32metadata\55.0.45-preview\Windows.Win32.winmd" />
     </ItemGroup>
   </Target>
 
