@@ -1,4 +1,4 @@
-﻿using Bloxstrap.AppData;
+using Bloxstrap.AppData;
 using Bloxstrap.Integrations;
 
 namespace Bloxstrap
@@ -111,6 +111,8 @@ namespace Bloxstrap
             }
         }
 
+        public readonly TaskCompletionSource<bool> SystemTrayExitSignal = new();
+
         public async Task Run()
         {
             if (!_lock.IsAcquired || _watcherData is null)
@@ -124,6 +126,14 @@ namespace Bloxstrap
 
             while (Utilities.GetProcessesSafe().Any(x => x.Id == _watcherData.ProcessId))
                 await Task.Delay(1000);
+
+            // Jika system tray mode aktif, jangan langsung exit
+            if (App.Settings.Prop.EnableSystemTrayOnClose)
+            {
+                _notifyIcon?.ShowAlert("BoneFish", "Roblox telah ditutup. BoneFish masih berjalan di system tray.", 5, null);
+                // Menunggu sampai user klik Exit dari context menu
+                await SystemTrayExitSignal.Task;
+            }
 
             if (_watcherData.AutoclosePids is not null)
             {

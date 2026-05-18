@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 
 namespace Bloxstrap.Models.Persistable
 {
@@ -52,5 +52,14 @@ namespace Bloxstrap.Models.Persistable
 
         // mod preset configuration
         public bool UseDisableAppPatch { get; set; } = false;
+
+        // experimental features
+        public bool EnableSystemTrayOnClose { get; set; } = false;
+
+        // performance preset
+        public string SelectedPerformancePreset { get; set; } = "None";
+
+        // custom background
+        public string CustomBackgroundPath { get; set; } = "";
     }
 }

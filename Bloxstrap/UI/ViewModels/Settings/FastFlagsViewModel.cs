@@ -1,4 +1,4 @@
-﻿using System.Windows.Input;
+using System.Windows.Input;
 
 using CommunityToolkit.Mvvm.Input;
 
@@ -184,6 +184,25 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        public string SelectedPreset
+        {
+            get => App.Settings.Prop.SelectedPerformancePreset;
+            set
+            {
+                App.Settings.Prop.SelectedPerformancePreset = value;
+                OnPropertyChanged(nameof(SelectedPreset));
+                OnPropertyChanged(nameof(IsUltraLowActive));
+                OnPropertyChanged(nameof(IsBalancedActive));
+                OnPropertyChanged(nameof(IsStableActive));
+                OnPropertyChanged(nameof(IsAutoOptimizeActive));
+            }
+        }
+
+        public bool IsUltraLowActive => SelectedPreset == "UltraLow";
+        public bool IsBalancedActive => SelectedPreset == "Balanced";
+        public bool IsStableActive => SelectedPreset == "Stable";
+        public bool IsAutoOptimizeActive => SelectedPreset == "AutoOptimize";
+
         private void ApplyRecommendedFastFlags()
         {
             UseFastFlagManager = true;
@@ -196,6 +215,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             FRMQualityOverrideEnabled = true;
             FRMQualityOverride = 21;
 
+            SelectedPreset = "AutoOptimize";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
             Notify("Auto-optimize FastFlags telah diterapkan.");
         }
@@ -204,8 +224,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
         {
             App.Settings.Prop.EnableBetterMatchmaking = true;
             App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
+
+            // DNS/No Delay Network Flags
+            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
+            App.FastFlags.SetValue("DFIntMaxReceivePPS", "50000");
+            App.FastFlags.SetValue("DFIntMaxSendPPS", "50000");
+            App.FastFlags.SetValue("DFIntConnectionMTUSize", "1500");
+            App.FastFlags.SetValue("DFIntOptimizeSendQueue", "1");
+
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-            Notify("Auto-optimize jaringan telah diterapkan.");
+            Notify("Auto-optimize jaringan & No Delay telah diterapkan.");
         }
 
         private void ApplyRecommendedStabilityPreset()
@@ -216,6 +244,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
 
+            SelectedPreset = "Stable";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
             Notify("Preset stabil untuk low-spec telah diterapkan.");
         }
@@ -230,7 +259,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             MeshQualityEnabled = true;
             MeshQuality = 0;
             FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 2;  // Sangat rendah untuk ultra low-spec
+            FRMQualityOverride = 1;  // Minimum rendering quality
             
             // Ultra low lighting
             App.FastFlags.SetPreset("Rendering.LightingMode", "Default");
@@ -238,12 +267,19 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetPreset("Rendering.DisableLighting", "False");
             App.FastFlags.SetPreset("Terrain.GridV2", "False");
 
+            // Anti-crash memory optimizations
+            App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
+            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "1");
+            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
+            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
+
             ApplyRecommendedNetworkSettings();
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
 
+            SelectedPreset = "UltraLow";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-            Notify("Ultra low-spec preset untuk rendering sangat ringan telah diterapkan.");
+            Notify("Ultra low-spec preset untuk PC spek kentang telah diterapkan.");
         }
 
         private void ApplyBalancedPreset()
@@ -258,14 +294,15 @@ namespace Bloxstrap.UI.ViewModels.Settings
             FRMQualityOverrideEnabled = true;
             FRMQualityOverride = 15;
 
-            // Balanced lighting - lebih bagus tapi masih ringan
+            // Balanced lighting
             App.FastFlags.SetPreset("Rendering.LightingMode", "Default");
             App.FastFlags.SetPreset("Terrain.GridV2", "False");
 
             ApplyRecommendedNetworkSettings();
 
+            SelectedPreset = "Balanced";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-            Notify("Preset seimbang dengan kualitas visual dan performa yang baik telah diterapkan.");
+            Notify("Preset seimbang telah diterapkan.");
         }
     }
 }
