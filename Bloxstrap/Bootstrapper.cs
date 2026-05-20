@@ -663,6 +663,9 @@ namespace Bloxstrap
             if (datacenters == null || !datacenters.Any())
                 throw new HttpRequestException("No datacenters in response.");
 
+            if (string.IsNullOrEmpty(ipinfo.Loc) || !ipinfo.Loc.Contains(','))
+                throw new HttpRequestException("Location coordinate is blank or invalid.");
+
             string[] location = ipinfo.Loc.Split(",");
             double lat1 = double.Parse(location[0], CultureInfo.InvariantCulture);
             double lon1 = double.Parse(location[1], CultureInfo.InvariantCulture);

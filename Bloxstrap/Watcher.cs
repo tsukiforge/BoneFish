@@ -7,6 +7,8 @@ namespace Bloxstrap
     {
         private readonly InterProcessLock _lock = new("Watcher");
 
+        private readonly System.Threading.EventWaitHandle _exitEvent = new(false, System.Threading.EventResetMode.AutoReset, "BoneFish-WatcherExitEvent");
+
         private readonly WatcherData? _watcherData;
         
         private readonly NotifyIconWrapper? _notifyIcon;
@@ -24,7 +26,31 @@ namespace Bloxstrap
 
             if (!_lock.IsAcquired)
             {
-                App.Logger.WriteLine(LOG_IDENT, "Watcher instance already exists");
+                App.Logger.WriteLine(LOG_IDENT, "Watcher instance already exists, signaling it to exit...");
+                try
+                {
+                    _exitEvent.Set();
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteException(LOG_IDENT, ex);
+                }
+
+                if (_lock.RetryAcquire(TimeSpan.FromSeconds(2)))
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Successfully took over Watcher lock.");
+                }
+                else
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Failed to acquire Watcher lock after signal. Force closing other instances...");
+                    Utilities.KillProcessesRunningFrom(Paths.Process);
+                    _lock.RetryAcquire(TimeSpan.FromSeconds(1));
+                }
+            }
+
+            if (!_lock.IsAcquired)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Watcher instance still exists, aborting watcher startup.");
                 return;
             }
 
@@ -131,8 +157,21 @@ namespace Bloxstrap
             if (App.Settings.Prop.EnableSystemTrayOnClose)
             {
                 _notifyIcon?.ShowAlert("BoneFish", "Roblox telah ditutup. BoneFish masih berjalan di system tray.", 5, null);
-                // Menunggu sampai user klik Exit dari context menu
-                await SystemTrayExitSignal.Task;
+                // Menunggu sampai user klik Exit dari context menu ATAU ada watcher baru yang menyuruh kita exit
+                var exitSignalTask = SystemTrayExitSignal.Task;
+                var externalExitTask = Task.Run(() => {
+                    try
+                    {
+                        _exitEvent.WaitOne();
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+
+                await Task.WhenAny(exitSignalTask, externalExitTask);
             }
 
             if (_watcherData.AutoclosePids is not null)
@@ -153,6 +192,15 @@ namespace Bloxstrap
             RichPresence?.Dispose();
 
             App.State.Prop.WatcherRunning = false;
+
+            try
+            {
+                _exitEvent.Dispose();
+            }
+            catch (Exception)
+            {
+                // Ignore disposal exceptions
+            }
 
             GC.SuppressFinalize(this);
         }

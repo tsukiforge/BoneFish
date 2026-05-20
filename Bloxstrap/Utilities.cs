@@ -1,4 +1,4 @@
-﻿using Bloxstrap.AppData;
+using Bloxstrap.AppData;
 using System.ComponentModel;
 
 namespace Bloxstrap
@@ -160,6 +160,41 @@ namespace Bloxstrap
         {
             using EventWaitHandle handle = new EventWaitHandle(false, EventResetMode.AutoReset, "Bloxstrap-BackgroundUpdaterKillEvent");
             handle.Set();
+        }
+
+        public static void KillProcessesRunningFrom(string filePath)
+        {
+            const string LOG_IDENT = "Utilities::KillProcessesRunningFrom";
+            int currentPid = Environment.ProcessId;
+            string targetPath = Path.GetFullPath(filePath);
+            string processName = Path.GetFileNameWithoutExtension(filePath);
+
+            foreach (var process in GetProcessesSafe())
+            {
+                try
+                {
+                    if (process.Id == currentPid)
+                        continue;
+
+                    if (!string.Equals(process.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string? processPath = process.MainModule?.FileName;
+                    if (string.IsNullOrEmpty(processPath))
+                        continue;
+
+                    if (string.Equals(Path.GetFullPath(processPath), targetPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, $"Killing locking process '{process.ProcessName}' (pid={process.Id}) running from {processPath}");
+                        process.Kill();
+                        process.WaitForExit(2000);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Access denied or process exited, ignore
+                }
+            }
         }
     }
 }

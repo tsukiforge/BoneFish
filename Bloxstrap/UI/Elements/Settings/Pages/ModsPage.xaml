@@ -97,6 +97,8 @@
             </StackPanel>
         </controls:OptionControl>
 
+        <TextBlock Text="Kustomisasi Gambar" FontSize="20" FontWeight="Medium" Margin="0,16,0,0" />
+
         <controls:OptionControl 
             Header="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Title}" 
             Description="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Description}">

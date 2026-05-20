@@ -184,6 +184,44 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        public bool DisableRobloxAnimations
+        {
+            get => App.FastFlags.GetValue("FFlagRenderUIAnimations") == "False";
+            set
+            {
+                if (value)
+                {
+                    App.FastFlags.SetValue("FFlagRenderUIAnimations", "False");
+                    App.FastFlags.SetValue("FFlagRenderMenuTransitions", "False");
+                    App.FastFlags.SetValue("FFlagRenderInventoryEffects", "False");
+                }
+                else
+                {
+                    App.FastFlags.SetValue("FFlagRenderUIAnimations", null);
+                    App.FastFlags.SetValue("FFlagRenderMenuTransitions", null);
+                    App.FastFlags.SetValue("FFlagRenderInventoryEffects", null);
+                }
+                OnPropertyChanged(nameof(DisableRobloxAnimations));
+            }
+        }
+
+        public bool EnableLowMemoryMode
+        {
+            get => App.FastFlags.GetValue("FFlagLuaAppEnableLowMemoryMode") == "True";
+            set
+            {
+                if (value)
+                {
+                    App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", "True");
+                }
+                else
+                {
+                    App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", null);
+                }
+                OnPropertyChanged(nameof(EnableLowMemoryMode));
+            }
+        }
+
         public string SelectedPreset
         {
             get => App.Settings.Prop.SelectedPerformancePreset;
@@ -214,6 +252,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
             MeshQuality = 0;
             FRMQualityOverrideEnabled = true;
             FRMQualityOverride = 21;
+            DisableRobloxAnimations = true;
+            EnableLowMemoryMode = true;
 
             SelectedPreset = "AutoOptimize";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
@@ -272,6 +312,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "1");
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
             App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
+
+            DisableRobloxAnimations = true;
+            EnableLowMemoryMode = true;
 
             ApplyRecommendedNetworkSettings();
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
