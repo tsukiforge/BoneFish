@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -26,6 +26,23 @@ namespace Bloxstrap.Utility
             {
                 IsAcquired = true;
             }
+        }
+
+        public bool RetryAcquire(TimeSpan timeout)
+        {
+            if (IsAcquired)
+                return true;
+
+            try
+            {
+                IsAcquired = Mutex.WaitOne(timeout);
+            }
+            catch (AbandonedMutexException)
+            {
+                IsAcquired = true;
+            }
+
+            return IsAcquired;
         }
 
         public void Dispose()

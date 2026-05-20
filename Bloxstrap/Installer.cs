@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Xml.Linq;
 using Bloxstrap.AppData;
@@ -450,8 +450,18 @@ namespace Bloxstrap
             {
                 if (!ipl.IsAcquired)
                 {
-                    App.Logger.WriteLine(LOG_IDENT, "Failed to update! (Could not obtain singleton mutex)");
-                    return;
+                    App.Logger.WriteLine(LOG_IDENT, "Failed to obtain AutoUpdater mutex, trying to kill locking processes...");
+                    Utilities.KillProcessesRunningFrom(Paths.Application);
+                    
+                    if (!ipl.RetryAcquire(TimeSpan.FromSeconds(3)))
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, "Failed to update! (Could not obtain singleton mutex)");
+                        Frontend.ShowMessageBox(
+                            "BoneFish failed to update because another instance of the application is running and could not be closed. Please close any background BoneFish processes and try again.",
+                            MessageBoxImage.Error
+                        );
+                        return;
+                    }
                 }
             }
 
@@ -469,11 +479,17 @@ namespace Bloxstrap
                     if (i == 1)
                     {
                         App.Logger.WriteLine(LOG_IDENT, "Waiting for write permissions to update version");
+                        Utilities.KillProcessesRunningFrom(Paths.Application);
                     }
                     else if (i == 10)
                     {
                         App.Logger.WriteLine(LOG_IDENT, "Failed to update! (Could not get write permissions after 10 tries/5 seconds)");
                         App.Logger.WriteException(LOG_IDENT, ex);
+
+                        Frontend.ShowMessageBox(
+                            "BoneFish failed to apply the update because the application file is locked or in use. Please close any background BoneFish processes and try again.",
+                            MessageBoxImage.Error
+                        );
                         return;
                     }
 

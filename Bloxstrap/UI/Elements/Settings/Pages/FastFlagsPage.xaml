@@ -76,6 +76,18 @@
             <ui:ToggleSwitch IsChecked="{Binding ResetConfiguration, Mode=TwoWay}" />
         </controls:OptionControl>
 
+        <controls:OptionControl 
+            Header="Nonaktifkan Animasi UI Roblox"
+            Description="Menonaktifkan animasi menu ESC dan transisi UI lainnya untuk memperingan game.">
+            <ui:ToggleSwitch IsChecked="{Binding DisableRobloxAnimations, Mode=TwoWay}" />
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="Mode Memori Rendah Roblox"
+            Description="Mengoptimalkan penggunaan RAM Roblox agar lebih ringan pada PC spek rendah.">
+            <ui:ToggleSwitch IsChecked="{Binding EnableLowMemoryMode, Mode=TwoWay}" />
+        </controls:OptionControl>
+
         <TextBlock Text="{x:Static resources:Strings.Common_Presets}" FontSize="20" FontWeight="Medium" Margin="0,16,0,0" />
 
         <TextBlock Text="{x:Static resources:Strings.Common_Geometry}" FontSize="16" FontWeight="Medium" Margin="0,16,0,0" />

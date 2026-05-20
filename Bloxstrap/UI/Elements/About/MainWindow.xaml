@@ -1,4 +1,4 @@
-﻿<base:WpfUiWindow x:Class="Bloxstrap.UI.Elements.About.MainWindow"
+<base:WpfUiWindow x:Class="Bloxstrap.UI.Elements.About.MainWindow"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -7,6 +7,7 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:base="clr-namespace:Bloxstrap.UI.Elements.Base"
              xmlns:resources="clr-namespace:Bloxstrap.Resources"
+             xmlns:models="clr-namespace:Bloxstrap.UI.ViewModels"
              mc:Ignorable="d"
              Title="{x:Static resources:Strings.About_Title}"
              Background="{ui:ThemeResource ApplicationBackgroundBrush}"
@@ -42,6 +43,9 @@
                         <TextBlock x:Name="TranslatorsText" Text="{x:Static resources:Strings.About_Translators_Title}" FontSize="10" />
                     </ui:NavigationItem>
                     <ui:NavigationItem Content="{x:Static resources:Strings.About_Licenses_Title}" PageType="{x:Type pages:LicensesPage}" Icon="Code24" Tag="licenses" Margin="0,0,0,12" />
+                    <ui:NavigationItem Content="Donasi (Saweria)" Icon="Heart24" Command="{x:Static models:GlobalViewModel.OpenWebpageCommand}" CommandParameter="https://saweria.co/MahiroDev" Margin="0,0,0,12" />
+                    <ui:NavigationItem Content="Donasi (SociaBuzz)" Icon="Heart24" Command="{x:Static models:GlobalViewModel.OpenWebpageCommand}" CommandParameter="https://sociabuzz.com/zuax" Margin="0,0,0,12" />
+                    <ui:NavigationItem Content="Original Repo" Icon="Code24" Command="{x:Static models:GlobalViewModel.OpenWebpageCommand}" CommandParameter="https://github.com/fishstrap/fishstrap" Margin="0,0,0,12" />
                 </ui:NavigationStore.Items>
             </ui:NavigationStore>
 
