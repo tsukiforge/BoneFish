@@ -46,7 +46,8 @@ namespace Bloxstrap.Integrations
             style &= ~WS_MAXIMIZEBOX;
             style &= ~WS_SYSMENU;
 
-            Rectangle resolution = Screen.PrimaryScreen.Bounds;
+            var screen = Screen.PrimaryScreen;
+            Rectangle resolution = screen?.Bounds ?? Rectangle.Empty;
 
             PInvoke.SetWindowLong((HWND)_hWnd, (WINDOW_LONG_PTR_INDEX)GWLSTYLE, style);
 
@@ -63,7 +64,8 @@ namespace Bloxstrap.Integrations
 
             App.Logger.WriteLine(LOG_IDENT, "Applying window modifications");
 
-            _setTitleHook = new(SetWindowTitleHook);
+            var setTitleHook = new WINEVENTPROC(SetWindowTitleHook);
+            _setTitleHook = setTitleHook;
 
             // icon
             App.Logger.WriteLine(LOG_IDENT, "Setting Roblox icon");
@@ -84,7 +86,7 @@ namespace Bloxstrap.Integrations
                 PInvoke.SetWindowText(_hWnd, robloxTitle);
 
                 // because (Internal) exists Roblox will reset the title after couple of seconds
-                App.Current.Dispatcher.Invoke(() => PInvoke.SetWinEventHook(EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_NAMECHANGE, null, _setTitleHook, _robloxPID, 0, WINEVENT_OUTOFCONTEXT));
+                App.Current.Dispatcher.Invoke(() => PInvoke.SetWinEventHook(EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_NAMECHANGE, null, setTitleHook, _robloxPID, 0, WINEVENT_OUTOFCONTEXT));
             }
         }
 
