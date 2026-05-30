@@ -15,7 +15,7 @@ jobs:
 
     - uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '9.0.x'
 
     - name: Restore dependencies
       run: dotnet restore BoneFish.sln
@@ -30,7 +30,7 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: BoneFish-Release
-        path: .\Bloxstrap\bin\Release\net6.0-windows\win-x64\publish\BoneFish.exe
+        path: .\Bloxstrap\bin\Release\net9.0-windows\win-x64\publish\BoneFish.exe
         if-no-files-found: error
 
   release:
