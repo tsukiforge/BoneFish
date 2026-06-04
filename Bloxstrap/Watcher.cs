@@ -19,6 +19,10 @@ namespace Bloxstrap
 
         public readonly DiscordRichPresence? RichPresence;
 
+        public readonly RobloxNotification? Notification;
+
+        public readonly FpsMonitorService? FpsMonitor;
+
         public Watcher()
         {
             const string LOG_IDENT = "Watcher";
@@ -101,6 +105,18 @@ namespace Bloxstrap
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Running rpc");
                     RichPresence = new(ActivityWatcher);
+                }
+
+                if (App.Settings.Prop.EnableRobloxNotifications)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Initializing Roblox notifications");
+                    Notification = new(ActivityWatcher);
+                }
+
+                if (App.Settings.Prop.EnableFpsMonitor)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Initializing FPS Monitor");
+                    FpsMonitor = new(ActivityWatcher);
                 }
             }
 
@@ -190,6 +206,10 @@ namespace Bloxstrap
 
             _notifyIcon?.Dispose();
             RichPresence?.Dispose();
+
+            Notification?.Dispose();
+
+            FpsMonitor?.Dispose();
 
             App.State.Prop.WatcherRunning = false;
 
