@@ -55,6 +55,13 @@ namespace Bloxstrap.Models.Persistable
 
         // experimental features
         public bool EnableSystemTrayOnClose { get; set; } = false;
+        public bool EnableRobloxNotifications { get; set; } = false;
+        public bool EnableFriendOnlineNotifications { get; set; } = false;
+        public bool EnableNotificationSound { get; set; } = true;
+        public bool EnableFpsMonitor { get; set; } = false;
+        public double FpsMonitorX { get; set; } = 0;
+        public double FpsMonitorY { get; set; } = 0;
+        public bool OptimizeForLowEnd { get; set; } = false; // when true, reduce timers and visual updates to save CPU on older devices
 
         // performance preset
         public string SelectedPerformancePreset { get; set; } = "None";

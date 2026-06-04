@@ -22,5 +22,37 @@
             <ui:ToggleSwitch IsChecked="{Binding EnableSystemTrayOnClose, Mode=TwoWay}" />
         </controls:OptionControl>
 
+        <controls:OptionControl 
+            Header="Notifikasi Roblox Native Windows" 
+            Description="Aktifkan notifikasi Windows native untuk menampilkan notifikasi dari Roblox di pojok bawah kanan.">
+            <ui:ToggleSwitch IsChecked="{Binding EnableRobloxNotifications, Mode=TwoWay}" />
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="Notifikasi Teman Online" 
+            Description="Tampilkan notifikasi ketika teman mu ada yang online. Notifikasi akan muncul di pojok bawah kanan layar." 
+            IsEnabled="{Binding EnableRobloxNotifications, Mode=OneWay}">
+            <ui:ToggleSwitch IsChecked="{Binding EnableFriendOnlineNotifications, Mode=TwoWay}" />
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="Suara Notifikasi" 
+            Description="Putar suara saat notifikasi datang." 
+            IsEnabled="{Binding EnableRobloxNotifications, Mode=OneWay}">
+            <ui:ToggleSwitch IsChecked="{Binding EnableNotificationSound, Mode=TwoWay}" />
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="FPS Monitor Overlay" 
+            Description="Tampilkan monitor FPS real-time di pojok layar saat bermain Roblox. Klik dan drag untuk memindahkan posisi.">
+            <ui:ToggleSwitch IsChecked="{Binding EnableFpsMonitor, Mode=TwoWay}" />
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="Optimalkan untuk perangkat low-end (Rendah)" 
+            Description="Kurangi frekuensi update dan beban CPU agar fitur lebih ringan di laptop jadul. Recommended untuk perangkat kentang.">
+            <ui:ToggleSwitch IsChecked="{Binding OptimizeForLowEnd, Mode=TwoWay}" />
+        </controls:OptionControl>
+
     </StackPanel>
 </ui:UiPage>
