@@ -15,7 +15,7 @@
         MouseUp="Window_MouseUp"
         MouseEnter="Window_MouseEnter"
         MouseLeave="Window_MouseLeave">
-    <Grid Background="#1F1F1F" Opacity="0.85" CornerRadius="10" Margin="5">
+    <Border Background="#1F1F1F" Opacity="0.85" CornerRadius="10" Margin="5" Padding="10">
         <StackPanel Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Center">
             <TextBlock 
                 Text="FPS Monitor" 
@@ -51,5 +51,5 @@
                 FontSize="9" 
                 HorizontalAlignment="Center"/>
         </StackPanel>
-    </Grid>
+    </Border>
 </Window>

@@ -1,7 +1,6 @@
 using System.Windows;
+using System.Xml;
 using Bloxstrap.Models.RobloxApi;
-using Windows.UI.Notifications;
-using Windows.Data.Xml.Dom;
 
 namespace Bloxstrap.Integrations
 {
@@ -105,33 +104,8 @@ namespace Bloxstrap.Integrations
 
                 _notifiedUsers.Add(username);
 
-                // Buat XML untuk toast notification
-                string toastXml = $@"
-                    <toast>
-                        <visual>
-                            <binding template='ToastText02'>
-                                <text id='1'>👋 {System.Net.WebUtility.HtmlEncode(username)} ada online!</text>
-                                <text id='2'>Apa mau main bareng?</text>
-                            </binding>
-                        </visual>
-                        <audio src='ms-winsoundevent:Notification.Default'/>
-                    </toast>";
-
-                var xmlDoc = new XmlDocument();
-                xmlDoc.LoadXml(toastXml);
-
-                var toast = new ToastNotification(xmlDoc);
-                toast.ExpirationTime = DateTime.Now.AddSeconds(30);
-                
-                try
-                {
-                    ToastNotificationManager.CreateToastNotifier(APP_ID).Show(toast);
-                }
-                catch
-                {
-                    // Fallback jika toast notifier tidak tersedia
-                    ShowGeneralNotification($"{username} ada online!", "Apa mau main bareng?");
-                }
+                // Fallback to MessageBox since Windows Runtime APIs are not available
+                ShowGeneralNotification($"{username} ada online!", "Apa mau main bareng?");
 
                 App.Logger.WriteLine(LOG_IDENT, $"Menampilkan notifikasi untuk teman online: {username}");
                 OnFriendOnline?.Invoke(this, new FriendNotificationEventArgs { Username = username });
@@ -146,33 +120,8 @@ namespace Bloxstrap.Integrations
         {
             try
             {
-                // Buat XML untuk toast notification umum
-                string toastXml = $@"
-                    <toast>
-                        <visual>
-                            <binding template='ToastText02'>
-                                <text id='1'>{System.Net.WebUtility.HtmlEncode(title)}</text>
-                                <text id='2'>{System.Net.WebUtility.HtmlEncode(message)}</text>
-                            </binding>
-                        </visual>
-                        <audio src='ms-winsoundevent:Notification.Default'/>
-                    </toast>";
-
-                var xmlDoc = new XmlDocument();
-                xmlDoc.LoadXml(toastXml);
-
-                var toast = new ToastNotification(xmlDoc);
-                toast.ExpirationTime = DateTime.Now.AddSeconds(15);
-
-                try
-                {
-                    ToastNotificationManager.CreateToastNotifier(APP_ID).Show(toast);
-                }
-                catch
-                {
-                    // Fallback jika toast notifier tidak tersedia
-                    MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information);
-                }
+                // Use MessageBox as the primary notification method
+                MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information);
 
                 App.Logger.WriteLine(LOG_IDENT, $"Menampilkan notifikasi: {title}");
                 OnNotification?.Invoke(this, new NotificationEventArgs { Title = title, Message = message });
