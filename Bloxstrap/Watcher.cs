@@ -87,6 +87,17 @@ namespace Bloxstrap
 
             WindowManipulation = new(_watcherData.Handle, _watcherData.ProcessId);
 
+            // Auto-detect low-end systems and enable OptimizeForLowEnd if needed
+            try
+            {
+                if (AutoOptimizeService.CheckAndApply())
+                    App.Logger.WriteLine(LOG_IDENT, "Auto-optimize: OptimizeForLowEnd enabled due to system detection.");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+
             if (App.Settings.Prop.EnableActivityTracking)
             {
                 ActivityWatcher = new(_watcherData.LogFile);
