@@ -7,8 +7,8 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
     <ApplicationIcon>BoneFish.ico</ApplicationIcon>
-    <Version>3.3.3</Version>
-    <FileVersion>3.3.3</FileVersion>
+    <Version>3.4.0</Version>
+    <FileVersion>3.4.0</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
