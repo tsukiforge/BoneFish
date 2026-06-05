@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Diagnostics;
 using System.Windows.Media;
+using Bloxstrap.Integrations;
 
 namespace Bloxstrap.UI.Elements
 {
