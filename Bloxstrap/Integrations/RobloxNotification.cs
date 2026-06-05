@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Xml;
+using System.Net.Http;
 using Bloxstrap.Models.RobloxApi;
 
 namespace Bloxstrap.Integrations
@@ -33,7 +34,7 @@ namespace Bloxstrap.Integrations
             if (App.Settings.Prop.EnableRobloxNotifications == false)
                 return;
 
-            const string LOG_IDENT = "RobloxNotification";
+            const string LOG_IDENT = "RobloxNotification::StartNotificationMonitoring";
             App.Logger.WriteLine(LOG_IDENT, "Starting notification monitoring");
 
             StopNotificationMonitoring();
@@ -43,17 +44,31 @@ namespace Bloxstrap.Integrations
 
             _notificationCheckTask = Task.Run(async () =>
             {
+                int consecutiveFailures = 0;
+                const int MAX_CONSECUTIVE_FAILURES = 3;
+
                 while (!_notificationCheckToken.Token.IsCancellationRequested)
                 {
                     try
                     {
-                        int delayMs = App.Settings.Prop.OptimizeForLowEnd ? 15000 : 5000;
-                        await Task.Delay(delayMs, _notificationCheckToken.Token); // Check interval configurable based on low-end optimization
+                        // Adaptive delay based on low-end optimization dan network failures
+                        int baseDelayMs = App.Settings.Prop.OptimizeForLowEnd ? 15000 : 5000;
+                        int delayMs = baseDelayMs + (consecutiveFailures * 2000); // Backoff on failures
                         
+                        await Task.Delay(Math.Min(delayMs, 30000), _notificationCheckToken.Token);
+                        
+                        // Check DNS connectivity sebelum API call
+                        if (!await DnsResilienceService.TestDnsConnectivityAsync())
+                        {
+                            App.Logger.WriteLine(LOG_IDENT, "DNS unavailable, skipping notification check");
+                            consecutiveFailures++;
+                            continue;
+                        }
+
+                        consecutiveFailures = 0; // Reset on success
+
                         if (App.Settings.Prop.EnableFriendOnlineNotifications)
                         {
-                            // Placeholder: Dalam implementasi nyata, ini akan mengambil data teman dari Roblox API
-                            // Untuk sekarang, ini adalah skeleton yang menunggu integrasi API
                             await CheckFriendsStatus();
                         }
                     }
@@ -61,9 +76,22 @@ namespace Bloxstrap.Integrations
                     {
                         break;
                     }
+                    catch (HttpRequestException ex)
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, $"Network error in notification monitoring: {ex.Message}");
+                        consecutiveFailures++;
+                    }
                     catch (Exception ex)
                     {
                         App.Logger.WriteLine(LOG_IDENT, $"Error in notification monitoring: {ex.Message}");
+                        consecutiveFailures++;
+                    }
+
+                    // Stop monitoring jika too many failures
+                    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES)
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, $"Too many failures ({MAX_CONSECUTIVE_FAILURES}), pausing notifications");
+                        break;
                     }
                 }
             }, _notificationCheckToken.Token);
