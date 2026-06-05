@@ -32,8 +32,8 @@ namespace Bloxstrap.UI.Elements
 
         private void InitializeFpsMonitoring()
         {
-            // Determine update interval based on low-end optimization
-            int updateMs = App.Settings.Prop.OptimizeForLowEnd ? 2000 : 1000;
+            // Determine update interval based on system tier
+            int updateMs = DetermineFpsUpdateInterval();
 
             // FPS Update Timer - update UI at configurable interval
             _fpsUpdateTimer = new System.Windows.Threading.DispatcherTimer
@@ -46,9 +46,36 @@ namespace Bloxstrap.UI.Elements
             // Use CompositionTarget.Rendering for accurate frame counting (lightweight)
             CompositionTarget.Rendering += OnRendering;
 
+            // Reduce overlay visibility for very low-end systems
+            if (App.Settings.Prop.OptimizeForLowEnd)
+            {
+                this.Opacity = 0.7; // Reduce opacity to save rendering
+            }
+
             _frameTimer.Start();
 
-            App.Logger.WriteLine(LOG_IDENT, $"FPS Monitor initialized (update interval={updateMs}ms)");
+            App.Logger.WriteLine(LOG_IDENT, $"FPS Monitor initialized (update interval={updateMs}ms, tier={GetSystemTier()})");
+        }
+
+        private int DetermineFpsUpdateInterval()
+        {
+            // Ultra-aggressive for ultra-low-end: only update every 3 seconds
+            if (App.Settings.Prop.OptimizeForLowEnd)
+            {
+                var systemInfo = AutoOptimizeService.GetSystemInfo();
+                if (systemInfo.Contains("1") || systemInfo.Contains("2GB")) // 1-2GB RAM
+                    return 3000; // Update every 3 seconds
+                
+                return 2000; // Update every 2 seconds for regular low-end
+            }
+
+            return 1000; // Update every 1 second for normal systems
+        }
+
+        private string GetSystemTier()
+        {
+            // Call static system info method
+            return AutoOptimizeService.GetSystemInfo();
         }
 
         private void OnRendering(object? sender, EventArgs e)

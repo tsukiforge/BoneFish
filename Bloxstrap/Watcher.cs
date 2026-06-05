@@ -92,6 +92,15 @@ namespace Bloxstrap
             {
                 if (AutoOptimizeService.CheckAndApply())
                     App.Logger.WriteLine(LOG_IDENT, "Auto-optimize: OptimizeForLowEnd enabled due to system detection.");
+                
+                // Initialize DNS resilience for network stability
+                var dnsTask = DnsResilienceService.TestDnsConnectivityAsync();
+                dnsTask.Wait(TimeSpan.FromSeconds(3)); // Wait max 3 seconds
+                
+                if (dnsTask.IsCompletedSuccessfully)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "DNS resilience service initialized");
+                }
             }
             catch (Exception ex)
             {

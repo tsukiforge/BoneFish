@@ -30,15 +30,13 @@
 
         <controls:OptionControl 
             Header="Notifikasi Teman Online" 
-            Description="Tampilkan notifikasi ketika teman mu ada yang online. Notifikasi akan muncul di pojok bawah kanan layar." 
-            IsEnabled="{Binding EnableRobloxNotifications, Mode=OneWay}">
+            Description="Tampilkan notifikasi ketika teman mu ada yang online. Notifikasi akan muncul di pojok bawah kanan layar.">
             <ui:ToggleSwitch IsChecked="{Binding EnableFriendOnlineNotifications, Mode=TwoWay}" />
         </controls:OptionControl>
 
         <controls:OptionControl 
             Header="Suara Notifikasi" 
-            Description="Putar suara saat notifikasi datang." 
-            IsEnabled="{Binding EnableRobloxNotifications, Mode=OneWay}">
+            Description="Putar suara saat notifikasi datang.">
             <ui:ToggleSwitch IsChecked="{Binding EnableNotificationSound, Mode=TwoWay}" />
         </controls:OptionControl>
 
