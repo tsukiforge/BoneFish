@@ -60,6 +60,9 @@
     <EmbeddedResource Include="Resources\Mods\Sounds\OldWalk.mp3" />
     <EmbeddedResource Include="Resources\Mods\Sounds\Empty.mp3" />
     <EmbeddedResource Include="Resources\Mods\OldAvatarBackground.rbxl" />
+    <None Include="Resources\Wallpapers\wallpapers.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Resources\Wallpapers\wallpapersC.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Resources\Wallpapers\wallpapersQ.jpg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

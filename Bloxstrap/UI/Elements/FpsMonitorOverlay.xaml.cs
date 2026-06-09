@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Diagnostics;
 using System.Windows.Media;
+using System.Threading;
 using Bloxstrap.Integrations;
 
 namespace Bloxstrap.UI.Elements
@@ -16,13 +17,16 @@ namespace Bloxstrap.UI.Elements
         private double _frameTime = 0;
         
         private System.Windows.Threading.DispatcherTimer? _fpsUpdateTimer;
+        private System.Windows.Threading.DispatcherTimer? _frameCounterTimer;
         
         private Point _lastMousePos;
         private bool _isDragging = false;
+        private bool _persistentMode = false;
 
         private readonly SolidColorBrush _greenBrush = new(Color.FromRgb(0, 255, 0));
         private readonly SolidColorBrush _goldBrush = new(Color.FromRgb(255, 215, 0));
         private readonly SolidColorBrush _redBrush = new(Color.FromRgb(255, 0, 0));
+        private readonly SolidColorBrush _purpleBrush = new(Color.FromRgb(200, 100, 255));
 
         public FpsMonitorOverlay()
         {
@@ -44,8 +48,13 @@ namespace Bloxstrap.UI.Elements
             _fpsUpdateTimer.Tick += (_, _) => UpdateFpsDisplay();
             _fpsUpdateTimer.Start();
 
-            // Use CompositionTarget.Rendering for accurate frame counting (lightweight)
-            CompositionTarget.Rendering += OnRendering;
+            // Frame counter timer - increment frame count every 16ms (~60fps)
+            _frameCounterTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(16)
+            };
+            _frameCounterTimer.Tick += (_, _) => _frameCount++;
+            _frameCounterTimer.Start();
 
             // Reduce overlay visibility for very low-end systems
             if (App.Settings.Prop.OptimizeForLowEnd)
@@ -79,12 +88,6 @@ namespace Bloxstrap.UI.Elements
             return AutoOptimizeService.GetSystemInfo();
         }
 
-        private void OnRendering(object? sender, EventArgs e)
-        {
-            // Called once per WPF render; cheap to increment
-            _frameCount++;
-        }
-
         private void UpdateFpsDisplay()
         {
             if (_frameTimer.Elapsed.TotalSeconds > 0)
@@ -102,6 +105,8 @@ namespace Bloxstrap.UI.Elements
                     FpsValueText.Foreground = _greenBrush;
                 else if (_currentFps >= 30)
                     FpsValueText.Foreground = _goldBrush;
+                else if (_persistentMode)
+                    FpsValueText.Foreground = _purpleBrush; // Purple untuk persistent mode
                 else
                     FpsValueText.Foreground = _redBrush;
 
@@ -142,12 +147,12 @@ namespace Bloxstrap.UI.Elements
 
         private void Window_MouseEnter(object sender, MouseEventArgs e)
         {
-            StatusText.Text = "Drag to move";
+            StatusText.Text = _persistentMode ? "Persistent | Drag to move" : "Drag to move";
         }
 
         private void Window_MouseLeave(object sender, MouseEventArgs e)
         {
-            StatusText.Text = "Online";
+            StatusText.Text = _persistentMode ? "Persistent" : "Online";
         }
 
         private void SavePosition()
@@ -188,10 +193,25 @@ namespace Bloxstrap.UI.Elements
             }
         }
 
+        public void SetPersistentMode(bool persistent)
+        {
+            _persistentMode = persistent;
+            if (persistent)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "FPS Monitor set to persistent mode - will continue running after game exit");
+                StatusText.Text = "Persistent";
+            }
+            else
+            {
+                App.Logger.WriteLine(LOG_IDENT, "FPS Monitor set to normal mode");
+                StatusText.Text = "Online";
+            }
+        }
+
         protected override void OnClosed(EventArgs e)
         {
             _fpsUpdateTimer?.Stop();
-            CompositionTarget.Rendering -= OnRendering;
+            _frameCounterTimer?.Stop();
             _frameTimer?.Stop();
             
             App.Logger.WriteLine(LOG_IDENT, "FPS Monitor closed");
