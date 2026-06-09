@@ -350,7 +350,7 @@ namespace Bloxstrap
                     Logger.WriteLine(LOG_IDENT, "Initializing app background");
                     
                     // Validate and set random app background if enabled
-                    if (Settings.Prop.EnableWallpaperLauncher)
+                    if (App.Settings.Prop.EnableWallpaperLauncher)
                     {
                         bool isValid = AppBackgroundService.ValidateBackgroundFiles();
                         
