@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
-    <ApplicationIcon>BoneFish.ico</ApplicationIcon>
-    <Version>3.4.0</Version>
-    <FileVersion>3.4.0</FileVersion>
+    <ApplicationIcon>Bloxstrap.ico</ApplicationIcon>
+    <Version>3.5.0</Version>
+    <FileVersion>3.5.0</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
@@ -19,7 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="BoneFish.ico" />
+    <Resource Include="Bloxstrap.ico" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\PlayerLogo.png" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Roblox.png" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Studio.png" />
@@ -63,7 +63,8 @@
     <None Include="Resources\Wallpapers\wallpapers.jpg" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Resources\Wallpapers\wallpapersC.jpg" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Resources\Wallpapers\wallpapersQ.jpg" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
+    <None Include="Resources\Wallpapers\wallpapersE.jpg" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
