@@ -6,6 +6,7 @@ using Wpf.Ui.Controls.Interfaces;
 using Wpf.Ui.Mvvm.Contracts;
 
 using Bloxstrap.UI.ViewModels.Settings;
+using Bloxstrap.Integrations;
 using Wpf.Ui.Common;
 using Wpf.Ui.Controls;
 using Bloxstrap.UI.Elements.Settings.Pages;
@@ -33,6 +34,26 @@ namespace Bloxstrap.UI.Elements.Settings
             InitializeComponent();
 
             App.Logger.WriteLine("MainWindow", "Initializing settings window");
+
+            // Set random app background if wallpaper launcher is enabled
+            if (App.Settings.Prop.EnableWallpaperLauncher)
+            {
+                try
+                {
+                    var backgroundImage = AppBackgroundService.GetRandomBackground();
+                    if (backgroundImage != null)
+                    {
+                        this.Background = new System.Windows.Media.ImageBrush(backgroundImage)
+                        {
+                            Stretch = System.Windows.Media.Stretch.UniformToFill
+                        };
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteLine("MainWindow", $"Failed to set background: {ex.Message}");
+                }
+            }
 
             if (showAlreadyRunningWarning)
                 ShowAlreadyRunningSnackbar();
