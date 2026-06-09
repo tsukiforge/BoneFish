@@ -63,7 +63,6 @@
     <None Include="Resources\Wallpapers\wallpapers.jpg" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Resources\Wallpapers\wallpapersC.jpg" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Resources\Wallpapers\wallpapersQ.jpg" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Resources\Wallpapers\wallpapersE.jpg" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
   <ItemGroup>

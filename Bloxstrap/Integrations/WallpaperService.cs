@@ -42,7 +42,6 @@ namespace Bloxstrap.Integrations
                 WallpaperType.Default => Path.Combine(wallpaperPath, "wallpapers.jpg"),
                 WallpaperType.Cool => Path.Combine(wallpaperPath, "wallpapersC.jpg"),
                 WallpaperType.Quality => Path.Combine(wallpaperPath, "wallpapersQ.jpg"),
-                WallpaperType.E => Path.Combine(wallpaperPath, "wallpapersE.jpg"),
                 _ => Path.Combine(wallpaperPath, "wallpapers.jpg")
             };
         }
