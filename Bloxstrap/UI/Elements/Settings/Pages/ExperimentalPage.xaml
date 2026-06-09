@@ -42,7 +42,7 @@
 
         <controls:OptionControl 
             Header="FPS Monitor Overlay" 
-            Description="Tampilkan monitor FPS real-time di pojok layar saat bermain Roblox. Klik dan drag untuk memindahkan posisi.">
+            Description="Tampilkan monitor FPS real-time di pojok layar saat bermain Roblox. Klik dan drag untuk memindahkan posisi. FPS Monitor akan tetap aktif bahkan setelah Anda keluar dari game.">
             <ui:ToggleSwitch IsChecked="{Binding EnableFpsMonitor, Mode=TwoWay}" />
         </controls:OptionControl>
 
@@ -51,6 +51,18 @@
             Description="Kurangi frekuensi update dan beban CPU agar fitur lebih ringan di laptop jadul. Recommended untuk perangkat kentang.">
             <ui:ToggleSwitch IsChecked="{Binding OptimizeForLowEnd, Mode=TwoWay}" />
         </controls:OptionControl>
+
+        <TextBlock Text="Wallpaper Launcher" FontSize="20" FontWeight="Medium" Margin="0,24,0,0" />
+        <TextBlock Text="Ubah background aplikasi BoneFish setiap kali membuka atau pilih secara manual di bawah." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+
+        <StackPanel Orientation="Vertical" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <ui:Button Content="Wallpaper 1 (Default)" Command="{Binding SelectWallpaper1Command, Mode=OneTime}" Appearance="Primary" Margin="0,0,8,0" MinWidth="140" />
+                <ui:Button Content="Wallpaper 2 (Cool)" Command="{Binding SelectWallpaper2Command, Mode=OneTime}" Margin="0,0,8,0" MinWidth="140" />
+                <ui:Button Content="Wallpaper 3 (Quality)" Command="{Binding SelectWallpaper3Command, Mode=OneTime}" MinWidth="140" />
+            </StackPanel>
+            <TextBlock x:Name="WallpaperStatusText" Margin="0,0,0,0" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding WallpaperStatus, Mode=OneWay}" />
+        </StackPanel>
 
     </StackPanel>
 </ui:UiPage>

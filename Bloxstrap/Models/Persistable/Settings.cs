@@ -62,6 +62,8 @@ namespace Bloxstrap.Models.Persistable
         public double FpsMonitorX { get; set; } = 0;
         public double FpsMonitorY { get; set; } = 0;
         public bool OptimizeForLowEnd { get; set; } = false; // when true, reduce timers and visual updates to save CPU on older devices
+        public bool EnableWallpaperLauncher { get; set; } = true; // change Windows wallpaper on app launch
+        public int SelectedWallpaperType { get; set; } = 0; // 0=Default, 1=Cool, 2=Quality
 
         // performance preset
         public string SelectedPerformancePreset { get; set; } = "None";
