@@ -36,23 +36,35 @@ namespace Bloxstrap.UI.Elements.Settings
             App.Logger.WriteLine("MainWindow", "Initializing settings window");
 
             // Set random app background if wallpaper launcher is enabled
+            App.Logger.WriteLine("MainWindow", $"EnableWallpaperLauncher = {App.Settings.Prop.EnableWallpaperLauncher}");
+            
             if (App.Settings.Prop.EnableWallpaperLauncher)
             {
                 try
                 {
+                    App.Logger.WriteLine("MainWindow", "Attempting to load random background...");
                     var backgroundImage = AppBackgroundService.GetRandomBackground();
                     if (backgroundImage != null)
                     {
+                        App.Logger.WriteLine("MainWindow", "Background loaded successfully, applying to window");
                         this.Background = new System.Windows.Media.ImageBrush(backgroundImage)
                         {
                             Stretch = System.Windows.Media.Stretch.UniformToFill
                         };
+                    }
+                    else
+                    {
+                        App.Logger.WriteLine("MainWindow", "Background image is null");
                     }
                 }
                 catch (Exception ex)
                 {
                     App.Logger.WriteLine("MainWindow", $"Failed to set background: {ex.Message}");
                 }
+            }
+            else
+            {
+                App.Logger.WriteLine("MainWindow", "Wallpaper launcher is disabled in settings");
             }
 
             if (showAlreadyRunningWarning)
