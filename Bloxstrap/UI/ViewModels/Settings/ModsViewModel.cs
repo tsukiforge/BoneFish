@@ -13,26 +13,12 @@ using CommunityToolkit.Mvvm.Input;
 
 using Bloxstrap.Models.SettingTasks;
 using Bloxstrap.AppData;
-using Bloxstrap.Integrations;
 
 namespace Bloxstrap.UI.ViewModels.Settings
 {
     public class ModsViewModel : NotifyPropertyChangedViewModel
     {
-        private ImageSource? _backgroundPreview;
         private ImageSource? _loadingScreenPreview;
-        private string _wallpaperStatus = string.Empty;
-
-        public ImageSource? BackgroundPreview
-        {
-            get => _backgroundPreview;
-            set
-            {
-                _backgroundPreview = value;
-                OnPropertyChanged(nameof(BackgroundPreview));
-                OnPropertyChanged(nameof(BackgroundPreviewVisibility));
-            }
-        }
 
         public ImageSource? LoadingScreenPreview
         {
@@ -45,30 +31,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        public string WallpaperStatus
-        {
-            get => _wallpaperStatus;
-            set
-            {
-                if (_wallpaperStatus != value)
-                {
-                    _wallpaperStatus = value;
-                    OnPropertyChanged(nameof(WallpaperStatus));
-                }
-            }
-        }
-
-        public bool EnableWallpaperLauncher
-        {
-            get => App.Settings.Prop.EnableWallpaperLauncher;
-            set
-            {
-                App.Settings.Prop.EnableWallpaperLauncher = value;
-                OnPropertyChanged(nameof(EnableWallpaperLauncher));
-            }
-        }
-
-        public Visibility BackgroundPreviewVisibility => BackgroundPreview != null ? Visibility.Visible : Visibility.Collapsed;
         public Visibility LoadingScreenPreviewVisibility => LoadingScreenPreview != null ? Visibility.Visible : Visibility.Collapsed;
 
         private void OpenModsFolder() => Process.Start("explorer.exe", Paths.Modifications);
@@ -122,107 +84,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ModsViewModel()
         {
-            // Restore custom background from settings if it exists
-            if (!String.IsNullOrEmpty(App.Settings.Prop.CustomBackgroundPath) && File.Exists(App.Settings.Prop.CustomBackgroundPath))
-            {
-                BackgroundTask.NewState = App.Settings.Prop.CustomBackgroundPath;
-                try
-                {
-                    var bitmap = new BitmapImage();
-                    bitmap.BeginInit();
-                    bitmap.UriSource = new Uri(App.Settings.Prop.CustomBackgroundPath);
-                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmap.DecodePixelWidth = 400;
-                    bitmap.EndInit();
-                    bitmap.Freeze();
-                    
-                    BackgroundPreview = bitmap;
-                }
-                catch { }
-            }
-
-            SelectWallpaper1Command = new AsyncRelayCommand(SelectWallpaper1);
-            SelectWallpaper2Command = new AsyncRelayCommand(SelectWallpaper2);
-            SelectWallpaper3Command = new AsyncRelayCommand(SelectWallpaper3);
-            SelectWallpaper4Command = new AsyncRelayCommand(SelectWallpaper4);
-
-            WallpaperStatus = App.Settings.Prop.EnableWallpaperLauncher
-                ? "✓ Background acak aktif setiap aplikasi dibuka."
-                : "Background acak tidak aktif.";
-        }
-
-        public IAsyncRelayCommand SelectWallpaper1Command { get; }
-        public IAsyncRelayCommand SelectWallpaper2Command { get; }
-        public IAsyncRelayCommand SelectWallpaper3Command { get; }
-        public IAsyncRelayCommand SelectWallpaper4Command { get; }
-
-        private Task SelectWallpaper1() => ApplyWallpaper(AppBackgroundService.BackgroundType.Default);
-        private Task SelectWallpaper2() => ApplyWallpaper(AppBackgroundService.BackgroundType.Cool);
-        private Task SelectWallpaper3() => ApplyWallpaper(AppBackgroundService.BackgroundType.Quality);
-        private Task SelectWallpaper4() => ApplyWallpaper(AppBackgroundService.BackgroundType.Extra);
-
-        private async Task ApplyWallpaper(AppBackgroundService.BackgroundType type)
-        {
-            await Task.Run(() =>
-            {
-                try
-                {
-                    var img = AppBackgroundService.GetBackground(type);
-                    WallpaperStatus = img != null
-                        ? $"✓ Background diubah ke: {type}"
-                        : $"✗ Gagal memuat background: {type}";
-                }
-                catch (Exception ex)
-                {
-                    WallpaperStatus = $"✗ Error: {ex.Message}";
-                }
-            });
-        }
-
-        private void ManageCustomBackground()
-        {
-            if (!String.IsNullOrEmpty(BackgroundTask.NewState))
-            {
-                BackgroundTask.NewState = "";
-                BackgroundPreview = null;
-                App.Settings.Prop.CustomBackgroundPath = "";
-            }
-            else
-            {
-                var dialog = new OpenFileDialog
-                {
-                    Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp"
-                };
-
-                if (dialog.ShowDialog() != true)
-                    return;
-
-                try
-                {
-                    using var img = System.Drawing.Image.FromFile(dialog.FileName);
-                    BackgroundTask.NewState = dialog.FileName;
-                    App.Settings.Prop.CustomBackgroundPath = dialog.FileName;
-                    
-                    // Load preview image
-                    var bitmap = new BitmapImage();
-                    bitmap.BeginInit();
-                    bitmap.UriSource = new Uri(dialog.FileName);
-                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmap.DecodePixelWidth = 400; // Resize untuk preview
-                    bitmap.EndInit();
-                    bitmap.Freeze();
-                    
-                    BackgroundPreview = bitmap;
-                }
-                catch
-                {
-                    Frontend.ShowMessageBox(Strings.Menu_Mods_Misc_CustomBackground_Invalid, MessageBoxImage.Error);
-                    return;
-                }
-            }
-
-            OnPropertyChanged(nameof(ChooseCustomBackgroundVisibility));
-            OnPropertyChanged(nameof(DeleteCustomBackgroundVisibility));
         }
 
         private void ManageCustomLoadingScreen()
@@ -269,15 +130,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
             OnPropertyChanged(nameof(DeleteCustomLoadingScreenVisibility));
         }
 
-        public Visibility ChooseCustomBackgroundVisibility => !String.IsNullOrEmpty(BackgroundTask.NewState) ? Visibility.Collapsed : Visibility.Visible;
-        public Visibility DeleteCustomBackgroundVisibility => !String.IsNullOrEmpty(BackgroundTask.NewState) ? Visibility.Visible : Visibility.Collapsed;
-        public ICommand ManageCustomBackgroundCommand => new RelayCommand(ManageCustomBackground);
-
         public Visibility ChooseCustomLoadingScreenVisibility => !String.IsNullOrEmpty(LoadingScreenTask.NewState) ? Visibility.Collapsed : Visibility.Visible;
         public Visibility DeleteCustomLoadingScreenVisibility => !String.IsNullOrEmpty(LoadingScreenTask.NewState) ? Visibility.Visible : Visibility.Collapsed;
         public ICommand ManageCustomLoadingScreenCommand => new RelayCommand(ManageCustomLoadingScreen);
 
-        public BackgroundModPresetTask BackgroundTask { get; } = new();
         public LoadingScreenModPresetTask LoadingScreenTask { get; } = new();
 
         public ICommand OpenCompatSettingsCommand => new RelayCommand(OpenCompatSettings);
