@@ -19,7 +19,8 @@ namespace Bloxstrap.Integrations
         {
             Default = 0,
             Cool = 1,
-            Quality = 2
+            Quality = 2,
+            Extra = 3
         }
 
         /// <summary>
@@ -36,6 +37,7 @@ namespace Bloxstrap.Integrations
                     BackgroundType.Default => Path.Combine(wallpaperPath, "wallpapers.jpg"),
                     BackgroundType.Cool => Path.Combine(wallpaperPath, "wallpapersC.jpg"),
                     BackgroundType.Quality => Path.Combine(wallpaperPath, "wallpapersQ.jpg"),
+                    BackgroundType.Extra => Path.Combine(wallpaperPath, "wallpapersE.jpg"),
                     _ => Path.Combine(wallpaperPath, "wallpapers.jpg")
                 };
 
@@ -106,6 +108,7 @@ namespace Bloxstrap.Integrations
                         BackgroundType.Default => Path.Combine(wallpaperPath, "wallpapers.jpg"),
                         BackgroundType.Cool => Path.Combine(wallpaperPath, "wallpapersC.jpg"),
                         BackgroundType.Quality => Path.Combine(wallpaperPath, "wallpapersQ.jpg"),
+                        BackgroundType.Extra => Path.Combine(wallpaperPath, "wallpapersE.jpg"),
                         _ => Path.Combine(wallpaperPath, "wallpapers.jpg")
                     };
 

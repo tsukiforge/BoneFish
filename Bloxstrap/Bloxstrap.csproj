@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <Resource Include="Bloxstrap.ico" />
+    <Resource Include="BoneFish.ico" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\PlayerLogo.png" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Roblox.png" />
     <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Studio.png" />
@@ -27,6 +28,10 @@
     <Resource Include="Resources\LightEditor.xshd" />
     <Resource Include="Resources\Fonts\NotoSansThai-VariableFont_wdth,wght.ttf" />
     <Resource Include="Resources\Fonts\Rubik-VariableFont_wght.ttf" />
+    <Resource Include="Resources\Fonts\Inter-Regular.ttf" />
+    <Resource Include="Resources\Fonts\Inter-Medium.ttf" />
+    <Resource Include="Resources\Fonts\Inter-SemiBold.ttf" />
+    <Resource Include="Resources\Fonts\Inter-Light.ttf" />
     <Resource Include="Resources\BootstrapperStyles\ByfronDialog\ByfronLogoDark.jpg" />
     <Resource Include="Resources\BootstrapperStyles\ByfronDialog\ByfronLogoLight.jpg" />
     <Resource Include="Resources\BootstrapperStyles\ByfronDialog\Matt.png" />
@@ -63,6 +68,7 @@
     <None Include="Resources\Wallpapers\wallpapers.jpg" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Resources\Wallpapers\wallpapersC.jpg" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Resources\Wallpapers\wallpapersQ.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Resources\Wallpapers\wallpapersE.jpg" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
   <ItemGroup>
