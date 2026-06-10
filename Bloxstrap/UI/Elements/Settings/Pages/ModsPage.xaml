@@ -100,6 +100,25 @@
         <TextBlock Text="Kustomisasi Gambar" FontSize="20" FontWeight="Medium" Margin="0,16,0,0" />
 
         <controls:OptionControl 
+            Header="Wallpaper Launcher"
+            Description="Aktifkan background acak setiap kali aplikasi BoneFish dibuka. Pilih salah satu preset di bawah untuk langsung terapkan.">
+            <ui:ToggleSwitch IsChecked="{Binding EnableWallpaperLauncher, Mode=TwoWay}" />
+        </controls:OptionControl>
+
+        <Border Margin="0,4,0,8" Background="{DynamicResource ControlFillColorDefaultBrush}" CornerRadius="8" Padding="12,10">
+            <StackPanel>
+                <TextBlock Text="Preset Background" FontSize="13" FontWeight="Medium" Margin="0,0,0,8" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <ui:Button Content="Default" Icon="Image16" Command="{Binding SelectWallpaper1Command, Mode=OneTime}" Appearance="Primary" Margin="0,0,8,0" MinWidth="110" />
+                    <ui:Button Content="Cool" Icon="Image16" Command="{Binding SelectWallpaper2Command, Mode=OneTime}" Margin="0,0,8,0" MinWidth="110" />
+                    <ui:Button Content="Quality" Icon="Image16" Command="{Binding SelectWallpaper3Command, Mode=OneTime}" Margin="0,0,8,0" MinWidth="110" />
+                    <ui:Button Content="Extra" Icon="Image16" Command="{Binding SelectWallpaper4Command, Mode=OneTime}" MinWidth="110" />
+                </StackPanel>
+                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding WallpaperStatus, Mode=OneWay}" />
+            </StackPanel>
+        </Border>
+
+        <controls:OptionControl 
             Header="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Title}" 
             Description="{x:Static resources:Strings.Menu_Mods_Misc_CustomBackground_Description}">
             <StackPanel>

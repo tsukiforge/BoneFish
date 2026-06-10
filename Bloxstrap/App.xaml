@@ -16,6 +16,24 @@
             </ResourceDictionary.MergedDictionaries>
 
             <FontFamily x:Key="Rubik">pack://application:,,,/Resources/Fonts/#Rubik Light</FontFamily>
+            <FontFamily x:Key="InterRegular">pack://application:,,,/Resources/Fonts/#Inter</FontFamily>
+            <FontFamily x:Key="InterMedium">pack://application:,,,/Resources/Fonts/#Inter Medium</FontFamily>
+            <FontFamily x:Key="InterSemiBold">pack://application:,,,/Resources/Fonts/#Inter SemiBold</FontFamily>
+            <FontFamily x:Key="InterLight">pack://application:,,,/Resources/Fonts/#Inter Light</FontFamily>
+
+            <!-- Global font override — Inter for all text elements -->
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource InterRegular}" />
+            </Style>
+            <Style TargetType="TextBox">
+                <Setter Property="FontFamily" Value="{StaticResource InterRegular}" />
+            </Style>
+            <Style TargetType="Button">
+                <Setter Property="FontFamily" Value="{StaticResource InterMedium}" />
+            </Style>
+            <Style TargetType="ComboBox">
+                <Setter Property="FontFamily" Value="{StaticResource InterRegular}" />
+            </Style>
 
             <Style TargetType="Hyperlink">
                 <Style.Triggers>
