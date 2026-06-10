@@ -13,6 +13,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using Bloxstrap.Models.SettingTasks;
 using Bloxstrap.AppData;
+using Bloxstrap.Integrations;
 
 namespace Bloxstrap.UI.ViewModels.Settings
 {
@@ -20,6 +21,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
     {
         private ImageSource? _backgroundPreview;
         private ImageSource? _loadingScreenPreview;
+        private string _wallpaperStatus = string.Empty;
 
         public ImageSource? BackgroundPreview
         {
@@ -40,6 +42,29 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 _loadingScreenPreview = value;
                 OnPropertyChanged(nameof(LoadingScreenPreview));
                 OnPropertyChanged(nameof(LoadingScreenPreviewVisibility));
+            }
+        }
+
+        public string WallpaperStatus
+        {
+            get => _wallpaperStatus;
+            set
+            {
+                if (_wallpaperStatus != value)
+                {
+                    _wallpaperStatus = value;
+                    OnPropertyChanged(nameof(WallpaperStatus));
+                }
+            }
+        }
+
+        public bool EnableWallpaperLauncher
+        {
+            get => App.Settings.Prop.EnableWallpaperLauncher;
+            set
+            {
+                App.Settings.Prop.EnableWallpaperLauncher = value;
+                OnPropertyChanged(nameof(EnableWallpaperLauncher));
             }
         }
 
@@ -115,6 +140,43 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 }
                 catch { }
             }
+
+            SelectWallpaper1Command = new AsyncRelayCommand(SelectWallpaper1);
+            SelectWallpaper2Command = new AsyncRelayCommand(SelectWallpaper2);
+            SelectWallpaper3Command = new AsyncRelayCommand(SelectWallpaper3);
+            SelectWallpaper4Command = new AsyncRelayCommand(SelectWallpaper4);
+
+            WallpaperStatus = App.Settings.Prop.EnableWallpaperLauncher
+                ? "✓ Background acak aktif setiap aplikasi dibuka."
+                : "Background acak tidak aktif.";
+        }
+
+        public IAsyncRelayCommand SelectWallpaper1Command { get; }
+        public IAsyncRelayCommand SelectWallpaper2Command { get; }
+        public IAsyncRelayCommand SelectWallpaper3Command { get; }
+        public IAsyncRelayCommand SelectWallpaper4Command { get; }
+
+        private Task SelectWallpaper1() => ApplyWallpaper(AppBackgroundService.BackgroundType.Default);
+        private Task SelectWallpaper2() => ApplyWallpaper(AppBackgroundService.BackgroundType.Cool);
+        private Task SelectWallpaper3() => ApplyWallpaper(AppBackgroundService.BackgroundType.Quality);
+        private Task SelectWallpaper4() => ApplyWallpaper(AppBackgroundService.BackgroundType.Extra);
+
+        private async Task ApplyWallpaper(AppBackgroundService.BackgroundType type)
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var img = AppBackgroundService.GetBackground(type);
+                    WallpaperStatus = img != null
+                        ? $"✓ Background diubah ke: {type}"
+                        : $"✗ Gagal memuat background: {type}";
+                }
+                catch (Exception ex)
+                {
+                    WallpaperStatus = $"✗ Error: {ex.Message}";
+                }
+            });
         }
 
         private void ManageCustomBackground()
