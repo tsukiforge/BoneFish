@@ -52,5 +52,25 @@
             <ui:ToggleSwitch IsChecked="{Binding OptimizeForLowEnd, Mode=TwoWay}" />
         </controls:OptionControl>
 
+        <TextBlock Text="Wallpaper Launcher" FontSize="20" FontWeight="Medium" Margin="0,24,0,0" />
+        <TextBlock Text="Ubah background aplikasi BoneFish setiap kali membuka atau pilih secara manual di bawah." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+
+        <controls:OptionControl 
+            Header="Aktifkan Background Acak" 
+            Description="Background akan berubah acak setiap kali aplikasi BoneFish dibuka.">
+            <ui:ToggleSwitch IsChecked="{Binding EnableWallpaperLauncher, Mode=TwoWay}" />
+        </controls:OptionControl>
+
+        <StackPanel Orientation="Vertical" Margin="0,8,0,0">
+            <TextBlock Text="Pilih Background Sekarang:" FontSize="13" FontWeight="Medium" Margin="0,0,0,8" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <ui:Button Content="Wallpaper 1 (Default)" Command="{Binding SelectWallpaper1Command, Mode=OneTime}" Appearance="Primary" Margin="0,0,8,0" MinWidth="140" />
+                <ui:Button Content="Wallpaper 2 (Cool)" Command="{Binding SelectWallpaper2Command, Mode=OneTime}" Margin="0,0,8,0" MinWidth="140" />
+                <ui:Button Content="Wallpaper 3 (Quality)" Command="{Binding SelectWallpaper3Command, Mode=OneTime}" Margin="0,0,8,0" MinWidth="140" />
+                <ui:Button Content="Wallpaper 4 (Extra)" Command="{Binding SelectWallpaper4Command, Mode=OneTime}" MinWidth="140" />
+            </StackPanel>
+            <TextBlock x:Name="WallpaperStatusText" Margin="0,0,0,0" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding WallpaperStatus, Mode=OneWay}" />
+        </StackPanel>
+
     </StackPanel>
 </ui:UiPage>
