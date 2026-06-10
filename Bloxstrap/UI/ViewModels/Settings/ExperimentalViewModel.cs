@@ -110,7 +110,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
         {
             try
             {
+                App.Logger.WriteLine("ExperimentalViewModel", $"SelectBackground called with type: {type}");
+                
                 var backgroundImage = AppBackgroundService.GetBackground(type);
+                
+                App.Logger.WriteLine("ExperimentalViewModel", $"Background image loaded: {backgroundImage != null}");
+                
                 if (backgroundImage != null)
                 {
                     // Apply to current window immediately
@@ -119,10 +124,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
                         var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
                         if (mainWindow != null)
                         {
+                            App.Logger.WriteLine("ExperimentalViewModel", "Applying background to MainWindow");
                             mainWindow.Background = new System.Windows.Media.ImageBrush(backgroundImage)
                             {
                                 Stretch = System.Windows.Media.Stretch.UniformToFill
                             };
+                            App.Logger.WriteLine("ExperimentalViewModel", "Background applied successfully");
+                        }
+                        else
+                        {
+                            App.Logger.WriteLine("ExperimentalViewModel", "MainWindow not found!");
                         }
                     });
 
@@ -137,6 +148,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 WallpaperStatus = $"✗ Error: {ex.Message}";
                 App.Logger.WriteLine("ExperimentalViewModel", $"Error selecting background: {ex.Message}");
+                App.Logger.WriteLine("ExperimentalViewModel", $"Stack trace: {ex.StackTrace}");
             }
         }
 
