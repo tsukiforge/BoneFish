@@ -7,8 +7,8 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
     <ApplicationIcon>Bloxstrap.ico</ApplicationIcon>
-    <Version>3.7.2</Version>
-    <FileVersion>3.7.2</FileVersion>
+    <Version>3.8.0</Version>
+    <FileVersion>3.8.0</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
@@ -18,63 +18,27 @@
     <SelfContained>false</SelfContained>
   </PropertyGroup>
 
+  <!-- Resources folder: auto-include via wildcards so new files are picked up automatically -->
   <ItemGroup>
+    <!-- WPF Resources (images, fonts, editor themes) -->
+    <Resource Include="Resources\**\*.png;Resources\**\*.ttf;Resources\**\*.xshd;Resources\**\*.jpg"
+               Exclude="Resources\Mods\**;Resources\Wallpapers\**" />
+    <!-- Embedded Resources (icons, configs, Roblox files, sounds, mod cursors) -->
+    <EmbeddedResource Include="Resources\**\*.ico;Resources\**\*.json;Resources\**\*.xml;Resources\**\*.rbxl;Resources\**\*.mp3;Resources\Mods\**\*.png" />
+    <!-- Wallpapers: copy to output directory -->
+    <None Include="Resources\Wallpapers\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Explicit items outside Resources folder -->
     <Resource Include="Bloxstrap.ico" />
-    <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\PlayerLogo.png" />
-    <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Roblox.png" />
-    <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Studio.png" />
-    <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\StudioLogo.png" />
-    <Resource Include="Resources\LightEditor.xshd" />
-    <Resource Include="Resources\Fonts\NotoSansThai-VariableFont_wdth,wght.ttf" />
-    <Resource Include="Resources\Fonts\Rubik-VariableFont_wght.ttf" />
-    <Resource Include="Resources\Fonts\Inter-Regular.ttf" />
-    <Resource Include="Resources\Fonts\Inter-Medium.ttf" />
-    <Resource Include="Resources\Fonts\Inter-SemiBold.ttf" />
-    <Resource Include="Resources\Fonts\Inter-Light.ttf" />
-    <Resource Include="Resources\BootstrapperStyles\ByfronDialog\ByfronLogoDark.jpg" />
-    <Resource Include="Resources\BootstrapperStyles\ByfronDialog\ByfronLogoLight.jpg" />
-    <Resource Include="Resources\BootstrapperStyles\ByfronDialog\Matt.png" />
-    <Resource Include="Resources\MessageBox\Error.png" />
-    <Resource Include="Resources\MessageBox\Information.png" />
-    <Resource Include="Resources\MessageBox\Question.png" />
-    <Resource Include="Resources\MessageBox\Warning.png" />
     <EmbeddedResource Include="UI\Style\Editor-Theme-Dark.xshd" />
     <EmbeddedResource Include="UI\Style\Editor-Theme-Light.xshd" />
   </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Resources\CustomBootstrapperSchema.json" />
-    <EmbeddedResource Include="Resources\CustomBootstrapperTemplate.xml" />
-    <EmbeddedResource Include="Resources\CustomBootstrapperTemplate_Blank.xml" />
-    <EmbeddedResource Include="Resources\CustomBootstrapperTemplate_Simple.xml" />
-    <EmbeddedResource Include="Resources\Icon2008.ico" />
-    <EmbeddedResource Include="Resources\Icon2011.ico" />
-    <EmbeddedResource Include="Resources\Icon2017.ico" />
-    <EmbeddedResource Include="Resources\Icon2019.ico" />
-    <EmbeddedResource Include="Resources\Icon2022.ico" />
-    <EmbeddedResource Include="Resources\IconBoneFish.ico" />
-    <EmbeddedResource Include="Resources\IconEarly2015.ico" />
-    <EmbeddedResource Include="Resources\IconLate2015.ico" />
-    <EmbeddedResource Include="Resources\Mods\Cursor\From2006\ArrowCursor.png" />
-    <EmbeddedResource Include="Resources\Mods\Cursor\From2006\ArrowFarCursor.png" />
-    <EmbeddedResource Include="Resources\Mods\Cursor\From2013\ArrowCursor.png" />
-    <EmbeddedResource Include="Resources\Mods\Cursor\From2013\ArrowFarCursor.png" />
-    <EmbeddedResource Include="Resources\Mods\Sounds\OldGetUp.mp3" />
-    <EmbeddedResource Include="Resources\Mods\Sounds\OldJump.mp3" />
-    <EmbeddedResource Include="Resources\Mods\Sounds\OldWalk.mp3" />
-    <EmbeddedResource Include="Resources\Mods\Sounds\Empty.mp3" />
-    <EmbeddedResource Include="Resources\Mods\OldAvatarBackground.rbxl" />
-    <None Include="Resources\Wallpapers\wallpapers.jpg" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Resources\Wallpapers\wallpapersC.jpg" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Resources\Wallpapers\wallpapersQ.jpg" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Resources\Wallpapers\wallpapersE.jpg" CopyToOutputDirectory="PreserveNewest" />
-    </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="DiscordRichPresence" Version="1.2.1.24" />
     <PackageReference Include="Markdig" Version="0.40.0" />
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.3" />
     <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.275">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
@@ -115,8 +79,7 @@
 
   <Target Name="FixMds" BeforeTargets="CoreCompile" Condition="'@(ProjectionMetadataWinmd)'==''">
     <ItemGroup>
-      <ProjectionMetadataWinmd
-        Include="$(UserProfile)\.nuget\packages\microsoft.windows.sdk.win32metadata\55.0.45-preview\Windows.Win32.winmd" />
+      <ProjectionMetadataWinmd Include="$(UserProfile)\.nuget\packages\microsoft.windows.sdk.win32metadata\55.0.45-preview\Windows.Win32.winmd" />
     </ItemGroup>
   </Target>
 

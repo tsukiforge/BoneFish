@@ -72,7 +72,9 @@ namespace Bloxstrap.Integrations
         }
 
         /// <summary>
-        /// Cek dan apply optimasi otomatis berdasarkan spek sistem
+        /// Cek dan apply optimasi otomatis berdasarkan spek sistem.
+        /// Mengaktifkan OptimizeForLowEnd untuk perangkat low-end dan menerapkan
+        /// FastFlag rendering ringan agar Roblox benar-benar lebih lancar.
         /// </summary>
         public static bool CheckAndApply()
         {
@@ -94,16 +96,19 @@ namespace Bloxstrap.Integrations
                     };
 
                     App.Logger.WriteLine(LOG_IDENT, $"System tier detected: {tierName}. OptimizeForLowEnd enabled.");
+                }
+
+                // Apply rendering optimizations whenever low-end mode is active.
+                // This must run before Roblox launches so the FastFlags take effect.
+                if (App.Settings.Prop.OptimizeForLowEnd)
+                {
+                    ApplyAggressiveOptimizations(tier);
                     return true;
                 }
 
-                if (!shouldOptimize && App.Settings.Prop.OptimizeForLowEnd)
-                {
-                    // Optional: disable optimization jika sistem cukup bagus
-                    // App.Settings.Prop.OptimizeForLowEnd = false;
-                }
-
-                return false;
+                // Low-end mode is off: make sure our previously-applied optimization flags are removed
+                // so the user isn't permanently stuck on degraded quality.
+                return RemoveOptimizations();
             }
             catch (Exception ex)
             {
@@ -133,29 +138,91 @@ namespace Bloxstrap.Integrations
         }
 
         /// <summary>
-        /// Apply aggressive optimizations untuk ultra-low-end systems
+        /// Apply rendering optimizations untuk perangkat low-end / ultra-low-end.
+        /// FastFlag yang diterapkan akan disimpan oleh pemanggil (Bootstrapper) sebelum Roblox berjalan.
         /// </summary>
-        public static void ApplyAggressiveOptimizations()
+        public static void ApplyAggressiveOptimizations(SystemTier? tier = null)
         {
             try
             {
-                if (App.Settings.Prop.OptimizeForLowEnd)
+                if (!App.Settings.Prop.OptimizeForLowEnd)
+                    return;
+
+                tier ??= DetectSystemTier();
+
+                // Lower the texture quality to reduce VRAM/memory pressure.
+                App.FastFlags.SetValue("DFFlagTextureQualityOverrideEnabled", "True");
+                App.FastFlags.SetValue("DFIntTextureQualityOverride", "0");
+
+                // Disable post-processing grain which is comparatively expensive.
+                App.FastFlags.SetValue("FIntRenderGrainScale", "0");
+
+                // Increase batch size so the renderer flushes less often.
+                App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
+
+                // Reduce render-distance / level-of-detail switching cost.
+                // Use a milder quality floor for low-end and the lowest for ultra-low-end.
+                App.FastFlags.SetValue("DFIntDebugFRMQualityLevelOverride", tier == SystemTier.UltraLow ? "1" : "5");
+
+                if (tier == SystemTier.UltraLow)
                 {
-                    // Disable expensive features
+                    // Disable BoneFish overlays/services that themselves consume CPU on the weakest devices.
                     App.Settings.Prop.EnableFpsMonitor = false;
                     App.Settings.Prop.EnableRobloxNotifications = false;
-                    
-                    // Reduce visual effects
-                    App.FastFlags.SetValue("DFIntTextureQualityOverride", "0");
-                    App.FastFlags.SetValue("FIntRenderGrainScale", "0");
-                    App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
+                    try { App.Settings.Save(); } catch { }
 
                     App.Logger.WriteLine(LOG_IDENT, "Aggressive optimizations applied for ultra-low-end");
+                }
+                else
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Rendering optimizations applied for low-end");
                 }
             }
             catch (Exception ex)
             {
                 App.Logger.WriteLine(LOG_IDENT, $"Error applying aggressive optimizations: {ex.Message}");
+            }
+        }
+
+        // FastFlags that this service manages. Kept in one place so we can cleanly remove them
+        // when low-end optimization is turned off.
+        private static readonly string[] ManagedFlags =
+        {
+            "DFFlagTextureQualityOverrideEnabled",
+            "DFIntTextureQualityOverride",
+            "FIntRenderGrainScale",
+            "FIntMaxBatchesPerFlush",
+            "DFIntDebugFRMQualityLevelOverride"
+        };
+
+        /// <summary>
+        /// Remove any optimization FastFlags this service previously applied.
+        /// Returns true if at least one flag was removed.
+        /// </summary>
+        public static bool RemoveOptimizations()
+        {
+            try
+            {
+                bool removedAny = false;
+
+                foreach (string flag in ManagedFlags)
+                {
+                    if (App.FastFlags.GetValue(flag) is not null)
+                    {
+                        App.FastFlags.SetValue(flag, null);
+                        removedAny = true;
+                    }
+                }
+
+                if (removedAny)
+                    App.Logger.WriteLine(LOG_IDENT, "Removed low-end optimization FastFlags");
+
+                return removedAny;
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Error removing optimizations: {ex.Message}");
+                return false;
             }
         }
     }
