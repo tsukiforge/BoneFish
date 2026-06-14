@@ -1,5 +1,6 @@
 using Bloxstrap.AppData;
 using System.ComponentModel;
+using System.Security.Principal;
 
 namespace Bloxstrap
 {
@@ -89,6 +90,20 @@ namespace Bloxstrap
             }
 
             return version;
+        }
+
+        public static bool IsRunningAsAdmin()
+        {
+            try
+            {
+                using var identity = WindowsIdentity.GetCurrent();
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static bool IsRobloxRunning()

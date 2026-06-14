@@ -1,5 +1,4 @@
 using System;
-using System.Windows;
 using System.Threading;
 using System.Windows.Threading;
 using Bloxstrap.UI.Elements;
@@ -7,24 +6,32 @@ using Bloxstrap.UI.Elements;
 namespace Bloxstrap.Integrations
 {
     /// <summary>
-    /// Service untuk menampilkan FPS Monitor overlay saat game berjalan
-    /// FPS Monitor tetap aktif bahkan setelah user keluar dari game atau menutup BoneFish
-    /// Menggunakan separate dispatcher untuk persistence
+    /// Service untuk menampilkan FPS Monitor overlay dengan FPS Roblox yang ASLI.
+    ///
+    /// Sumber FPS:
+    ///  - Jika BoneFish berjalan sebagai administrator: gunakan <see cref="RealFpsCounter"/>
+    ///    (ETW / PresentMon-style) dan tampilkan overlay kustom yang bisa digeser.
+    ///  - Jika tidak (tanpa admin): ETW tidak tersedia, jadi kita mengandalkan HUD FPS
+    ///    bawaan Roblox yang sudah diaktifkan saat launch via FastFlag (FFlagDebugDisplayFPS).
     /// </summary>
     public class FpsMonitorService : IDisposable
     {
         private const string LOG_IDENT = "FpsMonitorService";
 
         private readonly ActivityWatcher _activityWatcher;
+        private readonly int _processId;
+
+        private RealFpsCounter? _fpsCounter;
         private FpsMonitorOverlay? _fpsOverlay;
         private bool _isRunning = false;
         private bool _persistentMode = false;
         private Dispatcher? _fpsDispatcher;
         private Thread? _fpsThread;
 
-        public FpsMonitorService(ActivityWatcher activityWatcher)
+        public FpsMonitorService(ActivityWatcher activityWatcher, int processId)
         {
             _activityWatcher = activityWatcher;
+            _processId = processId;
 
             _activityWatcher.OnGameJoin += (_, _) => StartMonitoring();
             _activityWatcher.OnGameLeave += (_, _) => ContinueMonitoring();
@@ -39,6 +46,18 @@ namespace Bloxstrap.Integrations
             {
                 App.Logger.WriteLine(LOG_IDENT, "Starting FPS Monitor");
 
+                _fpsCounter = new RealFpsCounter(_processId);
+
+                if (!_fpsCounter.Start())
+                {
+                    // No external real-FPS source available (ETW needs admin).
+                    // The built-in Roblox FPS HUD (enabled at launch) is used instead.
+                    App.Logger.WriteLine(LOG_IDENT, "ETW unavailable; relying on Roblox built-in FPS HUD");
+                    _fpsCounter.Dispose();
+                    _fpsCounter = null;
+                    return;
+                }
+
                 _isRunning = true;
                 _persistentMode = true;
 
@@ -46,7 +65,7 @@ namespace Bloxstrap.Integrations
                 {
                     CreateFpsWindowOnSeparateThread();
                 }
-                else if (_fpsDispatcher != null)
+                else
                 {
                     _fpsDispatcher.Invoke(() =>
                     {
@@ -72,7 +91,7 @@ namespace Bloxstrap.Integrations
                 try
                 {
                     _fpsDispatcher = Dispatcher.CurrentDispatcher;
-                    _fpsOverlay = new FpsMonitorOverlay();
+                    _fpsOverlay = new FpsMonitorOverlay(_fpsCounter!);
                     _fpsOverlay.Show();
                     App.Logger.WriteLine(LOG_IDENT, "FPS Monitor overlay created on separate dispatcher");
                     Dispatcher.Run();
@@ -99,7 +118,7 @@ namespace Bloxstrap.Integrations
                 try
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Game left but FPS Monitor continues (persistent mode enabled)");
-                    
+
                     _fpsDispatcher.Invoke(() =>
                     {
                         if (_fpsOverlay != null && _fpsOverlay.IsLoaded)
@@ -135,9 +154,7 @@ namespace Bloxstrap.Integrations
                         try
                         {
                             if (_fpsOverlay.IsLoaded)
-                            {
                                 _fpsOverlay.Close();
-                            }
                         }
                         catch { }
                     });
@@ -154,20 +171,18 @@ namespace Bloxstrap.Integrations
             try
             {
                 if (_fpsDispatcher != null)
-                {
                     _fpsDispatcher.InvokeShutdown();
-                }
 
                 if (_fpsThread != null && _fpsThread.IsAlive)
-                {
                     _fpsThread.Join(TimeSpan.FromSeconds(2));
-                }
             }
             catch (Exception ex)
             {
                 App.Logger.WriteLine(LOG_IDENT, $"Error disposing: {ex.Message}");
             }
 
+            _fpsCounter?.Dispose();
+            _fpsCounter = null;
             _fpsOverlay = null;
             _fpsDispatcher = null;
             _fpsThread = null;

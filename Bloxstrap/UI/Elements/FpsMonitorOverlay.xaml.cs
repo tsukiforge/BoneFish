@@ -1,8 +1,7 @@
+using System;
 using System.Windows;
 using System.Windows.Input;
-using System.Diagnostics;
 using System.Windows.Media;
-using System.Threading;
 using Bloxstrap.Integrations;
 
 namespace Bloxstrap.UI.Elements
@@ -10,37 +9,39 @@ namespace Bloxstrap.UI.Elements
     public partial class FpsMonitorOverlay : Window
     {
         private const string LOG_IDENT = "FpsMonitorOverlay";
-        
-        private Stopwatch _frameTimer = new();
-        private int _frameCount = 0;
-        private double _currentFps = 0;
-        private double _frameTime = 0;
-        
+
+        private readonly RealFpsCounter _fpsCounter;
+
         private System.Windows.Threading.DispatcherTimer? _fpsUpdateTimer;
-        private System.Windows.Threading.DispatcherTimer? _frameCounterTimer;
-        
+
         private Point _lastMousePos;
         private bool _isDragging = false;
         private bool _persistentMode = false;
+        private bool _vulkanWarned = false;
+        private int _ticksSinceStart = 0;
 
         private readonly SolidColorBrush _greenBrush = new(Color.FromRgb(0, 255, 0));
         private readonly SolidColorBrush _goldBrush = new(Color.FromRgb(255, 215, 0));
         private readonly SolidColorBrush _redBrush = new(Color.FromRgb(255, 0, 0));
         private readonly SolidColorBrush _purpleBrush = new(Color.FromRgb(200, 100, 255));
 
-        public FpsMonitorOverlay()
+        public FpsMonitorOverlay(RealFpsCounter fpsCounter)
         {
+            _fpsCounter = fpsCounter;
+
             InitializeComponent();
             InitializeFpsMonitoring();
             LoadPosition();
+
+            StatusText.Text = "Online";
         }
 
         private void InitializeFpsMonitoring()
         {
-            // Determine update interval based on system tier
-            int updateMs = DetermineFpsUpdateInterval();
+            // The real FPS source (ETW) is sampled on a fixed interval.
+            // Use a slower interval on low-end systems to save CPU.
+            int updateMs = App.Settings.Prop.OptimizeForLowEnd ? 2000 : 1000;
 
-            // FPS Update Timer - update UI at configurable interval
             _fpsUpdateTimer = new System.Windows.Threading.DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(updateMs)
@@ -48,71 +49,59 @@ namespace Bloxstrap.UI.Elements
             _fpsUpdateTimer.Tick += (_, _) => UpdateFpsDisplay();
             _fpsUpdateTimer.Start();
 
-            // Frame counter timer - increment frame count every 16ms (~60fps)
-            _frameCounterTimer = new System.Windows.Threading.DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(16)
-            };
-            _frameCounterTimer.Tick += (_, _) => _frameCount++;
-            _frameCounterTimer.Start();
-
-            // Reduce overlay visibility for very low-end systems
+            // Reduce overlay opacity for very low-end systems to save rendering
             if (App.Settings.Prop.OptimizeForLowEnd)
-            {
-                this.Opacity = 0.7; // Reduce opacity to save rendering
-            }
+                this.Opacity = 0.7;
 
-            _frameTimer.Start();
-
-            App.Logger.WriteLine(LOG_IDENT, $"FPS Monitor initialized (update interval={updateMs}ms, tier={GetSystemTier()})");
-        }
-
-        private int DetermineFpsUpdateInterval()
-        {
-            // Ultra-aggressive for ultra-low-end: only update every 3 seconds
-            if (App.Settings.Prop.OptimizeForLowEnd)
-            {
-                var systemInfo = AutoOptimizeService.GetSystemInfo();
-                if (systemInfo.Contains("1") || systemInfo.Contains("2GB")) // 1-2GB RAM
-                    return 3000; // Update every 3 seconds
-                
-                return 2000; // Update every 2 seconds for regular low-end
-            }
-
-            return 1000; // Update every 1 second for normal systems
-        }
-
-        private string GetSystemTier()
-        {
-            // Call static system info method
-            return AutoOptimizeService.GetSystemInfo();
+            App.Logger.WriteLine(LOG_IDENT, $"FPS Monitor initialized (real ETW source, update interval={updateMs}ms)");
         }
 
         private void UpdateFpsDisplay()
         {
-            if (_frameTimer.Elapsed.TotalSeconds > 0)
+            _ticksSinceStart++;
+
+            double fps = _fpsCounter.SampleFps();
+            double frameTime = fps > 0 ? 1000.0 / fps : 0;
+
+            // If after a few seconds in-game we've never seen a DXGI Present event,
+            // the client is rendering through Vulkan (no DXGI events). The custom
+            // overlay can't read FPS in that case, so inform the user to use the
+            // built-in Roblox HUD (Shift+F5) instead of showing a misleading 0.
+            if (!_fpsCounter.HasObservedFrames)
             {
-                _currentFps = _frameCount / _frameTimer.Elapsed.TotalSeconds;
-                if (_currentFps <= 0) _currentFps = 0.0001; // prevent div by zero
-                _frameTime = 1000.0 / _currentFps;
+                if (_ticksSinceStart >= 4 && !_vulkanWarned)
+                {
+                    _vulkanWarned = true;
+                    App.Logger.WriteLine(LOG_IDENT, "No DXGI frames observed; likely Vulkan rendering mode");
 
-                // Update UI (on UI thread)
-                FpsValueText.Text = $"{(int)_currentFps} FPS";
-                FrameTimeText.Text = $"{_frameTime:F1} ms";
+                    FpsValueText.Text = "N/A";
+                    FpsValueText.Foreground = _purpleBrush;
+                    FrameTimeText.Text = "Vulkan";
+                    StatusText.Text = "Use Shift+F5";
+                }
 
-                // Color coding for FPS using preallocated brushes
-                if (_currentFps >= 60)
-                    FpsValueText.Foreground = _greenBrush;
-                else if (_currentFps >= 30)
-                    FpsValueText.Foreground = _goldBrush;
-                else if (_persistentMode)
-                    FpsValueText.Foreground = _purpleBrush; // Purple untuk persistent mode
-                else
-                    FpsValueText.Foreground = _redBrush;
-
-                _frameCount = 0;
-                _frameTimer.Restart();
+                if (_vulkanWarned)
+                    return;
             }
+            else if (_vulkanWarned)
+            {
+                // frames started coming in after all; resume normal display
+                _vulkanWarned = false;
+                StatusText.Text = _persistentMode ? "Persistent" : "Online";
+            }
+
+            FpsValueText.Text = $"{(int)Math.Round(fps)} FPS";
+            FrameTimeText.Text = $"{frameTime:F1} ms";
+
+            // Color coding for FPS using preallocated brushes
+            if (fps >= 60)
+                FpsValueText.Foreground = _greenBrush;
+            else if (fps >= 30)
+                FpsValueText.Foreground = _goldBrush;
+            else if (_persistentMode)
+                FpsValueText.Foreground = _purpleBrush; // Purple untuk persistent mode
+            else
+                FpsValueText.Foreground = _redBrush;
         }
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
@@ -211,9 +200,7 @@ namespace Bloxstrap.UI.Elements
         protected override void OnClosed(EventArgs e)
         {
             _fpsUpdateTimer?.Stop();
-            _frameCounterTimer?.Stop();
-            _frameTimer?.Stop();
-            
+
             App.Logger.WriteLine(LOG_IDENT, "FPS Monitor closed");
             base.OnClosed(e);
         }

@@ -296,6 +296,44 @@ namespace Bloxstrap
                 if (_cancelTokenSource.IsCancellationRequested)
                     return;
 
+                // auto-detect low-end systems and apply performance FastFlags BEFORE modifications are written,
+                // so the optimizations actually take effect for this launch
+                try
+                {
+                    if (App.Settings.Prop.UseFastFlagManager && Integrations.AutoOptimizeService.CheckAndApply())
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, "Auto-optimize: low-end performance FastFlags applied");
+
+                        if (App.FastFlags.Changed)
+                            App.FastFlags.Save();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteException(LOG_IDENT, ex);
+                }
+
+                // FPS Monitor: ensure a real FPS source is available for this launch.
+                // Non-elevated sessions cannot read external FPS (ETW needs admin), so we
+                // enable Roblox's own built-in FPS HUD via FastFlag. Elevated sessions use
+                // the custom ETW overlay instead, so the built-in HUD flag is removed.
+                try
+                {
+                    if (App.Settings.Prop.UseFastFlagManager)
+                    {
+                        bool useBuiltinHud = App.Settings.Prop.EnableFpsMonitor && !Utilities.IsRunningAsAdmin();
+
+                        App.FastFlags.SetValue("FFlagDebugDisplayFPS", useBuiltinHud ? "True" : null);
+
+                        if (App.FastFlags.Changed)
+                            App.FastFlags.Save();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteException(LOG_IDENT, ex);
+                }
+
                 // we require deployment details for applying modifications for a worst case scenario,
                 // where we'd need to restore files from a package that isn't present on disk and needs to be redownloaded
                 allModificationsApplied = await ApplyModifications();
@@ -887,9 +925,12 @@ namespace Bloxstrap
 
             if (String.IsNullOrEmpty(logFileName))
             {
-                App.Logger.WriteLine(LOG_IDENT, "Unable to identify log file");
-                // Frontend.ShowPlayerErrorDialog();
-                return;
+                // We couldn't identify the log file (this commonly happens when Roblox
+                // performs its own self-update and restarts). Do NOT return here:
+                // the watcher still needs to be spawned so the system tray icon, context
+                // menu, and "Close Roblox" option appear. Only activity tracking depends
+                // on the log file, and the watcher handles a missing log gracefully.
+                App.Logger.WriteLine(LOG_IDENT, "Unable to identify log file; continuing so the tray icon still appears");
             }
             else
             {
@@ -939,8 +980,6 @@ namespace Bloxstrap
 
             if (App.Settings.Prop.EnableActivityTracking || App.LaunchSettings.TestModeFlag.Active || autoclosePids.Any())
             {
-                using var ipl = new InterProcessLock("Watcher", TimeSpan.FromSeconds(5));
-
                 var watcherData = new WatcherData
                 {
                     ProcessId = _appPid,
@@ -956,8 +995,11 @@ namespace Bloxstrap
                 if (App.LaunchSettings.TestModeFlag.Active)
                     args += " -testmode";
 
-                if (ipl.IsAcquired || true)
-                    Process.Start(Paths.Process, args);
+                // Spawn the watcher directly. We must NOT hold the "Watcher" InterProcessLock
+                // here: the watcher process manages that lock itself (with a takeover routine
+                // for stale instances). Holding it from the bootstrapper made the freshly
+                // spawned watcher fail to acquire the lock and abort before creating the tray icon.
+                Process.Start(Paths.Process, args);
             }
 
             // allow for window to show, since the log is created pretty far beforehand
