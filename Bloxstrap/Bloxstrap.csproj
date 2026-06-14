@@ -29,9 +29,51 @@
     <None Include="Resources\Wallpapers\**\*" CopyToOutputDirectory="PreserveNewest" />
     <!-- Explicit items outside Resources folder -->
     <Resource Include="Bloxstrap.ico" />
+      <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\PlayerLogo.png" />
+    <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Roblox.png" />
+    <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\Studio.png" />
+    <Resource Include="Resources\BootstrapperStyles\TwentyFiveDialog\StudioLogo.png" />
+    <Resource Include="Resources\LightEditor.xshd" />
+    <Resource Include="Resources\Fonts\NotoSansThai-VariableFont_wdth,wght.ttf" />
+    <Resource Include="Resources\Fonts\Rubik-VariableFont_wght.ttf" />
+    <Resource Include="Resources\Fonts\Inter-Regular.ttf" />
+    <Resource Include="Resources\Fonts\Inter-Medium.ttf" />
+    <Resource Include="Resources\Fonts\Inter-SemiBold.ttf" />
+    <Resource Include="Resources\Fonts\Inter-Light.ttf" />
+    <Resource Include="Resources\BootstrapperStyles\ByfronDialog\ByfronLogoDark.jpg" />
+    <Resource Include="Resources\BootstrapperStyles\ByfronDialog\ByfronLogoLight.jpg" />
+    <Resource Include="Resources\BootstrapperStyles\ByfronDialog\Matt.png" />
+    <Resource Include="Resources\MessageBox\Error.png" />
+    <Resource Include="Resources\MessageBox\Information.png" />
+    <Resource Include="Resources\MessageBox\Question.png" />
+    <Resource Include="Resources\MessageBox\Warning.png" />
     <EmbeddedResource Include="UI\Style\Editor-Theme-Dark.xshd" />
     <EmbeddedResource Include="UI\Style\Editor-Theme-Light.xshd" />
   </ItemGroup>
+
+<ItemGroup>
+    <EmbeddedResource Include="Resources\CustomBootstrapperSchema.json" />
+    <EmbeddedResource Include="Resources\CustomBootstrapperTemplate.xml" />
+    <EmbeddedResource Include="Resources\CustomBootstrapperTemplate_Blank.xml" />
+    <EmbeddedResource Include="Resources\CustomBootstrapperTemplate_Simple.xml" />
+    <EmbeddedResource Include="Resources\Icon2008.ico" />
+    <EmbeddedResource Include="Resources\Icon2011.ico" />
+    <EmbeddedResource Include="Resources\Icon2017.ico" />
+    <EmbeddedResource Include="Resources\Icon2019.ico" />
+    <EmbeddedResource Include="Resources\Icon2022.ico" />
+    <EmbeddedResource Include="Resources\IconBoneFish.ico" />
+    <EmbeddedResource Include="Resources\IconEarly2015.ico" />
+    <EmbeddedResource Include="Resources\IconLate2015.ico" />
+    <EmbeddedResource Include="Resources\Mods\Cursor\From2006\ArrowCursor.png" />
+    <EmbeddedResource Include="Resources\Mods\Cursor\From2006\ArrowFarCursor.png" />
+    <EmbeddedResource Include="Resources\Mods\Cursor\From2013\ArrowCursor.png" />
+    <EmbeddedResource Include="Resources\Mods\Cursor\From2013\ArrowFarCursor.png" />
+    <EmbeddedResource Include="Resources\Mods\Sounds\OldGetUp.mp3" />
+    <EmbeddedResource Include="Resources\Mods\Sounds\OldJump.mp3" />
+    <EmbeddedResource Include="Resources\Mods\Sounds\OldWalk.mp3" />
+    <EmbeddedResource Include="Resources\Mods\Sounds\Empty.mp3" />
+    <EmbeddedResource Include="Resources\Mods\OldAvatarBackground.rbxl" />
+    </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
