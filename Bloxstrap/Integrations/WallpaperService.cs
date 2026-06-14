@@ -30,12 +30,9 @@ namespace Bloxstrap.Integrations
             Quality = 2
         }
 
-        /// <summary>
-        /// Get wallpaper path berdasarkan tipe
-        /// </summary>
         private static string GetWallpaperPath(WallpaperType type)
         {
-            string wallpaperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Wallpapers");
+            string wallpaperPath = Paths.ResolveWallpapersDir();
 
             return type switch
             {
