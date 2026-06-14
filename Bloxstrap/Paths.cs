@@ -39,6 +39,29 @@
 
         public static bool Initialized => !String.IsNullOrEmpty(Base);
 
+        /// <summary>
+        /// Resolve the Wallpapers folder path, trying multiple base directories
+        /// to handle different execution contexts (build, installed, published).
+        /// </summary>
+        public static string ResolveWallpapersDir()
+        {
+            string[] candidates = new[]
+            {
+                AppDomain.CurrentDomain.BaseDirectory,
+                Path.GetDirectoryName(typeof(Paths).Assembly.Location) ?? "",
+                Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ""
+            };
+
+            foreach (string dir in candidates)
+            {
+                if (string.IsNullOrEmpty(dir)) continue;
+                string path = Path.Combine(dir, "Resources", "Wallpapers");
+                if (Directory.Exists(path)) return path;
+            }
+
+            return Path.Combine(candidates[0], "Resources", "Wallpapers");
+        }
+
         public static void Initialize(string baseDirectory)
         {
             Base = baseDirectory;

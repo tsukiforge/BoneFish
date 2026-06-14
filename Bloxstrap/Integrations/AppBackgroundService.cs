@@ -23,6 +23,8 @@ namespace Bloxstrap.Integrations
             Extra = 3
         }
 
+
+
         /// <summary>
         /// Get wallpaper image source berdasarkan tipe
         /// </summary>
@@ -30,7 +32,7 @@ namespace Bloxstrap.Integrations
         {
             try
             {
-                string wallpaperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Wallpapers");
+                string wallpaperPath = Paths.ResolveWallpapersDir();
 
                 string imagePath = type switch
                 {
@@ -102,7 +104,7 @@ namespace Bloxstrap.Integrations
 
                 foreach (BackgroundType type in Enum.GetValues(typeof(BackgroundType)))
                 {
-                    string wallpaperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Wallpapers");
+                    string wallpaperPath = Paths.ResolveWallpapersDir();
                     string imagePath = type switch
                     {
                         BackgroundType.Default => Path.Combine(wallpaperPath, "wallpapers.jpg"),
