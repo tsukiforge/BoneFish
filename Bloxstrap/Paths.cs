@@ -45,6 +45,14 @@
         /// </summary>
         public static string ResolveWallpapersDir()
         {
+            // If installed, wallpapers are extracted to Base\Resources\Wallpapers
+            if (Initialized)
+            {
+                string installedPath = Path.Combine(Base, "Resources", "Wallpapers");
+                if (Directory.Exists(installedPath)) return installedPath;
+            }
+
+            // Fallback: look next to the executable (dev/build environment)
             string[] candidates = new[]
             {
                 AppDomain.CurrentDomain.BaseDirectory,
