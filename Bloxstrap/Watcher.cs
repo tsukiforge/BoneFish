@@ -31,23 +31,35 @@ namespace Bloxstrap
             if (!_lock.IsAcquired)
             {
                 App.Logger.WriteLine(LOG_IDENT, "Watcher instance already exists, signaling it to exit...");
-                try
+
+                // Wake up any waiting watcher zombies so they exit gracefully. The exit event
+                // is AutoReset, so each Set() only releases a single waiter; loop to handle
+                // more than one stale instance, retrying the lock after each signal.
+                for (int i = 0; i < 5 && !_lock.IsAcquired; i++)
                 {
-                    _exitEvent.Set();
-                }
-                catch (Exception ex)
-                {
-                    App.Logger.WriteException(LOG_IDENT, ex);
+                    try
+                    {
+                        _exitEvent.Set();
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Logger.WriteException(LOG_IDENT, ex);
+                    }
+
+                    _lock.RetryAcquire(TimeSpan.FromMilliseconds(400));
                 }
 
-                if (_lock.RetryAcquire(TimeSpan.FromSeconds(2)))
+                if (_lock.IsAcquired)
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Successfully took over Watcher lock.");
                 }
                 else
                 {
-                    App.Logger.WriteLine(LOG_IDENT, "Failed to acquire Watcher lock after signal. Force closing other instances...");
-                    Utilities.KillProcessesRunningFrom(Paths.Process);
+                    // The previous watcher didn't exit gracefully. Force-kill ONLY the stuck
+                    // watcher process (identified by its PID file), so we never take down a
+                    // legitimate bootstrapper/settings/menu process running from the same path.
+                    App.Logger.WriteLine(LOG_IDENT, "Watcher did not exit gracefully. Force-killing the stuck watcher process...");
+                    KillStuckWatcher();
                     _lock.RetryAcquire(TimeSpan.FromSeconds(1));
                 }
             }
@@ -57,6 +69,20 @@ namespace Bloxstrap
                 App.Logger.WriteLine(LOG_IDENT, "Watcher instance still exists, aborting watcher startup.");
                 return;
             }
+
+            // We hold the lock now. Clear any leftover exit-event signal (an AutoReset event
+            // can retain a pending Set() if no waiter consumed it) so we don't exit the system
+            // tray prematurely later, then record our PID so a future watcher can target us precisely.
+            try
+            {
+                _exitEvent.Reset();
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+
+            WriteWatcherPidFile();
 
             string? watcherDataArg = App.LaunchSettings.WatcherFlag.Data;
 
@@ -87,16 +113,13 @@ namespace Bloxstrap
 
             WindowManipulation = new(_watcherData.Handle, _watcherData.ProcessId);
 
-            // Auto-detect low-end systems and enable OptimizeForLowEnd if needed
+            // Initialize DNS resilience for network stability.
+            // (Performance FastFlags are now applied by the Bootstrapper before launch.)
             try
             {
-                if (AutoOptimizeService.CheckAndApply())
-                    App.Logger.WriteLine(LOG_IDENT, "Auto-optimize: OptimizeForLowEnd enabled due to system detection.");
-                
-                // Initialize DNS resilience for network stability
                 var dnsTask = DnsResilienceService.TestDnsConnectivityAsync();
                 dnsTask.Wait(TimeSpan.FromSeconds(3)); // Wait max 3 seconds
-                
+
                 if (dnsTask.IsCompletedSuccessfully)
                 {
                     App.Logger.WriteLine(LOG_IDENT, "DNS resilience service initialized");
@@ -107,7 +130,10 @@ namespace Bloxstrap
                 App.Logger.WriteException(LOG_IDENT, ex);
             }
 
-            if (App.Settings.Prop.EnableActivityTracking)
+            // Only start activity tracking if we actually have a valid log file.
+            // The tray icon below does not depend on this, so it will still appear
+            // even when Roblox self-updated and the log file couldn't be identified.
+            if (App.Settings.Prop.EnableActivityTracking && !String.IsNullOrEmpty(_watcherData.LogFile) && File.Exists(_watcherData.LogFile))
             {
                 ActivityWatcher = new(_watcherData.LogFile);
 
@@ -136,12 +162,122 @@ namespace Bloxstrap
                 if (App.Settings.Prop.EnableFpsMonitor)
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Initializing FPS Monitor");
-                    FpsMonitor = new(ActivityWatcher);
+                    FpsMonitor = new(ActivityWatcher, _watcherData.ProcessId);
                 }
             }
+            else if (App.Settings.Prop.EnableActivityTracking)
+            {
+                // Activity tracking is enabled but the log file is missing (e.g. Roblox self-updated).
+                // The tray icon will still be created below; tracking-dependent features are skipped this session.
+                App.Logger.WriteLine(LOG_IDENT, "Activity tracking enabled but log file is unavailable; skipping tracking, tray icon will still appear");
+            }
 
-            _notifyIcon = new(this);
+            // Always initialize the tray icon last; guard it so a failure here
+            // never leaves the user without a system tray icon.
+            try
+            {
+                _notifyIcon = new(this);
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Failed to initialize system tray icon");
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
         }
+
+        #region Watcher PID tracking
+        // Path to a small file recording the PID of the watcher that currently holds the lock.
+        // This lets a new watcher precisely target a stuck (zombie) watcher for cleanup without
+        // killing unrelated BoneFish processes (bootstrapper/settings/menu) from the same path.
+        private static string WatcherPidFile => Path.Combine(Paths.Base, "Watcher.pid");
+
+        private static void WriteWatcherPidFile()
+        {
+            const string LOG_IDENT = "Watcher::WriteWatcherPidFile";
+
+            try
+            {
+                File.WriteAllText(WatcherPidFile, Environment.ProcessId.ToString());
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+        }
+
+        private static void TryDeleteWatcherPidFile()
+        {
+            try
+            {
+                if (File.Exists(WatcherPidFile))
+                    File.Delete(WatcherPidFile);
+            }
+            catch (Exception)
+            {
+                // best-effort cleanup
+            }
+        }
+
+        private static void KillStuckWatcher()
+        {
+            const string LOG_IDENT = "Watcher::KillStuckWatcher";
+
+            if (!File.Exists(WatcherPidFile))
+            {
+                App.Logger.WriteLine(LOG_IDENT, "No watcher PID file found; nothing to clean up.");
+                return;
+            }
+
+            if (!int.TryParse(File.ReadAllText(WatcherPidFile).Trim(), out int pid))
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Watcher PID file is malformed; deleting it.");
+                TryDeleteWatcherPidFile();
+                return;
+            }
+
+            // never kill ourselves
+            if (pid == Environment.ProcessId)
+                return;
+
+            try
+            {
+                using var process = Process.GetProcessById(pid);
+
+                // Verify this is actually a BoneFish process running from our executable before
+                // killing it, so we never take down an unrelated process that happens to have
+                // reused the PID.
+                string currentName = Path.GetFileNameWithoutExtension(Paths.Process);
+                string? processPath = process.MainModule?.FileName;
+
+                bool isBoneFish =
+                    string.Equals(process.ProcessName, currentName, StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrEmpty(processPath)
+                    && string.Equals(Path.GetFullPath(processPath), Path.GetFullPath(Paths.Process), StringComparison.OrdinalIgnoreCase);
+
+                if (!isBoneFish)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"PID {pid} is not a BoneFish process from our path; skipping kill.");
+                    TryDeleteWatcherPidFile();
+                    return;
+                }
+
+                App.Logger.WriteLine(LOG_IDENT, $"Killing stuck watcher process (pid={pid})");
+                process.Kill();
+                process.WaitForExit(2000);
+            }
+            catch (ArgumentException)
+            {
+                // process already exited
+                App.Logger.WriteLine(LOG_IDENT, $"Stuck watcher process (pid={pid}) has already exited.");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+
+            TryDeleteWatcherPidFile();
+        }
+        #endregion
 
         public void KillRobloxProcess() => CloseProcess(_watcherData!.ProcessId, true);
 
@@ -232,6 +368,22 @@ namespace Bloxstrap
             FpsMonitor?.Dispose();
 
             App.State.Prop.WatcherRunning = false;
+
+            // Only remove the PID file if it still belongs to us, so we don't clobber a newer
+            // watcher that has since taken over.
+            try
+            {
+                if (File.Exists(WatcherPidFile)
+                    && int.TryParse(File.ReadAllText(WatcherPidFile).Trim(), out int pid)
+                    && pid == Environment.ProcessId)
+                {
+                    File.Delete(WatcherPidFile);
+                }
+            }
+            catch (Exception)
+            {
+                // best-effort cleanup
+            }
 
             try
             {
