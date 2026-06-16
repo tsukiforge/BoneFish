@@ -36,10 +36,20 @@ namespace Bloxstrap.UI.ViewModels.Settings
             set => App.Settings.Prop.EnableNotificationSound = value;
         }
 
+        public bool IsRunningAsAdmin => Utilities.IsRunningAsAdmin();
+
+        public Visibility FpsAdminInfoVisibility =>
+            EnableFpsMonitor && !IsRunningAsAdmin ? Visibility.Visible : Visibility.Collapsed;
+
         public bool EnableFpsMonitor
         {
             get => App.Settings.Prop.EnableFpsMonitor;
-            set => App.Settings.Prop.EnableFpsMonitor = value;
+            set
+            {
+                App.Settings.Prop.EnableFpsMonitor = value;
+                OnPropertyChanged(nameof(EnableFpsMonitor));
+                OnPropertyChanged(nameof(FpsAdminInfoVisibility));
+            }
         }
 
         public bool OptimizeForLowEnd

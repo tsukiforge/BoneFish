@@ -46,6 +46,25 @@
             <ui:ToggleSwitch IsChecked="{Binding EnableFpsMonitor, Mode=TwoWay}" />
         </controls:OptionControl>
 
+        <Border Visibility="{Binding FpsAdminInfoVisibility}" 
+                Background="{DynamicResource ControlFillColorDefaultBrush}" 
+                CornerRadius="8" 
+                Padding="12" 
+                Margin="0,0,0,8"
+                BorderBrush="{DynamicResource SystemControlForegroundAccentBrush}"
+                BorderThickness="1">
+            <StackPanel>
+                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                    <Run Text="💡 "/>
+                    <Run Text="Overlay FPS kustom hanya muncul jika BoneFish dijalankan sebagai "/>
+                    <Bold Foreground="{DynamicResource TextFillColorPrimaryBrush}"><Run Text="Administrator"/></Bold>
+                    <Run Text=". Jika tidak ingin pakai admin, aktifkan FPS Monitor ini lalu tekan "/>
+                    <Bold Foreground="{DynamicResource TextFillColorPrimaryBrush}"><Run Text="Shift+F5"/></Bold>
+                    <Run Text=" di dalam game untuk melihat FPS bawaan Roblox."/>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
         <controls:OptionControl 
             Header="Optimalkan untuk perangkat low-end (Rendah)" 
             Description="Kurangi frekuensi update dan beban CPU agar fitur lebih ringan di laptop jadul. Recommended untuk perangkat kentang.">
