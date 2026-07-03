@@ -69,6 +69,14 @@ namespace Bloxstrap.Models.Persistable
         // performance preset
         public string SelectedPerformancePreset { get; set; } = "None";
 
+        // ExtremePerformance (Potato Mode) — override manual agar user bisa paksa mode ini
+        // walau auto-detect tidak mendeteksi perangkat sebagai UltraLow
+        public bool ForceExtremeMode { get; set; } = false;
+
+        // Target FPS untuk TaskScheduler pada Extreme/UltraLow mode.
+        // Default 30fps; bisa diturunkan ke 24 untuk perangkat paling lemah.
+        public int ExtremeModeFpsTarget { get; set; } = 30;
+
         // custom background
         public string CustomBackgroundPath { get; set; } = "";
     }
