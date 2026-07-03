@@ -332,17 +332,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             MeshQualityEnabled = true;
             MeshQuality = 0;
             FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 1;  // Minimum rendering quality
-            
-            // Ultra low lighting
-            App.FastFlags.SetPreset("Rendering.LightingMode", "Default");
-            App.FastFlags.SetPreset("Rendering.EnvironmentSpecMap", "False");
-            App.FastFlags.SetPreset("Rendering.DisableLighting", "False");
-            App.FastFlags.SetPreset("Terrain.GridV2", "False");
+            FRMQualityOverride = 1;
 
-            // Anti-crash memory optimizations
+            // Anti-crash: batasi FPS, light updates (Max=4 bukan 1 — nilai 1 bug gelap),
+            // dan texture compositor jobs.
             App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "1");
+            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
             App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
 
@@ -424,29 +419,23 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // Pause voxelizer + reset fade radius voxelizer.
             App.FastFlags.SetValue("DFFlagDebugPauseVoxelizer", "True");
             App.FastFlags.SetValue("FIntCSGVoxelizerFadeRadius", "0");
-            // Paksa Voxel lighting (paling ringan) — otomatis hilangkan water reflection/PBR.
-            App.FastFlags.SetValue("DFFlagDebugRenderForceTechnologyVoxel", "True");
-            // Nonaktifkan light attenuation baru, fallback ke model lama yang lebih murah.
-            App.FastFlags.SetValue("FFlagNewLightAttenuation", "False");
-            // Light updates: Max=4 (BUKAN 1) — nilai 1 menyebabkan senter/torch bug
-            // gelap permanen karena posisi cahaya tidak update cukup cepat saat bergerak.
+            // DFFlagDebugRenderForceTechnologyVoxel: DIHAPUS — menyebabkan layar hitam
+            // di semua game yang memakai ShadowMap/Future lighting (mayoritas game Roblox).
+            // FFlagNewLightAttenuation: DIHAPUS — mengubah model lighting game, visual tidak normal.
+            // Light updates: Max=4 agar senter/torch tidak bug gelap.
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
 
             // ── Post-Processing ───────────────────────────────────────────────────────────
-            // Matikan semua post-FX: bloom, color correction, sun rays, depth of field.
-            App.FastFlags.SetValue("FFlagDisablePostFx", "True");
-            // Matikan SSAO (ambient occlusion) — efek bayangan kontak yang mahal di CPU/GPU.
+            // FFlagDisablePostFx: DIHAPUS — mematikan post-FX milik game (bukan hanya Roblox
+            // default), hasilnya visual game rusak total tergantung desain game tersebut.
+            // FFlagDebugSkyGray: DIHAPUS — skybox abu-abu merusak atmosphere semua game.
+            // Yang aman: hanya matikan SSAO, blur ESC menu, dan grain — tidak menyentuh
+            // lighting atau post-FX yang didesain oleh game developer.
             App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
             App.FastFlags.SetValue("FIntSSAOMipLevels", "0");
-            // Matikan blur menu ESC — post-process tambahan yang tidak diperlukan.
             App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
-            // Matikan grain/film noise pass.
             App.FastFlags.SetValue("FIntRenderGrainScale", "0");
-
-            // ── Sky & Atmosphere ──────────────────────────────────────────────────────────
-            // Ganti skybox dengan warna abu-abu datar — hapus render atmosfer gradient.
-            App.FastFlags.SetValue("FFlagDebugSkyGray", "True");
 
             // ── Grass, Foliage & Wind ─────────────────────────────────────────────────────
             App.FastFlags.SetValue("FIntFRMMinGrassDistance", "0");
