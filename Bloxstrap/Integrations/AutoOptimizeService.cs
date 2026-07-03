@@ -235,34 +235,36 @@ namespace Bloxstrap.Integrations
                 // Sumber: Firebladedoge229 gist (confirmed 2026).
                 App.FastFlags.SetValue("FIntCSGVoxelizerFadeRadius", "0");
 
-                // FFlagNewLightAttenuation=False: nonaktifkan attenuation pencahayaan baru
-                // yang lebih mahal, fallback ke model attenuation lama yang lebih ringan.
-                // Sumber: Firebladedoge229 gist, catb0x/Roblox-Potato-FFlags (confirmed 2026).
-                App.FastFlags.SetValue("FFlagNewLightAttenuation", "False");
+                // FFlagNewLightAttenuation: SENGAJA TIDAK DISET.
+                // Mengubah model attenuation bisa merusak lighting game yang didesain
+                // khusus untuk model tertentu — visual jadi gelap/terang tidak wajar.
 
                 // ── SKY, ATMOSPHERE & POST-PROCESSING ────────────────────────────────────
-                // FFlagDebugSkyGray=True: ganti skybox default dengan warna abu-abu datar.
-                // Menghilangkan render skybox + atmosphere yang mahal (gradient, scatter, dll).
-                // Hanya efektif pada game dengan default Roblox skybox.
-                // Sumber: catb0x/Roblox-Potato-FFlags, Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("FFlagDebugSkyGray", "True");
-
-                // FFlagDisablePostFx=True: matikan semua efek post-processing sekaligus —
-                // mencakup bloom, color correction, sun rays, depth of field, dan blur.
-                // Ini salah satu flag paling impactful untuk GPU budget rendah.
-                // Sumber: Firebladedoge229 gist, catb0x/Roblox-Potato-FFlags (confirmed 2026).
-                App.FastFlags.SetValue("FFlagDisablePostFx", "True");
+                // CATATAN: FFlagDebugSkyGray dan FFlagDisablePostFx SENGAJA TIDAK DIPAKAI.
+                //
+                // FFlagDebugSkyGray: mengganti skybox dengan abu-abu datar — terlihat sangat
+                // aneh di game apapun yang punya custom sky/atmosphere. Merusak visual.
+                //
+                // FFlagDisablePostFx: mematikan post-FX GLOBAL termasuk bloom, color correction,
+                // sun rays, dan depth of field milik GAME — bukan hanya Roblox default.
+                // Efeknya: visual game berubah total, bisa jadi terlalu gelap/flat/rusak
+                // tergantung desain game tersebut. Tidak acceptable untuk preset umum.
+                //
+                // Yang aman dan tetap dipakai:
+                // FIntRobloxGuiBlurIntensity=0: hanya matikan blur menu ESC — tidak menyentuh
+                // efek post-processing in-game sama sekali.
+                App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
 
                 // FFlagDebugSSAOForce=False + FIntSSAOMipLevels=0: matikan SSAO
-                // (Screen Space Ambient Occlusion) — efek bayangan kontak yang mahal.
+                // (Screen Space Ambient Occlusion) — efek bayangan kontak yang mahal di GPU.
+                // Penghematan nyata, perubahan visual minimal (hanya shadow contact yang halus).
                 // Sumber: Firebladedoge229 gist (confirmed 2026).
                 App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
                 App.FastFlags.SetValue("FIntSSAOMipLevels", "0");
 
-                // FIntRobloxGuiBlurIntensity=0: matikan blur background saat menu ESC dibuka.
-                // Blur menu adalah post-process tambahan yang tidak perlu di device kentang.
-                // Sumber: Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
+                // FIntRenderGrainScale=0: matikan efek grain/film noise.
+                // Grain murni kosmetik, tidak ada game yang bergantung pada efek ini.
+                App.FastFlags.SetValue("FIntRenderGrainScale", "0");
 
                 // ── GRASS, FOLIAGE & ANGIN ────────────────────────────────────────────────
                 // FIntFRMMinGrassDistance/FIntFRMMaxGrassDistance=0: set jarak render rumput
@@ -301,18 +303,13 @@ namespace Bloxstrap.Integrations
                 // Dinonaktifkan di sini. Tekanan RAM sudah cukup ditangani oleh LOD=0 + FRM=1.
 
                 // ── TERRAIN DETAIL ────────────────────────────────────────────────────────
-                // FIntTerrainArraySliceSize=0: kurangi jumlah slice array terrain texture —
-                // langsung berdampak pada kualitas terrain (lebih flat/blocky) tapi hemat VRAM.
-                // Sumber: Firebladedoge229 gist (confirmed 2026).
+                // FIntTerrainArraySliceSize=0: kurangi slice array terrain texture — hemat VRAM.
+                // Terrain jadi sedikit lebih flat tapi tidak mengubah lighting/visual game.
                 App.FastFlags.SetValue("FIntTerrainArraySliceSize", "0");
 
-                // ── WATER REFLECTION & EFEK PERMUKAAN ────────────────────────────────────
-                // DFFlagDebugRenderForceTechnologyVoxel=True: paksa engine ke mode Voxel
-                // Lighting alih-alih ShadowMap/Future. Voxel jauh lebih ringan — tidak ada
-                // real-time shadow map, tidak ada screen-space reflections, tidak ada PBR
-                // environment specular. Water reflections otomatis hilang di Voxel mode.
-                // Sumber: catb0x/Roblox-Potato-FFlags, Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("DFFlagDebugRenderForceTechnologyVoxel", "True");
+                // DFFlagDebugRenderForceTechnologyVoxel: SENGAJA TIDAK DISET.
+                // Memaksa Voxel lighting merusak SEMUA game yang memakai ShadowMap/Future —
+                // hasilnya layar hitam total seperti screenshot v3.9.0. Tidak acceptable.
 
                 // ── GRAIN SCALE & BATCH FLUSH ────────────────────────────────────────────
                 // FIntRenderGrainScale=0: matikan efek grain/film noise di post-process pass.
@@ -439,14 +436,16 @@ namespace Bloxstrap.Integrations
             "FIntRenderShadowIntensity",
             "DFFlagDebugPauseVoxelizer",
             "FIntCSGVoxelizerFadeRadius",
-            "FFlagNewLightAttenuation",
+            // FFlagNewLightAttenuation — DIHAPUS (mengubah model lighting game)
 
             // ── Sky, atmosphere & post-processing ────────────────────────────────────────
-            "FFlagDebugSkyGray",
-            "FFlagDisablePostFx",
+            // FFlagDebugSkyGray       — DIHAPUS (merusak visual semua game)
+            // FFlagDisablePostFx      — DIHAPUS (merusak post-FX milik game)
+            // FFlagNewLightAttenuation — DIHAPUS (mengubah model lighting game)
             "FFlagDebugSSAOForce",
             "FIntSSAOMipLevels",
             "FIntRobloxGuiBlurIntensity",
+            "FIntRenderGrainScale",
 
             // ── Grass, foliage & wind ─────────────────────────────────────────────────────
             "FIntFRMMinGrassDistance",
@@ -467,7 +466,7 @@ namespace Bloxstrap.Integrations
             "FIntTerrainArraySliceSize",
 
             // ── Water reflection / lighting technology ────────────────────────────────────
-            "DFFlagDebugRenderForceTechnologyVoxel",
+            // DFFlagDebugRenderForceTechnologyVoxel — DIHAPUS (layar hitam di semua game ShadowMap/Future)
 
             // ── Grain scale & batch flush ─────────────────────────────────────────────────
             "FIntRenderGrainScale",
