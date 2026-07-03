@@ -194,6 +194,10 @@ namespace Bloxstrap.Integrations
                 bool isExtreme = tier == SystemTier.ExtremePerformance;
                 bool isUltraOrExtreme = tier == SystemTier.UltraLow || isExtreme;
 
+                // Bersihkan SEMUA flag lama sebelum menulis yang baru —
+                // mencegah akumulasi flag antar versi / antar preset.
+                PurgeAllKnownFlags();
+
                 // ── TEXTURE QUALITY ──────────────────────────────────────────────────────
                 // Paksa kualitas tekstur ke level 0 (terendah) untuk kurangi tekanan VRAM/RAM.
                 // DFFlagTextureQualityOverrideEnabled: aktifkan override kualitas tekstur.
@@ -417,10 +421,102 @@ namespace Bloxstrap.Integrations
             }
         }
 
-        // FastFlags yang dikelola service ini. Satu tempat agar RemoveOptimizations()
-        // bisa membersihkan semua flag ketika low-end mode dimatikan.
-        // PENTING: setiap flag baru yang ditambah di ApplyAggressiveOptimizations()
-        // HARUS ditambahkan di sini juga, atau tidak akan dibersihkan saat mode dinonaktifkan.
+        // ── MASTER LIST: semua flag yang PERNAH dikelola BoneFish ────────────────────────
+        // Termasuk flag yang sudah dihapus dari versi lama (Voxel, PostFx, SkyGray, dll).
+        // Tujuan: PurgeAllKnownFlags() bisa membersihkan ClientAppSettings.json sepenuhnya
+        // dari SEMUA sisa flag lama, terlepas dari versi BoneFish yang sebelumnya dipakai.
+        // ATURAN: flag apapun yang PERNAH dipakai SetValue() di codebase ini HARUS ada di sini.
+        private static readonly string[] AllKnownManagedFlags =
+        {
+            // Texture quality
+            "DFFlagTextureQualityOverrideEnabled",
+            "DFIntTextureQualityOverride",
+            "FIntTextureCompositorLowResFactor",
+            "DFIntTextureCompositorActiveJobs",
+
+            // FRM / graphics quality
+            "DFIntDebugFRMQualityLevelOverride",
+            "FIntRomarkStartWithGraphicQualityLevel",
+
+            // Shadow rendering
+            "FIntRenderShadowIntensity",
+            "DFFlagDebugPauseVoxelizer",
+            "FIntCSGVoxelizerFadeRadius",
+
+            // Lighting technology — termasuk yang sudah DIHAPUS dari preset aktif
+            "DFFlagDebugRenderForceTechnologyVoxel",   // DIHAPUS — layar hitam
+            "FFlagNewLightAttenuation",                // DIHAPUS — merusak lighting game
+            "FFlagFastGPULightCulling3",               // night vision flag
+
+            // Sky, atmosphere & post-processing — termasuk yang sudah DIHAPUS
+            "FFlagDebugSkyGray",                       // DIHAPUS — sky abu-abu
+            "FFlagDisablePostFx",                      // DIHAPUS — post-FX game mati
+            "FFlagDebugSSAOForce",
+            "FIntSSAOMipLevels",
+            "FIntRobloxGuiBlurIntensity",
+            "FIntRenderGrainScale",
+
+            // Grass, foliage & wind
+            "FIntFRMMinGrassDistance",
+            "FIntFRMMaxGrassDistance",
+            "FIntRenderGrassDetailStrands",
+            "FIntRenderGrassHeightScaler",
+            "FFlagGlobalWindActivated",
+
+            // Mesh LOD / render distance
+            "DFIntCSGLevelOfDetailSwitchingDistance",
+            "DFIntCSGLevelOfDetailSwitchingDistanceL12",
+            "DFIntCSGLevelOfDetailSwitchingDistanceL23",
+            "DFIntCSGLevelOfDetailSwitchingDistanceL34",
+            "DFIntCSGv2LodsToGenerate",
+            "DFIntDebugRestrictGCDistance",            // DIHAPUS — not responding
+
+            // Terrain detail
+            "FIntTerrainArraySliceSize",
+
+            // Dynamic faces (FACS) — termasuk yang sudah DIHAPUS
+            "DFIntAnimationLodFacsDistanceMin",        // DIHAPUS — mic rusak
+            "DFIntAnimationLodFacsDistanceMax",        // DIHAPUS — mic rusak
+            "DFIntAnimationLodFacsVisibilityDenominator", // DIHAPUS — mic rusak
+
+            // Batch flush & render
+            "FIntMaxBatchesPerFlush",
+
+            // Task scheduler / FPS cap
+            "DFIntTaskSchedulerTargetFps",
+
+            // Dynamic lighting
+            "FIntRenderLocalLightUpdatesMax",
+            "FIntRenderLocalLightUpdatesMin",
+            "FIntRenderLocalLightFadeInMs",
+
+            // Anti not-responding
+            "DFIntMaxActiveAnimationTracks",
+            "FFlagDebugDisableTelemetryEphemeralCounter",
+            "FFlagDebugDisableTelemetryEphemeralStat",
+            "FFlagDebugDisableTelemetryEventIngest",
+            "FFlagDebugDisableTelemetryPoint",
+            "FFlagDebugDisableTelemetryV2Counter",
+            "FFlagDebugDisableTelemetryV2Event",
+            "FFlagDebugDisableTelemetryV2Stat",
+        };
+
+        /// <summary>
+        /// Hapus SEMUA flag yang pernah dikelola BoneFish dari ClientAppSettings.json —
+        /// termasuk flag dari versi lama yang sudah tidak dipakai lagi.
+        /// Dipanggil di awal setiap ApplyAggressiveOptimizations() agar tidak ada
+        /// sisa flag lama yang terakumulasi antar versi / antar preset.
+        /// </summary>
+        public static void PurgeAllKnownFlags()
+        {
+            foreach (string flag in AllKnownManagedFlags)
+                App.FastFlags.SetValue(flag, null);
+
+            App.Logger.WriteLine(LOG_IDENT, $"Purged {AllKnownManagedFlags.Length} known managed flags");
+        }
+
+        // FastFlags yang aktif dikelola oleh preset saat ini.
+        // Dipakai oleh RemoveOptimizations() untuk cleanup saat mode dimatikan.
         private static readonly string[] ManagedFlags =
         {
             // ── Texture quality ──────────────────────────────────────────────────────────
