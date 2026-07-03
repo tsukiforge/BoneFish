@@ -40,6 +40,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand ApplyExtremePerformancePresetCommand => new RelayCommand(ApplyExtremePerformancePreset);
 
+        public ICommand ToggleNightVisionCommand => new RelayCommand(ToggleNightVision);
         public bool UseFastFlagManager
         {
             get => App.Settings.Prop.UseFastFlagManager;
@@ -387,8 +388,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
         ///  - Matikan semua post-FX (bloom, SSAO, blur, color correction, sun rays)
         ///  - Matikan shadow intensitas + SSAO (bukan hanya voxelizer)
         ///  - Paksa Voxel lighting (water reflection otomatis hilang)
-        ///  - Matikan foliage wind + dynamic faces (FACS)
-        ///  - Matikan terrain detail (FIntTerrainArraySliceSize=0)
+        ///  - Matikan foliage wind, terrain detail
+        ///  - FACS/dynamic faces TIDAK dimatikan — mematikannya merusak voice activity indicator
+        ///  - Light updates Max=4 (bukan 1) — supaya senter/torch game tidak bug gelap
+        ///  - DFIntDebugRestrictGCDistance TIDAK dipakai — terlalu agresif, menyebabkan not responding
         ///  - Target FPS dapat dikonfigurasi user (default 30, min 24)
         ///  - ForceExtremeMode di-set true agar AutoOptimizeService juga apply tier ini
         /// </summary>
@@ -425,8 +428,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("DFFlagDebugRenderForceTechnologyVoxel", "True");
             // Nonaktifkan light attenuation baru, fallback ke model lama yang lebih murah.
             App.FastFlags.SetValue("FFlagNewLightAttenuation", "False");
-            // Batasi update dynamic light per frame ke 1.
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "1");
+            // Light updates: Max=4 (BUKAN 1) — nilai 1 menyebabkan senter/torch bug
+            // gelap permanen karena posisi cahaya tidak update cukup cepat saat bergerak.
+            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
 
             // ── Post-Processing ───────────────────────────────────────────────────────────
@@ -465,18 +469,31 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // ── Mesh LOD Extended ─────────────────────────────────────────────────────────
             // Matikan generasi LOD CSGv2 — kurangi CPU load saat load game awal.
             App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
-            // GC agresif terhadap aset jauh — turunkan streaming distance dan tekanan RAM.
-            App.FastFlags.SetValue("DFIntDebugRestrictGCDistance", "1");
+            // DFIntDebugRestrictGCDistance TIDAK dipakai — GC terlalu agresif menyebabkan
+            // spike RAM saat player bergerak (engine harus re-load aset) → not responding.
             // Perbesar ukuran batch render untuk kurangi draw-call overhead per frame.
             App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
             // Paksa kualitas grafis mulai dari level 1 di menu in-game.
             App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
 
             // ── Dynamic Faces (FACS) ──────────────────────────────────────────────────────
-            // Matikan LOD facial animation — hilangkan ekspresi wajah avatar untuk hemat CPU.
-            App.FastFlags.SetValue("DFIntAnimationLodFacsDistanceMin", "0");
-            App.FastFlags.SetValue("DFIntAnimationLodFacsDistanceMax", "0");
-            App.FastFlags.SetValue("DFIntAnimationLodFacsVisibilityDenominator", "0");
+            // SENGAJA TIDAK DISET — mematikan FACS pipeline (nilai 0) juga mematikan
+            // voice activity indicator Roblox. Mic user tidak akan naik meski Discord aktif
+            // karena Roblox memakai pipeline yang sama untuk facial capture + voice input.
+
+            // ── Anti Not-Responding ───────────────────────────────────────────────────────
+            // Batasi animation tracks aktif — kurangi Lua GC pressure yang menyebabkan stall.
+            App.FastFlags.SetValue("DFIntMaxActiveAnimationTracks", "32");
+            // Matikan light fade-in animation — kurangi per-frame work di main thread.
+            App.FastFlags.SetValue("FIntRenderLocalLightFadeInMs", "0");
+            // Matikan semua telemetry — kurangi background thread wakeup di dual-core.
+            App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralCounter", "True");
+            App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralStat",    "True");
+            App.FastFlags.SetValue("FFlagDebugDisableTelemetryEventIngest",      "True");
+            App.FastFlags.SetValue("FFlagDebugDisableTelemetryPoint",            "True");
+            App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Counter",        "True");
+            App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Event",          "True");
+            App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Stat",           "True");
 
             // ── Task Scheduler FPS Cap ────────────────────────────────────────────────────
             // Ambil target FPS dari setting user (default 30, minimum 24).
@@ -504,6 +521,101 @@ namespace Bloxstrap.UI.ViewModels.Settings
             SelectedPreset = "ExtremePerformance";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
             Notify("🥔 Potato Mode aktif — preset ekstrem untuk PC paling lemah diterapkan.");
+        }
+
+        // ── Night Vision ──────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Status Night Vision saat ini — true = aktif, false = nonaktif.
+        /// Membaca dari Settings agar persisten antar session.
+        /// </summary>
+        public bool NightVisionEnabled
+        {
+            get => App.Settings.Prop.EnableNightVision;
+            set
+            {
+                App.Settings.Prop.EnableNightVision = value;
+                OnPropertyChanged(nameof(NightVisionEnabled));
+            }
+        }
+
+        /// <summary>
+        /// Toggle Night Vision dengan dialog konfirmasi.
+        /// Menampilkan peringatan "Are you sure?" sebelum mengaktifkan,
+        /// karena flag ini mengubah cara lighting Roblox bekerja secara global.
+        ///
+        /// Cara kerja Night Vision (client-side only, tidak mempengaruhi server/pemain lain):
+        ///   FFlagFastGPULightCulling3=True  — aktifkan GPU light culling yang lebih efisien,
+        ///       sebagai efek samping membuat area yang seharusnya gelap menjadi lebih terang
+        ///       karena lebih banyak sumber cahaya ambient yang diproses.
+        ///   FFlagNewLightAttenuation=True   — model attenuation baru yang lebih "lembut",
+        ///       cahaya menyebar lebih jauh dari sumbernya, area transisi gelap-terang
+        ///       jadi lebih gradual dan tidak se-hitam mode normal.
+        ///   FIntRenderLocalLightUpdatesMax=8 — naikkan update dynamic light ke 8/frame
+        ///       agar senter/torch game update lebih sering = radius cahayanya terasa lebih luas.
+        ///
+        /// Catatan: TIDAK menggunakan flag ambient override karena tidak ada di allowlist Roblox.
+        /// Efek "night vision" adalah kombinasi light culling + attenuation, bukan cheat.
+        /// Sumber: Dantezz025/Roblox-Fast-Flags (FFlagFastGPULightCulling3 + FFlagNewLightAttenuation,
+        ///   confirmed 2026); flag ini juga tidak ada di daftar banned/exploit flagnya Roblox.
+        /// </summary>
+        private void ToggleNightVision()
+        {
+            if (!NightVisionEnabled)
+            {
+                // Belum aktif — tampilkan konfirmasi dulu
+                var result = System.Windows.MessageBox.Show(
+                    "🌙 Are you sure — aktifkan Night Vision?\n\n" +
+                    "Mode ini menerangkan area gelap di game secara client-side.\n" +
+                    "Pemain lain dan server TIDAK melihat perubahan apapun.\n\n" +
+                    "• Area gelap / senter game akan terasa lebih terang\n" +
+                    "• Tidak ada keuntungan kompetitif langsung\n" +
+                    "• Bisa di-nonaktifkan kapan saja\n\n" +
+                    "Lanjutkan?",
+                    "Night Vision — Konfirmasi",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Question
+                );
+
+                if (result != System.Windows.MessageBoxResult.Yes)
+                    return;
+
+                // Aktifkan Night Vision flags
+                // FFlagFastGPULightCulling3: GPU light culling efisien — sebagai efek samping
+                // lebih banyak ambient light yang sampai ke permukaan, area gelap jadi lebih terang.
+                App.FastFlags.SetValue("FFlagFastGPULightCulling3", "True");
+
+                // FFlagNewLightAttenuation=True: model attenuation "lembut" — cahaya menyebar
+                // lebih jauh dari sumbernya, transisi terang-gelap lebih gradual.
+                // Catatan: di AutoOptimizeService kita set ini ke False (untuk hemat CPU),
+                // Night Vision OVERRIDE nilai itu ke True saat aktif.
+                App.FastFlags.SetValue("FFlagNewLightAttenuation", "True");
+
+                // FIntRenderLocalLightUpdatesMax=8: naikkan dari 4 (potato mode) ke 8 agar
+                // senter/torch update lebih sering → radius cahaya terasa lebih luas & responsif.
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "8");
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
+
+                NightVisionEnabled = true;
+                try { App.Settings.Save(); } catch { }
+                Notify("🌙 Night Vision aktif — area gelap akan lebih terang.");
+            }
+            else
+            {
+                // Nonaktifkan — kembalikan ke nilai Potato Mode (tidak hapus total)
+                App.FastFlags.SetValue("FFlagFastGPULightCulling3", null);
+                // Kembalikan attenuation ke False (sesuai Potato Mode)
+                App.FastFlags.SetValue("FFlagNewLightAttenuation", "False");
+                // Kembalikan light updates ke nilai Potato Mode (Max=4, Min=1)
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
+
+                NightVisionEnabled = false;
+                try { App.Settings.Save(); } catch { }
+                Notify("🌙 Night Vision dinonaktifkan.");
+            }
+
+            OnPropertyChanged(nameof(NightVisionEnabled));
         }
     }
 }

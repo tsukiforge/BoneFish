@@ -906,6 +906,18 @@ namespace Bloxstrap
 
                 _appPid = process.Id;
                 _appWindowHandle = process.MainWindowHandle;
+
+                // Anti not-responding: set priority + trim RAM background processes.
+                // Dilakukan masih dalam blok `using` agar handle process masih valid
+                // untuk GetProcessById (walaupun kita buka ulang di dalam method-nya).
+                // Hanya aktif saat OptimizeForLowEnd = true.
+                if (App.Settings.Prop.OptimizeForLowEnd && _launchMode == LaunchMode.Player)
+                {
+                    // Beri Roblox sedikit waktu untuk inisialisasi sebelum kita set priority —
+                    // terlalu cepat bisa race condition dengan Roblox's own priority setup.
+                    await Task.Delay(800);
+                    Integrations.AutoOptimizeService.OptimizeRobloxProcess(_appPid);
+                }
             }
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {

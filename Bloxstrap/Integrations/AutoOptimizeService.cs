@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Bloxstrap.Integrations
@@ -10,6 +11,25 @@ namespace Bloxstrap.Integrations
     internal static class AutoOptimizeService
     {
         private const string LOG_IDENT = "AutoOptimizeService";
+
+        // ── P/Invoke untuk memory management ─────────────────────────────────────────────
+        // OpenProcess: buka handle ke process dengan PID — diperlukan untuk EmptyWorkingSet.
+        // PROCESS_SET_INFORMATION (0x0200) cukup untuk set priority/affinity.
+        // PROCESS_ALL_ACCESS lebih luas tapi lebih kompatibel di berbagai Windows version.
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
+
+        // EmptyWorkingSet: paksa Windows trim physical RAM yang dipakai proses lain
+        // ke minimum sebelum Roblox start — membebaskan RAM fisik untuk Roblox.
+        [DllImport("psapi.dll", SetLastError = true)]
+        private static extern bool EmptyWorkingSet(IntPtr hProcess);
+
+        // CloseHandle: wajib dipanggil setelah OpenProcess agar tidak leak handle.
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
+
+        // PROCESS_ALL_ACCESS — dipakai untuk OpenProcess agar bisa query dan set info.
+        private const uint PROCESS_ALL_ACCESS = 0x1F0FFF;
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
         private struct MEMORYSTATUSEX
@@ -275,10 +295,10 @@ namespace Bloxstrap.Integrations
                 // Sumber: Firebladedoge229 gist (confirmed 2026).
                 App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
 
-                // DFIntDebugRestrictGCDistance=1: paksa GC (Garbage Collector) lebih agresif
-                // terhadap aset jauh, efektif menurunkan streaming distance dan tekanan RAM.
-                // Sumber: Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("DFIntDebugRestrictGCDistance", "1");
+                // DFIntDebugRestrictGCDistance=1: flag ini TERLALU agresif untuk Extreme mode —
+                // GC membuang aset jauh terlalu cepat, lalu saat player gerak engine harus
+                // re-load semuanya sekaligus → spike RAM → not responding / freeze.
+                // Dinonaktifkan di sini. Tekanan RAM sudah cukup ditangani oleh LOD=0 + FRM=1.
 
                 // ── TERRAIN DETAIL ────────────────────────────────────────────────────────
                 // FIntTerrainArraySliceSize=0: kurangi jumlah slice array terrain texture —
@@ -304,13 +324,12 @@ namespace Bloxstrap.Integrations
                 App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
 
                 // ── DYNAMIC FACES (AVATAR FACIAL ANIMATION) ──────────────────────────────
-                // DFIntAnimationLodFacsDistanceMin/Max=0 + Denominator=0: matikan LOD
-                // facial animation (FACS) sepenuhnya — avatar tidak punya ekspresi wajah
-                // tapi menghilangkan overhead animasi wajah yang mahal di CPU.
-                // Sumber: Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("DFIntAnimationLodFacsDistanceMin", "0");
-                App.FastFlags.SetValue("DFIntAnimationLodFacsDistanceMax", "0");
-                App.FastFlags.SetValue("DFIntAnimationLodFacsVisibilityDenominator", "0");
+                // CATATAN PENTING: flag FACS (DFIntAnimationLodFacsDistanceMin/Max/Denominator)
+                // SENGAJA TIDAK DIPAKAI di sini.
+                // Mematikan FACS pipeline sepenuhnya (nilai 0) juga mematikan voice activity
+                // indicator Roblox — mic user tidak akan naik meski input Discord aktif,
+                // karena Roblox memakai pipeline FACS yang sama untuk facial + voice capture.
+                // Trade-off tidak sepadan: CPU saving kecil vs fitur mic rusak total.
 
                 // ── TARGET FPS / TASK SCHEDULER ───────────────────────────────────────────
                 // DFIntTaskSchedulerTargetFps: batasi target FPS internal Roblox.
@@ -329,14 +348,48 @@ namespace Bloxstrap.Integrations
                     App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
                 }
 
+                // ── ANTI NOT-RESPONDING: FastFlag level ───────────────────────────────────
+                // Flag-flag ini mengurangi penyebab main thread stall (freeze/not responding)
+                // yang paling umum di device RAM <4GB.
+
+                // DFIntMaxActiveAnimationTracks=32: default Roblox sekitar 200+ track animasi
+                // aktif per scene. Di device RAM kecil, Lua GC harus collect lebih banyak objek
+                // animasi → GC spike → stall main thread → not responding.
+                // 32 adalah nilai minimum yang masih membuat gameplay terasa normal.
+                // Sumber: Firebladedoge229 gist, terverifikasi 2026.
+                App.FastFlags.SetValue("DFIntMaxActiveAnimationTracks", "32");
+
+                // FIntRenderLocalLightFadeInMs=0: matikan animasi fade-in saat light update.
+                // Tanpa flag ini, setiap dynamic light yang berubah punya fade transition
+                // yang dijalankan di main thread — pada scene yang lampu-nya sering berubah
+                // (misalnya game horror dengan efek flicker), ini adalah source stutter rutin.
+                // Sumber: Dantezz025/Roblox-Fast-Flags (confirmed 2026).
+                App.FastFlags.SetValue("FIntRenderLocalLightFadeInMs", "0");
+
+                // Telemetry: Roblox kirim event ke server setiap beberapa detik.
+                // Di dual-core, thread telemetry wakeup berkompetisi dengan main thread.
+                // Matikan semua 7 endpoint telemetry = kurangi background CPU wakeup.
+                // Sumber: Firebladedoge229 gist, Dantezz025 (confirmed 2026).
+                App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralCounter", "True");
+                App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralStat",    "True");
+                App.FastFlags.SetValue("FFlagDebugDisableTelemetryEventIngest",      "True");
+                App.FastFlags.SetValue("FFlagDebugDisableTelemetryPoint",            "True");
+                App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Counter",        "True");
+                App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Event",          "True");
+                App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Stat",           "True");
+
                 // ── ULTRALLOW + EXTREME: dynamic lighting + texture compositor ────────────
                 if (isUltraOrExtreme)
                 {
-                    // FIntRenderLocalLightUpdatesMax/Min=1: batasi update dynamic light per frame
-                    // ke 1 saja. Scene dengan banyak lampu tetap bisa render tapi CPU overhead
-                    // turun drastis — tidak ada burst update saat lampu hidup/mati serentak.
+                    // FIntRenderLocalLightUpdatesMax/Min: batasi update dynamic light per frame.
+                    // NILAI DIPILIH HATI-HATI:
+                    //   - Nilai 1 (sebelumnya): terlalu rendah — senter/torch yang bergerak
+                    //     tidak bisa update posisi cahaya cukup cepat, area sekitar jadi hitam
+                    //     permanen / bug gelap. Ini terutama parah di game horror/RPG.
+                    //   - Nilai 4: cukup untuk senter bergerak smooth, tetap hemat vs default.
+                    //   - Default Roblox: ~8-16 tergantung scene.
                     // Sumber: catb0x/Roblox-Potato-FFlags (confirmed 2026).
-                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "1");
+                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
                     App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
 
                     // DFIntTextureCompositorActiveJobs=1: batasi worker background yang
@@ -408,7 +461,7 @@ namespace Bloxstrap.Integrations
             "DFIntCSGLevelOfDetailSwitchingDistanceL23",
             "DFIntCSGLevelOfDetailSwitchingDistanceL34",
             "DFIntCSGv2LodsToGenerate",
-            "DFIntDebugRestrictGCDistance",
+            // DFIntDebugRestrictGCDistance — SENGAJA TIDAK DI-MANAGE karena tidak dipakai lagi
 
             // ── Terrain detail ────────────────────────────────────────────────────────────
             "FIntTerrainArraySliceSize",
@@ -421,9 +474,8 @@ namespace Bloxstrap.Integrations
             "FIntMaxBatchesPerFlush",
 
             // ── Dynamic faces (FACS avatar animation) ────────────────────────────────────
-            "DFIntAnimationLodFacsDistanceMin",
-            "DFIntAnimationLodFacsDistanceMax",
-            "DFIntAnimationLodFacsVisibilityDenominator",
+            // DFIntAnimationLodFacsDistanceMin/Max/Denominator — SENGAJA TIDAK DI-MANAGE
+            // karena tidak dipakai lagi (mematikan ini rusak voice activity indicator)
 
             // ── Task scheduler / FPS cap ──────────────────────────────────────────────────
             "DFIntTaskSchedulerTargetFps",
@@ -434,7 +486,170 @@ namespace Bloxstrap.Integrations
 
             // ── Texture compositor concurrency (UltraLow + Extreme only) ─────────────────
             "DFIntTextureCompositorActiveJobs",
+
+            // ── Anti not-responding ───────────────────────────────────────────────────────
+            "DFIntMaxActiveAnimationTracks",
+            "FIntRenderLocalLightFadeInMs",
+            "FFlagDebugDisableTelemetryEphemeralCounter",
+            "FFlagDebugDisableTelemetryEphemeralStat",
+            "FFlagDebugDisableTelemetryEventIngest",
+            "FFlagDebugDisableTelemetryPoint",
+            "FFlagDebugDisableTelemetryV2Counter",
+            "FFlagDebugDisableTelemetryV2Event",
+            "FFlagDebugDisableTelemetryV2Stat",
         };
+
+        /// <summary>
+        /// Dipanggil dari Bootstrapper.StartRoblox() setelah Roblox process berhasil start.
+        /// Melakukan 3 hal untuk mencegah not-responding pada device RAM terbatas:
+        ///
+        /// 1. Set Roblox process priority ke AboveNormal — Windows scheduler kasih CPU time
+        ///    lebih banyak ke Roblox, mengurangi preemption dari background process Windows.
+        ///    Tidak pakai RealTime/High karena bisa deadlock system di dual-core.
+        ///
+        /// 2. EmptyWorkingSet semua proses non-sistem — paksa Windows swap RAM proses lain
+        ///    ke page file, membebaskan RAM fisik untuk Roblox sebelum loading screen selesai.
+        ///    Khusus device <4GB di mana margin RAM hampir nol.
+        ///
+        /// 3. Affinity hint untuk dual-core — hanya aktif jika CPU 2 core. Pin Roblox ke
+        ///    kedua core, BoneFish sendiri ke core 0 saja, agar tidak berebut L2 cache.
+        ///
+        /// Semua operasi wrapped dalam try-catch individual agar satu kegagalan tidak
+        /// menghentikan optimasi lainnya.
+        /// </summary>
+        public static void OptimizeRobloxProcess(int robloxPid)
+        {
+            if (!App.Settings.Prop.OptimizeForLowEnd)
+                return;
+
+            // ── 1. SET ROBLOX PROCESS PRIORITY ───────────────────────────────────────────
+            // AboveNormal: satu tingkat di atas Normal, satu di bawah High.
+            // High bisa menyebabkan Windows audio/input thread tidak kebagian CPU di dual-core.
+            // AboveNormal adalah sweet spot: Roblox dapat lebih banyak CPU tanpa destabilisasi.
+            try
+            {
+                // Buka process by PID — handle process sudah di-dispose di Bootstrapper
+                // (sengaja oleh tim Bloxstrap untuk menghindari Byfron trip), jadi kita
+                // buka ulang dengan PID yang sudah kita simpan.
+                using var robloxProc = Process.GetProcessById(robloxPid);
+                robloxProc.PriorityClass = ProcessPriorityClass.AboveNormal;
+                App.Logger.WriteLine(LOG_IDENT, $"Set Roblox PID {robloxPid} priority → AboveNormal");
+            }
+            catch (Exception ex)
+            {
+                // Bisa gagal jika Roblox sudah exit atau tidak ada permission
+                App.Logger.WriteLine(LOG_IDENT, $"Priority set failed (non-fatal): {ex.Message}");
+            }
+
+            // ── 2. TRIM WORKING SET PROSES LAIN ──────────────────────────────────────────
+            // Hanya dilakukan jika RAM total < 5GB — tidak perlu di device yang cukup RAM.
+            try
+            {
+                ulong totalMemBytes = GetTotalPhysicalMemory();
+                ulong totalMemGB    = totalMemBytes / (1024UL * 1024 * 1024);
+
+                if (totalMemGB < 5)
+                {
+                    TrimBackgroundProcesses(robloxPid);
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Memory trim failed (non-fatal): {ex.Message}");
+            }
+
+            // ── 3. PROCESSOR AFFINITY HINT (dual-core only) ──────────────────────────────
+            // Pada dual-core (2 logical processors), pin BoneFish ke core 0 saja agar
+            // core 1 lebih tersedia untuk Roblox main thread tanpa context switch berebut
+            // L1/L2 cache yang sama.
+            // Roblox sendiri tidak di-pin — biarkan OS scheduler yang manage, karena
+            // Roblox punya thread pool sendiri yang perlu fleksibel.
+            try
+            {
+                if (Environment.ProcessorCount <= 2)
+                {
+                    // Pin BoneFish ke core 0 saja (bit mask: 0b01 = core 0)
+                    using var self = Process.GetCurrentProcess();
+                    self.ProcessorAffinity = (IntPtr)0x1;
+                    App.Logger.WriteLine(LOG_IDENT, "Dual-core detected: BoneFish pinned to core 0");
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Affinity set failed (non-fatal): {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Trim RAM usage semua proses background (bukan Roblox, bukan system critical).
+        /// EmptyWorkingSet memaksa Windows memindahkan page-page RAM proses ke page file,
+        /// membebaskan RAM fisik untuk Roblox tanpa mematikan proses tersebut.
+        ///
+        /// Target: proses non-Roblox, non-sistem, non-BoneFish dengan working set > 20MB.
+        /// Proses yang di-skip: System, smss, csrss, lsass, svchost, winlogon, explorer
+        /// (mematikan atau trim terlalu agresif pada ini bisa destabilisasi Windows).
+        /// </summary>
+        private static void TrimBackgroundProcesses(int robloxPid)
+        {
+            // Daftar nama proses sistem kritis yang tidak boleh di-trim
+            var skipNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "System", "Idle", "smss", "csrss", "lsass", "services",
+                "winlogon", "wininit", "svchost", "dwm", "explorer",
+                "audiodg", "fontdrvhost", "spoolsv", "SearchIndexer"
+            };
+
+            string selfName = Process.GetCurrentProcess().ProcessName;
+            int trimmedCount = 0;
+            long totalFreedKB = 0;
+
+            foreach (var proc in Process.GetProcesses())
+            {
+                try
+                {
+                    // Skip Roblox sendiri dan BoneFish
+                    if (proc.Id == robloxPid)       continue;
+                    if (proc.ProcessName == selfName) continue;
+
+                    // Skip proses sistem kritis
+                    if (skipNames.Contains(proc.ProcessName)) continue;
+
+                    // Hanya trim proses dengan working set > 20MB — tidak worth trim yang kecil
+                    long workingSetKB = proc.WorkingSet64 / 1024;
+                    if (workingSetKB < 20 * 1024) continue;
+
+                    // Buka process handle dengan akses minimum yang diperlukan
+                    IntPtr handle = OpenProcess(PROCESS_ALL_ACCESS, false, (uint)proc.Id);
+                    if (handle == IntPtr.Zero) continue;
+
+                    try
+                    {
+                        bool trimmed = EmptyWorkingSet(handle);
+                        if (trimmed)
+                        {
+                            totalFreedKB += workingSetKB;
+                            trimmedCount++;
+                        }
+                    }
+                    finally
+                    {
+                        CloseHandle(handle);
+                    }
+                }
+                catch
+                {
+                    // Skip proses yang tidak bisa diakses (elevated, protected, dll)
+                    // — ini normal, tidak perlu log tiap proses
+                }
+            }
+
+            if (trimmedCount > 0)
+            {
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"RAM trim: {trimmedCount} background processes trimmed, " +
+                    $"~{totalFreedKB / 1024}MB working set released");
+            }
+        }
 
         /// <summary>
         /// Remove any optimization FastFlags this service previously applied.

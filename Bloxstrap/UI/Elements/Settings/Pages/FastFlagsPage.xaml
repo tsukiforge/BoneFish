@@ -120,6 +120,25 @@
             </Grid>
         </ui:CardExpander>
 
+        <!-- ═══ NIGHT VISION (Potato Mode) ══════════════════════════════════════════ -->
+        <ui:CardAction Margin="0,8,0,0" Icon="WeatherMoon24" Command="{Binding ToggleNightVisionCommand}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="🌙 Night Vision" />
+                    <Border Margin="8,0,0,0" Padding="6,2" Background="#1A4A8A" CornerRadius="4">
+                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="#7EC8FF" Text="CLIENT-SIDE ONLY" />
+                    </Border>
+                </StackPanel>
+                <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                           Text="Terangkan area gelap di game. Tidak mempengaruhi server atau pemain lain. Klik untuk toggle — akan muncul konfirmasi sebelum aktif." />
+                <!-- Status aktif: warna biru terang -->
+                <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="#7EC8FF"
+                           Text="[ 🌙 NIGHT VISION AKTIF ]"
+                           Visibility="{Binding NightVisionEnabled, Converter={StaticResource BoolToVis}}" />
+            </StackPanel>
+        </ui:CardAction>
+
         <TextBlock Text="Manual FastFlag Overrides" FontSize="20" FontWeight="Medium" Margin="0,16,0,8" />
 
         <controls:OptionControl 

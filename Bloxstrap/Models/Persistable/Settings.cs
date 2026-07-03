@@ -77,6 +77,10 @@ namespace Bloxstrap.Models.Persistable
         // Default 30fps; bisa diturunkan ke 24 untuk perangkat paling lemah.
         public int ExtremeModeFpsTarget { get; set; } = 30;
 
+        // Night Vision mode untuk Potato Mode — terangkan area gelap client-side.
+        // Client-side only, tidak mempengaruhi gameplay atau pemain lain.
+        public bool EnableNightVision { get; set; } = false;
+
         // custom background
         public string CustomBackgroundPath { get; set; } = "";
     }
