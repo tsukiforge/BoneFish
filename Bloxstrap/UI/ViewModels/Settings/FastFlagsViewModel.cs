@@ -276,6 +276,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         private void ApplyRecommendedFastFlags()
         {
+            // Bersihkan semua flag lama sebelum apply preset baru.
+            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+
             UseFastFlagManager = true;
             FixDisplayScaling = true;
             SelectedRenderingMode = RenderingMode.D3D11;
@@ -324,6 +327,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         private void ApplyUltraLowSpecPreset()
         {
+            // Bersihkan semua flag lama sebelum apply preset baru.
+            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+
             UseFastFlagManager = true;
             FixDisplayScaling = true;
             SelectedRenderingMode = RenderingMode.D3D11;
@@ -354,6 +360,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
 
         private void ApplyBalancedPreset()        {
+            // Bersihkan semua flag lama sebelum apply preset baru.
+            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+
             UseFastFlagManager = true;
             FixDisplayScaling = true;
             SelectedRenderingMode = RenderingMode.D3D11;
@@ -392,6 +401,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
         /// </summary>
         private void ApplyExtremePerformancePreset()
         {
+            // Bersihkan semua flag lama sebelum apply preset baru.
+            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+
             UseFastFlagManager = true;
             FixDisplayScaling = true;
 
