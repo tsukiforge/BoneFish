@@ -595,6 +595,89 @@ namespace Bloxstrap.Integrations
         };
 
         /// <summary>
+        /// Bersihkan ClientAppSettings.json di path Roblox default
+        /// (bukan path BoneFish) dari flag-flag yang pernah kita inject.
+        ///
+        /// Masalah: BoneFish menulis flags ke path-nya sendiri, tapi jika user
+        /// pernah pakai versi lama atau preset lama, sisa flags bisa tertinggal
+        /// di path Roblox standar (%localappdata%\Roblox\Versions\xxx\ClientSettings)
+        /// dan terus dibaca Roblox meski BoneFish sudah update.
+        ///
+        /// Dipanggil sekali saat BoneFish launch (dari Bootstrapper.Run) untuk
+        /// memastikan tidak ada kontaminasi flags lama di path Roblox.
+        /// </summary>
+        public static void CleanupLegacyRobloxFlags()
+        {
+            try
+            {
+                // Path Roblox default — berbeda dari path BoneFish
+                string robloxVersionsDir = Path.Combine(Paths.LocalAppData, "Roblox", "Versions");
+                if (!Directory.Exists(robloxVersionsDir))
+                    return;
+
+                int cleanedFiles = 0;
+
+                // Scan semua folder version-xxx
+                foreach (string versionDir in Directory.GetDirectories(robloxVersionsDir, "version-*"))
+                {
+                    string clientSettingsPath = Path.Combine(versionDir, "ClientSettings", "ClientAppSettings.json");
+                    if (!File.Exists(clientSettingsPath))
+                        continue;
+
+                    try
+                    {
+                        string content = File.ReadAllText(clientSettingsPath).Trim();
+
+                        // Skip kalau sudah kosong
+                        if (content == "{}" || content == "{ }" || string.IsNullOrWhiteSpace(content))
+                            continue;
+
+                        // Parse dan hapus semua flag yang kita kelola
+                        var flags = System.Text.Json.JsonSerializer
+                            .Deserialize<Dictionary<string, object>>(content);
+
+                        if (flags == null || flags.Count == 0)
+                            continue;
+
+                        bool modified = false;
+                        foreach (string flag in AllKnownManagedFlags)
+                        {
+                            if (flags.Remove(flag))
+                                modified = true;
+                        }
+
+                        if (modified)
+                        {
+                            string cleaned = System.Text.Json.JsonSerializer
+                                .Serialize(flags, new System.Text.Json.JsonSerializerOptions
+                                {
+                                    WriteIndented = true
+                                });
+                            File.WriteAllText(clientSettingsPath, cleaned);
+                            cleanedFiles++;
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"Cleaned legacy flags from: {clientSettingsPath}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Satu file gagal tidak menghentikan file lainnya
+                        App.Logger.WriteLine(LOG_IDENT,
+                            $"Could not clean {clientSettingsPath}: {ex.Message}");
+                    }
+                }
+
+                if (cleanedFiles > 0)
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Legacy flag cleanup done: {cleanedFiles} file(s) cleaned");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"CleanupLegacyRobloxFlags failed (non-fatal): {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Dipanggil dari Bootstrapper.StartRoblox() setelah Roblox process berhasil start.
         /// Melakukan 3 hal untuk mencegah not-responding pada device RAM terbatas:
         ///

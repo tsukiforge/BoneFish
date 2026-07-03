@@ -300,6 +300,9 @@ namespace Bloxstrap
                 // so the optimizations actually take effect for this launch
                 try
                 {
+                    // Bersihkan flag lama dari path Roblox standar — cegah kontaminasi antar versi
+                    Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+
                     if (App.Settings.Prop.UseFastFlagManager && Integrations.AutoOptimizeService.CheckAndApply())
                     {
                         App.Logger.WriteLine(LOG_IDENT, "Auto-optimize: low-end performance FastFlags applied");
