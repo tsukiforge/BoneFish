@@ -342,6 +342,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
             FRMQualityOverrideEnabled = true;
             FRMQualityOverride = 1;
 
+            // LOD — semua level 250 sesuai ultra low-spec.json
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
+
             // Anti-crash: batasi FPS, light updates (Max=4 bukan 1 — nilai 1 bug gelap),
             // dan texture compositor jobs.
             App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
@@ -352,9 +359,20 @@ namespace Bloxstrap.UI.ViewModels.Settings
             DisableRobloxAnimations = true;
             EnableLowMemoryMode = true;
 
-            ApplyRecommendedNetworkSettings();
+            // Network flags langsung
+            App.Settings.Prop.EnableBetterMatchmaking = true;
+            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
+            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
+            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
+            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
+            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
+            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
+
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
+
+            try { App.FastFlags.Save(); } catch { }
+            try { App.Settings.Save(); } catch { }
 
             SelectedPreset = "UltraLow";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
@@ -432,21 +450,17 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
             App.FastFlags.SetValue("FIntRenderGrainScale", "0");
 
-            // ── Grass & wind: matikan foliage (tidak menyentuh lighting) ────────────────
-            App.FastFlags.SetValue("FIntFRMMinGrassDistance", "0");
-            App.FastFlags.SetValue("FIntFRMMaxGrassDistance", "0");
-            App.FastFlags.SetValue("FIntRenderGrassDetailStrands", "0");
-            App.FastFlags.SetValue("FIntRenderGrassHeightScaler", "0");
-            App.FastFlags.SetValue("FFlagGlobalWindActivated", "False");
+            // ── Grass & wind: dibiarkan default — tidak memengaruhi rendering speed ──────
 
             // ── LOD / Asset rendering cepat ───────────────────────────────────────────────
             // Nilai 250 (bukan 0!) agar objek dekat tetap high-poly, tidak tembus/pop-in.
             // Nilai 0 menyebabkan semua objek jadi low-poly dari jarak 0 — itulah yang
             // bikin aset "tembus" saat didekati. 250 = switch ke low-poly mulai ~250 studs.
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12", "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23", "500");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34", "750");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    "500");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "750");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
             App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
 
             // ── Texture & terrain ────────────────────────────────────────────────────────
@@ -457,6 +471,26 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // ── Render batch: kurangi draw-call overhead ─────────────────────────────────
             App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
             App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
+
+            // ── Rendering speed: percepat render aset ────────────────────────────────────
+            // DFIntMaxFrameBufferSize=4: kurangi frame buffer queue dari default (~10) ke 4.
+            // Makin kecil buffer = frame lebih cepat ditampilkan, input lag berkurang.
+            // Nilai 0-3 bikin gerakan player lain laggy. 4 adalah sweet spot paling stabil.
+            // Sumber: Dantezz025/Roblox-Fast-Flags (confirmed 2026).
+            App.FastFlags.SetValue("DFIntMaxFrameBufferSize", "4");
+
+            // FIntRuntimeMaxNumOfThreads=4: batasi max thread yang di-spawn Roblox.
+            // Di dual-core, default Roblox spawn terlalu banyak thread → context switching
+            // overhead → tiap thread dapat lebih sedikit waktu CPU → render jadi lambat.
+            // Nilai 4 lebih terkontrol untuk dual/quad core.
+            // Sumber: Dantezz025/Roblox-Fast-Flags (confirmed 2026).
+            App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", "4");
+
+            // DFFlagEnableRequestAsyncCompression=True: aktifkan kompresi async untuk
+            // request aset ke server Roblox — aset lebih cepat di-download saat join game,
+            // mengurangi delay "tembus/pop-in" saat aset belum selesai load.
+            // Sumber: Firebladedoge229 gist (confirmed 2026).
+            App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
 
             // ── Anti Not-Responding ───────────────────────────────────────────────────────
             App.FastFlags.SetValue("DFIntMaxActiveAnimationTracks", "32");
@@ -479,7 +513,20 @@ namespace Bloxstrap.UI.ViewModels.Settings
             EnableLowMemoryMode = true;
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
-            ApplyRecommendedNetworkSettings();
+
+            // Network flags langsung — tidak panggil ApplyRecommendedNetworkSettings()
+            // karena method itu punya RequestPageReloadEvent sendiri yang interrupt flow save.
+            App.Settings.Prop.EnableBetterMatchmaking = true;
+            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
+            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
+            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
+            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
+            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
+            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
+
+            // Save semua flag ke disk SEBELUM page reload agar tidak ada flag yang hilang
+            try { App.FastFlags.Save(); } catch { }
+            try { App.Settings.Save(); } catch { }
 
             SelectedPreset = "ExtremePerformance";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
@@ -602,20 +649,23 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
 
                 NightVisionEnabled = true;
+                try { App.FastFlags.Save(); } catch { }
                 try { App.Settings.Save(); } catch { }
                 Notify("🌙 Night Vision aktif — area gelap akan lebih terang.");
             }
             else
             {
-                // Nonaktifkan — kembalikan ke nilai Potato Mode (tidak hapus total)
+                // Nonaktifkan — hapus semua flag Night Vision (kembalikan ke null = default game)
+                // JANGAN set FFlagNewLightAttenuation ke "False" — itu merusak lighting game.
+                // Cukup hapus flag ini sehingga Roblox pakai model lighting default-nya sendiri.
                 App.FastFlags.SetValue("FFlagFastGPULightCulling3", null);
-                // Kembalikan attenuation ke False (sesuai Potato Mode)
-                App.FastFlags.SetValue("FFlagNewLightAttenuation", "False");
-                // Kembalikan light updates ke nilai Potato Mode (Max=4, Min=1)
+                App.FastFlags.SetValue("FFlagNewLightAttenuation", null);
+                // Kembalikan light updates ke nilai Potato Mode
                 App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
                 App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
 
                 NightVisionEnabled = false;
+                try { App.FastFlags.Save(); } catch { }
                 try { App.Settings.Save(); } catch { }
                 Notify("🌙 Night Vision dinonaktifkan.");
             }
