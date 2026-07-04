@@ -41,6 +41,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ICommand ApplyExtremePerformancePresetCommand => new RelayCommand(ApplyExtremePerformancePreset);
 
         public ICommand ToggleNightVisionCommand => new RelayCommand(ToggleNightVision);
+
+        public ICommand ClearClientAppSettingsCommand => new RelayCommand(ClearClientAppSettings);
         public bool UseFastFlagManager
         {
             get => App.Settings.Prop.UseFastFlagManager;
@@ -385,19 +387,19 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
 
         /// <summary>
-        /// Preset "ExtremePerformance" (Potato Mode) — lebih agresif dari UltraLow.
-        /// Ditujukan untuk laptop dual-core, RAM kurang dari 4GB, tanpa GPU dedicated.
+        /// Preset "ExtremePerformance" (Potato Mode).
         ///
-        /// Perbedaan utama vs UltraLow:
-        ///  - Matikan semua post-FX (bloom, SSAO, blur, color correction, sun rays)
-        ///  - Matikan shadow intensitas + SSAO (bukan hanya voxelizer)
-        ///  - Paksa Voxel lighting (water reflection otomatis hilang)
-        ///  - Matikan foliage wind, terrain detail
-        ///  - FACS/dynamic faces TIDAK dimatikan — mematikannya merusak voice activity indicator
-        ///  - Light updates Max=4 (bukan 1) — supaya senter/torch game tidak bug gelap
-        ///  - DFIntDebugRestrictGCDistance TIDAK dipakai — terlalu agresif, menyebabkan not responding
-        ///  - Target FPS dapat dikonfigurasi user (default 30, min 24)
-        ///  - ForceExtremeMode di-set true agar AutoOptimizeService juga apply tier ini
+        /// Filosofi: SAMA dengan UltraLow sebagai base, ditambah:
+        ///  - Anti not-responding (telemetry off, animation tracks, light fade)
+        ///  - FPS cap yang bisa dikonfigurasi user (default 30, min 24)
+        ///  - Rendering asset lebih cepat muncul (LOD distance diperbesar, bukan 0)
+        ///    sehingga objek dekat tidak tembus/pop-in
+        ///
+        /// Yang TIDAK dilakukan (beda dari versi sebelumnya yang bermasalah):
+        ///  - TIDAK paksa Voxel lighting → layar hitam di game ShadowMap/Future
+        ///  - TIDAK disable PostFx → visual game rusak
+        ///  - TIDAK SkyGray → atmosphere game berubah
+        ///  - TIDAK ubah LightAttenuation → model lighting game berubah
         /// </summary>
         private void ApplyExtremePerformancePreset()
         {
@@ -406,88 +408,58 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-
-            // D3D11 adalah pilihan paling stabil untuk device lama.
-            // Hindari Vulkan (bisa crash) dan D3D10 (kompatibilitas game modern terbatas).
             SelectedRenderingMode = RenderingMode.D3D11;
-
-            // MSAA x1 = matikan anti-aliasing, hemat GPU fill-rate signifikan.
             SelectedMSAALevel = MSAAMode.x1;
-
-            // Tekstur level 0 = terendah, kurangi tekanan VRAM/RAM.
             SelectedTextureQuality = TextureQuality.Level0;
-
-            // Mesh LOD minimum (0) = semua objek langsung low-poly dari jarak berapa pun.
             MeshQualityEnabled = true;
             MeshQuality = 0;
-
-            // FRM Quality level 1 = resolusi render internal paling rendah.
             FRMQualityOverrideEnabled = true;
             FRMQualityOverride = 1;
 
-            // ── Shadow & Lighting ─────────────────────────────────────────────────────────
-            // Matikan intensitas shadow sama sekali — tidak ada bayangan yang digambar.
+            // ── Shadow: matikan intensitas bayangan (aman, tidak ubah lighting mode) ──────
             App.FastFlags.SetValue("FIntRenderShadowIntensity", "0");
-            // Pause voxelizer + reset fade radius voxelizer.
             App.FastFlags.SetValue("DFFlagDebugPauseVoxelizer", "True");
             App.FastFlags.SetValue("FIntCSGVoxelizerFadeRadius", "0");
-            // DFFlagDebugRenderForceTechnologyVoxel: DIHAPUS — menyebabkan layar hitam
-            // di semua game yang memakai ShadowMap/Future lighting (mayoritas game Roblox).
-            // FFlagNewLightAttenuation: DIHAPUS — mengubah model lighting game, visual tidak normal.
-            // Light updates: Max=4 agar senter/torch tidak bug gelap.
+
+            // ── Light updates: Max=4 agar senter/torch tidak bug gelap ────────────────────
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
+            App.FastFlags.SetValue("FIntRenderLocalLightFadeInMs", "0");
 
-            // ── Post-Processing ───────────────────────────────────────────────────────────
-            // FFlagDisablePostFx: DIHAPUS — mematikan post-FX milik game (bukan hanya Roblox
-            // default), hasilnya visual game rusak total tergantung desain game tersebut.
-            // FFlagDebugSkyGray: DIHAPUS — skybox abu-abu merusak atmosphere semua game.
-            // Yang aman: hanya matikan SSAO, blur ESC menu, dan grain — tidak menyentuh
-            // lighting atau post-FX yang didesain oleh game developer.
+            // ── Post-processing ringan: hanya yang tidak merusak visual game ────────────
             App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
             App.FastFlags.SetValue("FIntSSAOMipLevels", "0");
             App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
             App.FastFlags.SetValue("FIntRenderGrainScale", "0");
 
-            // ── Grass, Foliage & Wind ─────────────────────────────────────────────────────
+            // ── Grass & wind: matikan foliage (tidak menyentuh lighting) ────────────────
             App.FastFlags.SetValue("FIntFRMMinGrassDistance", "0");
             App.FastFlags.SetValue("FIntFRMMaxGrassDistance", "0");
             App.FastFlags.SetValue("FIntRenderGrassDetailStrands", "0");
             App.FastFlags.SetValue("FIntRenderGrassHeightScaler", "0");
-            // Matikan simulasi angin global — foliage dan kain tidak bergerak.
             App.FastFlags.SetValue("FFlagGlobalWindActivated", "False");
 
-            // ── Terrain Detail ────────────────────────────────────────────────────────────
-            // Kurangi slice array terrain texture — terrain jadi lebih flat tapi hemat VRAM.
-            App.FastFlags.SetValue("FIntTerrainArraySliceSize", "0");
+            // ── LOD / Asset rendering cepat ───────────────────────────────────────────────
+            // Nilai 250 (bukan 0!) agar objek dekat tetap high-poly, tidak tembus/pop-in.
+            // Nilai 0 menyebabkan semua objek jadi low-poly dari jarak 0 — itulah yang
+            // bikin aset "tembus" saat didekati. 250 = switch ke low-poly mulai ~250 studs.
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",    "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12", "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23", "500");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34", "750");
+            App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
 
-            // ── Texture ───────────────────────────────────────────────────────────────────
-            // Paksa compositor tekstur ke resolusi paling rendah.
+            // ── Texture & terrain ────────────────────────────────────────────────────────
+            App.FastFlags.SetValue("FIntTerrainArraySliceSize", "0");
             App.FastFlags.SetValue("FIntTextureCompositorLowResFactor", "1");
-            // Batasi concurrent texture compositor jobs ke 1 thread.
             App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
 
-            // ── Mesh LOD Extended ─────────────────────────────────────────────────────────
-            // Matikan generasi LOD CSGv2 — kurangi CPU load saat load game awal.
-            App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
-            // DFIntDebugRestrictGCDistance TIDAK dipakai — GC terlalu agresif menyebabkan
-            // spike RAM saat player bergerak (engine harus re-load aset) → not responding.
-            // Perbesar ukuran batch render untuk kurangi draw-call overhead per frame.
+            // ── Render batch: kurangi draw-call overhead ─────────────────────────────────
             App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
-            // Paksa kualitas grafis mulai dari level 1 di menu in-game.
             App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
 
-            // ── Dynamic Faces (FACS) ──────────────────────────────────────────────────────
-            // SENGAJA TIDAK DISET — mematikan FACS pipeline (nilai 0) juga mematikan
-            // voice activity indicator Roblox. Mic user tidak akan naik meski Discord aktif
-            // karena Roblox memakai pipeline yang sama untuk facial capture + voice input.
-
             // ── Anti Not-Responding ───────────────────────────────────────────────────────
-            // Batasi animation tracks aktif — kurangi Lua GC pressure yang menyebabkan stall.
             App.FastFlags.SetValue("DFIntMaxActiveAnimationTracks", "32");
-            // Matikan light fade-in animation — kurangi per-frame work di main thread.
-            App.FastFlags.SetValue("FIntRenderLocalLightFadeInMs", "0");
-            // Matikan semua telemetry — kurangi background thread wakeup di dual-core.
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralCounter", "True");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralStat",    "True");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryEventIngest",      "True");
@@ -496,36 +468,68 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Event",          "True");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Stat",           "True");
 
-            // ── Task Scheduler FPS Cap ────────────────────────────────────────────────────
-            // Ambil target FPS dari setting user (default 30, minimum 24).
-            // User bisa atur via slider "Target FPS (Extreme Mode)" di UI.
+            // ── FPS Cap ───────────────────────────────────────────────────────────────────
             int fpsCap = Math.Clamp(App.Settings.Prop.ExtremeModeFpsTarget, 24, 60);
             App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", fpsCap.ToString());
 
-            // ── BoneFish Settings ─────────────────────────────────────────────────────────
-            // Aktifkan ForceExtremeMode agar AutoOptimizeService juga apply tier Extreme
-            // saat Roblox launch berikutnya (CheckAndApply() terpanggil dari Bootstrapper).
+            // ── BoneFish settings ────────────────────────────────────────────────────────
             App.Settings.Prop.ForceExtremeMode = true;
             OnPropertyChanged(nameof(ForceExtremeMode));
-
-            // Nonaktifkan animasi UI dan low memory mode untuk efisiensi tambahan.
             DisableRobloxAnimations = true;
             EnableLowMemoryMode = true;
-
-            // Matikan background updates — tidak perlu cek update saat game berjalan.
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
-
-            // Terapkan juga network preset untuk latency minimum.
             ApplyRecommendedNetworkSettings();
 
             SelectedPreset = "ExtremePerformance";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-            Notify("🥔 Potato Mode aktif — preset ekstrem untuk PC paling lemah diterapkan.");
+            Notify("🥔 Potato Mode aktif — ringan, visual normal, aset tidak tembus.");
+        }
+
+        // ── Clear ClientAppSettings ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Hapus semua flag dari ClientAppSettings.json di path BoneFish DAN path Roblox.
+        /// Berguna saat terjadi bug visual (gelap, aneh) akibat akumulasi flag lama.
+        /// Setelah clear, user bisa pilih ulang preset yang diinginkan.
+        /// </summary>
+        private void ClearClientAppSettings()
+        {
+            var result = System.Windows.MessageBox.Show(
+                "Ini akan menghapus SEMUA FastFlag dari ClientAppSettings.json\n" +
+                "di folder BoneFish dan folder Roblox.\n\n" +
+                "Roblox akan berjalan dengan setting default sampai kamu\n" +
+                "pilih preset lagi.\n\n" +
+                "Lanjutkan?",
+                "Clear ClientAppSettings",
+                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Warning
+            );
+
+            if (result != System.Windows.MessageBoxResult.Yes)
+                return;
+
+            // 1. Clear via FastFlagManager (path BoneFish)
+            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            App.FastFlags.Prop.Clear();
+            try { App.FastFlags.Save(); } catch { }
+
+            // 2. Clear path Roblox juga
+            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+
+            // 3. Reset preset indicator
+            App.Settings.Prop.SelectedPerformancePreset = "None";
+            App.Settings.Prop.ForceExtremeMode = false;
+            OnPropertyChanged(nameof(ForceExtremeMode));
+            SelectedPreset = "None";
+
+            try { App.Settings.Save(); } catch { }
+
+            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            Notify("✅ ClientAppSettings berhasil dibersihkan. Pilih preset untuk memulai ulang.");
         }
 
         // ── Night Vision ──────────────────────────────────────────────────────────────────
-
         /// <summary>
         /// Status Night Vision saat ini — true = aktif, false = nonaktif.
         /// Membaca dari Settings agar persisten antar session.
