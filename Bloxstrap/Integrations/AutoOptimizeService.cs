@@ -383,13 +383,13 @@ namespace Bloxstrap.Integrations
                     //   - Nilai 1 (sebelumnya): terlalu rendah — senter/torch yang bergerak
                     //     tidak bisa update posisi cahaya cukup cepat, area sekitar jadi hitam
                     //     permanen / bug gelap. Ini terutama parah di game horror/RPG.
-                    //   - Nilai 2: minimum yang lebih aman untuk menjaga lighting responsif
+                    //   - Nilai 2: tetap terlalu agresif untuk banyak game modern.
+                    //   - Nilai 3/6: nilai yang lebih aman untuk menjaga lighting responsif
                     //     tanpa mengorbankan performance terlalu banyak.
-                    //   - Nilai 4: cukup untuk senter bergerak smooth, tetap hemat vs default.
                     //   - Default Roblox: ~8-16 tergantung scene.
                     // Sumber: catb0x/Roblox-Potato-FFlags (confirmed 2026).
-                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
+                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "6");
+                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "3");
 
                     // DFIntTextureCompositorActiveJobs=1: batasi worker background yang
                     // meng-composite atlas tekstur ke 1 thread — mencegah tekstur compositor
