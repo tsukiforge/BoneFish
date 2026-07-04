@@ -295,7 +295,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             SelectedPreset = "AutoOptimize";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-            Notify("Auto-optimize FastFlags telah diterapkan.");
+            Notify("✅ Mode aktif: Auto-Optimize (deteksi hardware + optimasi otomatis).");
         }
 
         private void ApplyRecommendedNetworkSettings()
@@ -324,7 +324,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             SelectedPreset = "Stable";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-            Notify("Preset stabil untuk low-spec telah diterapkan.");
+            Notify("✅ Mode aktif: Stable (lebih aman, visual lebih bersih, performa lebih seimbang).");
         }
 
         private void ApplyUltraLowSpecPreset()
@@ -376,7 +376,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             SelectedPreset = "UltraLow";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-            Notify("Ultra low-spec preset untuk PC spek kentang telah diterapkan.");
+            Notify("✅ Mode aktif: Ultra Low (lebih ringan, visual dikurangi, cocok untuk spek sangat rendah).");
         }
 
         private void ApplyBalancedPreset()        {
@@ -401,7 +401,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             SelectedPreset = "Balanced";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-            Notify("Preset seimbang telah diterapkan.");
+            Notify("✅ Mode aktif: Balanced (keseimbangan visual dan performa).");
         }
 
         /// <summary>
@@ -530,7 +530,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             SelectedPreset = "ExtremePerformance";
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-            Notify("🥔 Potato Mode aktif — ringan, visual normal, aset tidak tembus.");
+            Notify("🥔 Mode aktif: Potato Mode / Extreme Performance (lebih cepat, visual dikurangi, grass/wind tetap ada).");
         }
 
         // ── Clear ClientAppSettings ───────────────────────────────────────────────────────
@@ -643,15 +643,15 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 // Night Vision OVERRIDE nilai itu ke True saat aktif.
                 App.FastFlags.SetValue("FFlagNewLightAttenuation", "True");
 
-                // FIntRenderLocalLightUpdatesMax=8: naikkan dari 4 (potato mode) ke 8 agar
+                // FIntRenderLocalLightUpdatesMax=8: naikkan dari 6 (potato mode) ke 8 agar
                 // senter/torch update lebih sering → radius cahaya terasa lebih luas & responsif.
                 App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "8");
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "3");
 
                 NightVisionEnabled = true;
                 try { App.FastFlags.Save(); } catch { }
                 try { App.Settings.Save(); } catch { }
-                Notify("🌙 Night Vision aktif — area gelap akan lebih terang.");
+                Notify("🌙 Mode aktif: Night Vision (menerangkan area gelap secara client-side, tanpa mengubah server/pemain lain).");
             }
             else
             {
@@ -660,14 +660,14 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 // Cukup hapus flag ini sehingga Roblox pakai model lighting default-nya sendiri.
                 App.FastFlags.SetValue("FFlagFastGPULightCulling3", null);
                 App.FastFlags.SetValue("FFlagNewLightAttenuation", null);
-                // Kembalikan light updates ke nilai Potato Mode
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
+                // Kembalikan light updates ke nilai Potato Mode yang lebih aman
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "6");
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "3");
 
                 NightVisionEnabled = false;
                 try { App.FastFlags.Save(); } catch { }
                 try { App.Settings.Save(); } catch { }
-                Notify("🌙 Night Vision dinonaktifkan.");
+                Notify("🌙 Mode aktif: Night Vision nonaktif — kembali ke mode normal.");
             }
 
             OnPropertyChanged(nameof(NightVisionEnabled));
