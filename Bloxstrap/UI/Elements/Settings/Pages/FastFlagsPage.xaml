@@ -141,6 +141,21 @@
 
         <TextBlock Text="Manual FastFlag Overrides" FontSize="20" FontWeight="Medium" Margin="0,16,0,8" />
 
+        <!-- ═══ CLEAR CLIENTAPPSETTINGS ══════════════════════════════════════════════ -->
+        <ui:CardAction Margin="0,0,0,0" Icon="Delete24" Command="{Binding ClearClientAppSettingsCommand}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="🗑️ Clear ClientAppSettings" />
+                    <Border Margin="8,0,0,0" Padding="6,2" Background="#5A3000" CornerRadius="4">
+                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="#FFA040" Text="TROUBLESHOOT" />
+                    </Border>
+                </StackPanel>
+                <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                           Text="Hapus semua FastFlag dari BoneFish dan Roblox path. Gunakan jika game gelap atau visual aneh setelah ganti preset. Pilih ulang preset setelahnya." />
+            </StackPanel>
+        </ui:CardAction>
+
         <controls:OptionControl 
             Header="{x:Static resources:Strings.Menu_FastFlags_ManagerEnabled_Title}"
             Description="{x:Static resources:Strings.Menu_FastFlags_ManagerEnabled_Description}">
