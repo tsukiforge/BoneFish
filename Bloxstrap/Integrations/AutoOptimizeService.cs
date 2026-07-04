@@ -270,35 +270,17 @@ namespace Bloxstrap.Integrations
                 // Grain murni kosmetik, tidak ada game yang bergantung pada efek ini.
                 App.FastFlags.SetValue("FIntRenderGrainScale", "0");
 
-                // ── GRASS, FOLIAGE & ANGIN ────────────────────────────────────────────────
-                // FIntFRMMinGrassDistance/FIntFRMMaxGrassDistance=0: set jarak render rumput
-                // ke 0 sehingga tidak ada rumput yang digambar sama sekali.
-                // FIntRenderGrassDetailStrands=0: hapus helai detail rumput (strand rendering).
-                // FIntRenderGrassHeightScaler=0: set skala tinggi rumput ke 0, matikan sepenuhnya.
-                // Sumber: catb0x/Roblox-Potato-FFlags, Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("FIntFRMMinGrassDistance", "0");
-                App.FastFlags.SetValue("FIntFRMMaxGrassDistance", "0");
-                App.FastFlags.SetValue("FIntRenderGrassDetailStrands", "0");
-                App.FastFlags.SetValue("FIntRenderGrassHeightScaler", "0");
-
-                // FFlagGlobalWindActivated=False: matikan simulasi angin global —
-                // angin menggerakkan foliage dan kain, menambah beban CPU/GPU simulasi.
-                // Sumber: Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("FFlagGlobalWindActivated", "False");
+                // Grass & wind dibiarkan default — tidak memengaruhi rendering speed.
 
                 // ── MESH LOD / RENDER DISTANCE ───────────────────────────────────────────
-                // DFIntCSGLevelOfDetailSwitchingDistance + L12/L23/L34=0: paksa semua mesh
-                // ke LOD paling rendah mulai dari jarak 0 — semua objek langsung low-poly
-                // tanpa transisi jarak jauh/dekat.
-                // Sumber: Firebladedoge229 gist, catb0x/Roblox-Potato-FFlags (confirmed 2026).
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance", "0");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12", "0");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23", "0");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34", "0");
-
-                // DFIntCSGv2LodsToGenerate=0: matikan generasi LOD mesh CSGv2 sama sekali —
-                // mengurangi waktu load awal dan CPU overhead saat masuk game.
-                // Sumber: Firebladedoge229 gist (confirmed 2026).
+                // LOD 250/500/750 — objek dekat tetap high-poly, tidak tembus/pop-in.
+                // Nilai 0 menyebabkan semua objek jadi low-poly dari jarak 0 — bug aset tembus.
+                // Potato Mode dan UltraLow pakai 250 sebagai minimum switch distance.
+                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
+                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
+                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    isExtreme ? "500" : "250");
+                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    isExtreme ? "750" : "250");
+                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
                 App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
 
                 // DFIntDebugRestrictGCDistance=1: flag ini TERLALU agresif untuk Extreme mode —
@@ -316,13 +298,27 @@ namespace Bloxstrap.Integrations
                 // hasilnya layar hitam total seperti screenshot v3.9.0. Tidak acceptable.
 
                 // ── GRAIN SCALE & BATCH FLUSH ────────────────────────────────────────────
-                // FIntRenderGrainScale=0: matikan efek grain/film noise di post-process pass.
-                // Grain adalah efek kosmetik murni, tidak ada gunanya di device kentang.
+                // FIntRenderGrainScale=0: matikan efek grain/film noise.
                 App.FastFlags.SetValue("FIntRenderGrainScale", "0");
 
-                // FIntMaxBatchesPerFlush=5000: perbesar ukuran batch render agar flush
-                // lebih jarang — mengurangi overhead draw-call dan state-change per frame.
+                // FIntMaxBatchesPerFlush=5000: perbesar ukuran batch render.
                 App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
+
+                // ── RENDERING SPEED ───────────────────────────────────────────────────────
+                // DFIntMaxFrameBufferSize=4: kurangi frame buffer queue → frame lebih cepat
+                // ditampilkan, input lag berkurang. Nilai 4 paling stabil (0-3 bikin laggy).
+                // Sumber: Dantezz025/Roblox-Fast-Flags (confirmed 2026).
+                App.FastFlags.SetValue("DFIntMaxFrameBufferSize", "4");
+
+                // FIntRuntimeMaxNumOfThreads=4: batasi max thread Roblox di dual-core.
+                // Context switching overhead berkurang → tiap thread lebih banyak waktu CPU.
+                // Sumber: Dantezz025/Roblox-Fast-Flags (confirmed 2026).
+                App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", "4");
+
+                // DFFlagEnableRequestAsyncCompression=True: kompresi async request aset.
+                // Aset lebih cepat di-download saat join → kurangi pop-in/tembus.
+                // Sumber: Firebladedoge229 gist (confirmed 2026).
+                App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
 
                 // ── DYNAMIC FACES (AVATAR FACIAL ANIMATION) ──────────────────────────────
                 // CATATAN PENTING: flag FACS (DFIntAnimationLodFacsDistanceMin/Max/Denominator)
@@ -468,6 +464,7 @@ namespace Bloxstrap.Integrations
             "DFIntCSGLevelOfDetailSwitchingDistanceL12",
             "DFIntCSGLevelOfDetailSwitchingDistanceL23",
             "DFIntCSGLevelOfDetailSwitchingDistanceL34",
+            "DFIntCSGLevelOfDetailSwitchingDistanceStatic",
             "DFIntCSGv2LodsToGenerate",
             "DFIntDebugRestrictGCDistance",            // DIHAPUS — not responding
 
@@ -481,6 +478,9 @@ namespace Bloxstrap.Integrations
 
             // Batch flush & render
             "FIntMaxBatchesPerFlush",
+            "DFIntMaxFrameBufferSize",
+            "FIntRuntimeMaxNumOfThreads",
+            "DFFlagEnableRequestAsyncCompression",
 
             // Task scheduler / FPS cap
             "DFIntTaskSchedulerTargetFps",
