@@ -353,7 +353,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // dan texture compositor jobs.
             App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
+            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
             App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
 
             DisableRobloxAnimations = true;
@@ -441,7 +441,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             // ── Light updates: Max=4 agar senter/torch tidak bug gelap ────────────────────
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
+            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
             App.FastFlags.SetValue("FIntRenderLocalLightFadeInMs", "0");
 
             // ── Post-processing ringan: hanya yang tidak merusak visual game ────────────
@@ -662,7 +662,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.FastFlags.SetValue("FFlagNewLightAttenuation", null);
                 // Kembalikan light updates ke nilai Potato Mode
                 App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "1");
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
 
                 NightVisionEnabled = false;
                 try { App.FastFlags.Save(); } catch { }
