@@ -40,6 +40,7 @@ namespace Bloxstrap
             if (idx != -1)
                 version = version[..idx];
 
+            version = version.Replace(", ", ".").Replace(',', '.').Trim();
             return new Version(version);
         }
 

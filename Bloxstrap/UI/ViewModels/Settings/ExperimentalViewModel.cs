@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using Bloxstrap.Integrations;
 using Bloxstrap.UI.Elements.Settings;
@@ -15,25 +16,45 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public bool EnableSystemTrayOnClose
         {
             get => App.Settings.Prop.EnableSystemTrayOnClose;
-            set => App.Settings.Prop.EnableSystemTrayOnClose = value;
+            set
+            {
+                App.Settings.Prop.EnableSystemTrayOnClose = value;
+                OnPropertyChanged(nameof(EnableSystemTrayOnClose));
+                try { App.Settings.Save(); } catch { }
+            }
         }
 
         public bool EnableRobloxNotifications
         {
             get => App.Settings.Prop.EnableRobloxNotifications;
-            set => App.Settings.Prop.EnableRobloxNotifications = value;
+            set
+            {
+                App.Settings.Prop.EnableRobloxNotifications = value;
+                OnPropertyChanged(nameof(EnableRobloxNotifications));
+                try { App.Settings.Save(); } catch { }
+            }
         }
 
         public bool EnableFriendOnlineNotifications
         {
             get => App.Settings.Prop.EnableFriendOnlineNotifications;
-            set => App.Settings.Prop.EnableFriendOnlineNotifications = value;
+            set
+            {
+                App.Settings.Prop.EnableFriendOnlineNotifications = value;
+                OnPropertyChanged(nameof(EnableFriendOnlineNotifications));
+                try { App.Settings.Save(); } catch { }
+            }
         }
 
         public bool EnableNotificationSound
         {
             get => App.Settings.Prop.EnableNotificationSound;
-            set => App.Settings.Prop.EnableNotificationSound = value;
+            set
+            {
+                App.Settings.Prop.EnableNotificationSound = value;
+                OnPropertyChanged(nameof(EnableNotificationSound));
+                try { App.Settings.Save(); } catch { }
+            }
         }
 
         public bool IsRunningAsAdmin => Utilities.IsRunningAsAdmin();
@@ -49,13 +70,19 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.Settings.Prop.EnableFpsMonitor = value;
                 OnPropertyChanged(nameof(EnableFpsMonitor));
                 OnPropertyChanged(nameof(FpsAdminInfoVisibility));
+                try { App.Settings.Save(); } catch { }
             }
         }
 
         public bool OptimizeForLowEnd
         {
             get => App.Settings.Prop.OptimizeForLowEnd;
-            set => App.Settings.Prop.OptimizeForLowEnd = value;
+            set
+            {
+                App.Settings.Prop.OptimizeForLowEnd = value;
+                OnPropertyChanged(nameof(OptimizeForLowEnd));
+                try { App.Settings.Save(); } catch { }
+            }
         }
 
         public bool EnableWallpaperLauncher
@@ -65,6 +92,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.Settings.Prop.EnableWallpaperLauncher = value;
                 OnPropertyChanged(nameof(EnableWallpaperLauncher));
+                try { App.Settings.Save(); } catch { }
             }
         }
 
