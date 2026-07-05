@@ -1,4 +1,204 @@
-# BoneFish Release Notes
+# BoneFish Changelog
+
+## v5.0.0 - Apply & Restart, Dark Game Fix, Flag Verification & Auto-Optimize Guard
+
+Release date: 2026-07-05
+
+Major release — menambahkan Apply & Restart Roblox, memperbaiki root cause game gelap, verifikasi flag otomatis, dan proteksi AutoOptimizeService terhadap preset user.
+
+### New Features — 🚀 Apply & Restart Roblox
+
+Tombol baru di halaman Fast Flags yang memungkinkan user menerapkan semua flag dan restart Roblox dalam satu klik.
+
+**Cara kerja:**
+1. User pilih preset / atur flag sesuai keinginan
+2. Klik **🚀 Apply & Restart Roblox**
+3. Konfirmasi dialog muncul
+4. Otomatis: Save FastFlag + Settings → Kill Roblox + system tray → Launch BoneFish bootstrapper
+5. Settings window tertutup, bootstrapper mengambil alih
+
+**Yang dilakukan:**
+- Save semua `App.FastFlags` dan `App.Settings` ke disk
+- Kill proses `RobloxPlayerBeta` dan `RobloxCrashHandler` (async, UI tidak freeze)
+- Signal `BoneFish-WatcherExitEvent` untuk clean up system tray
+- Launch `BoneFish.exe -player` untuk restart dengan flag baru
+- Tutup settings window agar tidak ada 2 window aktif
+
+### New Features — ✅ FastFlag Verification (VerifyAndNotify)
+
+Setiap kali user mengapply preset, sistem sekarang membaca kembali `ClientAppSettings.json` dari disk dan menghitung jumlah flag yang berhasil ditulis.
+
+**Contoh notifikasi:**
+- `✅ Ultra Low aktif — 32 FastFlag berhasil ditulis ke disk.`
+- `✅ Balanced aktif — 28 FastFlag berhasil ditulis ke disk.`
+- `✅ Potato Mode aktif — 41 FastFlag berhasil ditulis ke disk.`
+- `✅ Stable aktif — 25 FastFlag berhasil ditulis ke disk.`
+
+Tujuan: memastikan user yakin flag sudah benar-benar tersimpan sebelum restart.
+
+### New Features — ⏳ Loading Indicator
+
+ProgressRing + teks "Menerapkan preset..." muncul saat user mengklik preset, menggantikan tombol sementara. Snackbar timeout dinaikkan dari 3 detik ke 5 detik agar user sempat membaca verifikasi.
+
+### Bug Fixes — 🌑 Game Gelap (Root Cause Found & Fixed)
+
+**Penyebab sesungguhnya** ditemukan dengan membaca file `ClientAppSettings.json` yang BENAR-BENAR ada di disk (bukan hanya di kode):
+
+| Flag di Disk | Nilai Sebelumnya | Dampak |
+|---|---|---|
+| `DFIntDebugFRMQualityLevelOverride` | **1** | FRM minimum → lighting pipeline rusak total |
+| `FIntRenderShadowIntensity` | **0** | Semua bayangan dimatikan → area gelap |
+| `DFFlagDebugPauseVoxelizer` | **True** | Voxelizer dimatikan → baked lighting mati |
+| `FIntCSGVoxelizerFadeRadius` | **0** | Tidak ada transisi lighting |
+
+**3 flag terakhir** (shadow=0 + voxelizer pause + fade=0) bersama FRM=1 **MEMATIKAN seluruh pipeline lighting Roblox** — bukan hanya mengurangi, tapi benar-benar mematikan. Ini menyebabkan game (terutama horror/RPG seperti Phasmophobia) menjadi hitam di area yang seharusnya terang.
+
+**Fix yang diterapkan:**
+
+1. **ExtremePerformance preset** (`FastFlagsViewModel.cs`):
+   - FRM: `1` → `3` (masih sangat ringan, tapi preserve lighting pipeline)
+   - **HAPUS** `FIntRenderShadowIntensity = 0` (shadow biarkan default Roblox)
+   - **HAPUS** `DFFlagDebugPauseVoxelizer = True` (voxelizer biarkan jalan)
+   - **HAPUS** `FIntCSGVoxelizerFadeRadius = 0` (fade biarkan default)
+
+2. **AutoOptimizeService** (`AutoOptimizeService.cs`):
+   - FRM: `1` → `3` (sama, untuk auto-detected low-end)
+   - **HAPUS** 3 flag shadow/voxelizer yang sama
+
+3. **UltraLow preset** (`FastFlagsViewModel.cs`):
+   - FRM: `1` → `5` (sedikit lebih tinggi dari Extreme, preserve lighting)
+
+### Bug Fixes — 💾 Save Order Bug (Preset Tidak Tersimpan ke Disk)
+
+**Root cause:** Di `ApplyUltraLowSpecPreset()` dan `ApplyExtremePerformancePreset()`, `SelectedPreset` di-set **SETELAH** `App.Settings.Save()`. Jadi nama preset tidak pernah tertulis ke disk.
+
+**Akibat:** Saat bootstrapper restart, `AutoOptimizeService.CheckAndApply()` baca `SelectedPerformancePreset` dari disk → preset tidak ditemukan → **OVERWRITE semua flag** user dengan FRM=1 + shadow=0 + voxelizer=True → game gelap.
+
+**Fix:** Pindahkan `SelectedPreset = "..."` **SEBELUM** `App.Settings.Save()` di kedua method. Sekarang preset tertulis ke disk SEBELUM save, sehingga bootstrapper membaca nilai yang benar.
+
+### Bug Fixes — 🛡️ AutoOptimizeService Overwrite Guard
+
+**Root cause:** `ApplyAggressiveOptimizations()` di `AutoOptimizeService.cs` berjalan **setiap kali** BoneFish launch dan **OVERWRITE** preset pilihan user — memaksa FRM=1, shadow=0, voxelizer=True meskipun user sudah memilih preset lain.
+
+**Fix:** Early-return check di `ApplyAggressiveOptimizations()`: jika user sudah memilih preset manual (UltraLow/Balanced/Stable/ExtremePerformance), **skip semua aggressive overrides** dan return. Preset user dihormati.
+
+### Performance Presets — Deskripsi Lengkap
+
+BoneFish menyediakan 5 preset performa untuk menyesuaikan Roblox dengan spesifikasi perangkat:
+
+#### 🤖 Auto-Optimize (Default)
+- **Target:** Semua spesifikasi
+- **Filosofi:** Deteksi hardware otomatis, apply optimasi yang sesuai
+- **Yang diatur:** FRM=21, Texture=Level0, MSAA=x1, Mesh=LOD0, D3D11, Disable Animations, Low Memory Mode
+- **Cocok untuk:** User yang tidak ingin repot atur manual
+
+#### 🛡️ Stable
+- **Target:** Semua spesifikasi, prioritaskan stabilitas
+- **Filosofi:** Auto-Optimize base + Network optimization + Nonaktifkan background updates
+- **Yang diatur:** Sama seperti Auto-Optimize + Network flags (No Delay) + BackgroundUpdates=False + FakeBorderlessFullscreen=False
+- **Cocok untuk:** User yang sering crash/freeze, ingin pengalaman paling stabil
+
+#### 🐌 Ultra Low-Spec
+- **Target:** PC kentang (2 core, 2-4GB RAM, Intel HD)
+- **Filosofi:** Aggressif tapi TIDAK mematikan lighting
+- **Yang diatur:** FRM=5, Texture=Level0, MSAA=x1, LOD=250, FPS=30, LightUpdates=4, Compositor=1, Animations Off, Low Memory Mode
+- **Cocok untuk:** Laptop lawas, PC integrated graphics, ingin main Roblox di spek minimum
+
+#### 🥔 Extreme Performance (Potato Mode)
+- **Target:** PC paling lemah (2 core, <4GB RAM, no GPU dedicated)
+- **Filosofi:** Maksimal performa, pertahankan VISIBILITAS game
+- **Yang diatur:** FRM=3, Texture=Level0, MSAA=x1, LOD=250/500/750, FPS=24-60 (configurable), LightUpdates=4, Compositor=1, Telemetry Off, Animations Off, Low Memory Mode
+- **Yang TIDAK dilakukan (perubahan dari v4.4.0):**
+  - ❌ TIDAK mematikan shadow (sebelumnya `FIntRenderShadowIntensity=0` → game gelap)
+  - ❌ TIDAK pause voxelizer (sebelumnya `DFFlagDebugPauseVoxelizer=True` → lighting baked mati)
+  - ❌ TIDAK paksa Voxel lighting (merusak game ShadowMap/Future)
+  - ❌ TIDAK disable PostFx (visual game rusak)
+  - ❌ TIDAK ubah SkyGray (atmosphere berubah)
+  - ❌ TIDAK ubah LightAttenuation (model lighting berubah)
+- **Cocok untuk:** Device paling lemah yang ingin tetap bisa MELIHAT game dengan jelas
+
+#### ⚖️ Balanced
+- **Target:** Mid-range PC (4 core, 8GB RAM)
+- **Filosofi:** Keseimbangan antara performa dan visual
+- **Yang diatur:** FRM=15, Texture=Level1, MSAA=x2, Mesh=LOD1, Lighting=Default, Network flags
+- **Cocok untuk:** PC menengah yang ingin performa lebih tanpa mengorbankan visual terlalu banyak
+
+### Night Vision Mode 🌙
+
+Mode opsional yang menerangkan area gelap di game secara client-side.
+
+**Cara kerja:**
+- `FFlagFastGPULightCulling3=True` — GPU light culling efisien, area gelap jadi lebih terang
+- `FFlagNewLightAttenuation=True` — model attenuation "lembut", cahaya menyebar lebih jauh
+- `FIntRenderLocalLightUpdatesMax=8` — senter/torch update lebih sering
+
+**Efek:** Area gelap / senter game terasa lebih terang. Pemain lain dan server TIDAK melihat perubahan apapun.
+
+**Toggle:** Settings → Fast Flags → Night Vision card → klik untuk aktif/nonaktifkan
+
+### FPS Monitor Overlay 📊
+
+Overlay transparan yang menampilkan FPS real-time, frame time, dan status game.
+
+**Fitur:**
+- FPS counter berbasis ETW (Event Tracing for Windows) — akurat, bukan WPF render frames
+- Color coding: Hijau (≥60 FPS), Kuning (30-59 FPS), Merah (<30 FPS)
+- Draggable — geser ke posisi manapun, posisi tersimpan
+- Persistent mode — tetap aktif meski keluar game
+- Vulkan detection — informasi jika game pakai Vulkan (ETW tidak bisa baca)
+- Low-end throttle — update interval naik ke 2 detik untuk hemat CPU
+
+**Toggle:** Settings → Experimental → Enable FPS Monitor
+
+### Anti Not-Responding System
+
+Sistem 3-layer proteksi terhadap freeze/crash di perangkat low-end:
+
+**Layer 1 — FastFlags (sebelum Roblox launch):**
+- `DFIntMaxActiveAnimationTracks=32` — potong Lua GC pressure (default 200+)
+- `FIntRenderLocalLightFadeInMs=0` — hapus light fade work di main thread
+- 7× `FFlagDebugDisableTelemetry*` — eliminasi background telemetry wakeups
+
+**Layer 2 — Process Priority (800ms setelah Roblox start):**
+- Roblox process → `AboveNormal` priority
+- Windows scheduler beri lebih banyak CPU time
+
+**Layer 3 — RAM Trim (device <5GB RAM):**
+- `EmptyWorkingSet()` pada semua non-critical background processes
+- Bebaskan RAM fisik untuk Roblox
+- System-critical processes (svchost, dwm, explorer) di-skip
+- Bonus: BoneFish pin ke core 0 di dual-core untuk kurangi L2 cache contention
+
+### Changelog (Technical)
+
+**Files changed:**
+- `Bloxstrap/UI/ViewModels/Settings/FastFlagsViewModel.cs`:
+  - Added `ApplyAndRestartRobloxCommand` + `ApplyAndRestartRoblox()` (async void, Task.Run for process kill)
+  - Added `RequestCloseWindowEvent` for settings window close
+  - Added `IsApplying`/`IsNotApplying` loading state
+  - Added `VerifyAndNotify()` method — reads back JSON, shows flag count
+  - Fixed save order: `SelectedPreset` before `App.Settings.Save()` in UltraLow + ExtremePerformance
+  - ExtremePerformance: FRM 1→3, removed shadow/voxelizer flags
+  - UltraLow: FRM 1→5
+  - All preset methods: `Notify()` → `VerifyAndNotify()` for verification
+
+- `Bloxstrap/UI/Elements/Settings/Pages/FastFlagsPage.xaml`:
+  - Added 🚀 Apply & Restart Roblox CardAction button with "SAVE + RESTART" badge
+  - Added loading indicator (ProgressRing + text) bound to `IsApplying`
+  - Increased snackbar timeout from 3000 to 5000ms
+
+- `Bloxstrap/UI/Elements/Settings/Pages/FastFlagsPage.xaml.cs`:
+  - Added `RequestCloseWindowEvent` handler → `Window.Close()`
+
+- `Bloxstrap/Integrations/AutoOptimizeService.cs`:
+  - Added early-return in `ApplyAggressiveOptimizations()`: skip if user has manual preset
+  - FRM: 1→3 for aggressive optimizations
+  - Removed: `FIntRenderShadowIntensity=0`, `DFFlagDebugPauseVoxelizer=True`, `FIntCSGVoxelizerFadeRadius=0`
+
+- `Bloxstrap/Bloxstrap.csproj`:
+  - Version bump: 4.4.0 → 5.0.0
+
+---
 
 ## v4.4.1 - Fix Custom Loading Screen: Registrasi Pertama, Persistensi & Preview
 
@@ -83,22 +283,6 @@ Hotfix — memperbaiki bug kritis yang dilaporkan user: game tetap gelap walau s
   - 4 preset method (`ApplyRecommendedFastFlags`, `ApplyUltraLowSpecPreset`, `ApplyBalancedPreset`, `ApplyExtremePerformancePreset`): + `CleanupLegacyRobloxFlags()`, + `NightVisionEnabled = false`
   - `ApplyRecommendedStabilityPreset`: di-refactor — inline semua logic, 1 save/notify/reload
 - `Bloxstrap/Integrations/AutoOptimizeService.cs`: nilai light updates disesuaikan (Max 6→4, Min 3→2) di `ApplyAggressiveOptimizations`
-
----
-
-## Mods Folder Analysis
-
-Lokasi: `Bloxstrap/Resources/Mods/`
-
-- **OldAvatarBackground.rbxl** — Roblox place file untuk old avatar background. Direferensi oleh `ModPresetTask` di `ModsViewModel.cs` dengan target `ExtraContent\places\Mobile.rbxl`. Status: **OK, file ada.**
-- **Cursor/From2006/** — Direktori kosong. Sepertinya direncanakan untuk cursor style 2006 tapi file cursornya belum ditambahkan. Status: **Direktori kosong — perlu diisi atau dihapus.**
-- **Cursor/From2013/** — Direktori kosong. Sama seperti From2006, direncanakan untuk cursor style 2013. Status: **Direktori kosong — perlu diisi atau dihapus.**
-- **Sounds/OldJump.mp3** — Sound effect lompat jadul Roblox. Status: **OK.**
-- **Sounds/OldWalk.mp3** — Sound effect jalan jadul Roblox. Status: **OK.**
-- **Sounds/OldGetUp.mp3** — Sound effect bangun jadul Roblox. Status: **OK.**
-- **Sounds/Empty.mp3** — File suara kosong (silence), kemungkinan untuk mute sound tertentu. Status: **OK.**
-
-Rekomendasi: Direktori `Cursor/From2006` dan `Cursor/From2013` kosong — jika fitur cursor mod belum diimplementasi, hapus direktori kosong ini. Jika direncanakan, tambahkan file `.cur` atau `.ani` yang sesuai.
 
 ---
 
@@ -218,8 +402,7 @@ Changelog (technical)
 - Bloxstrap/UI/ViewModels/Settings/ExperimentalViewModel.cs: new properties for binding
 
 Notes for CI-release
-- This file (RELEASE_NOTES.md) is CI-friendly and can be displayed as release notes in the release pipeline.
-- It includes user-facing highlights and developer technical changes.
+- This file (CHANGELOG.md) is CI-friendly and is automatically included in GitHub release notes by the CI/CD pipeline.
 
 ---
 
