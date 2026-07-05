@@ -383,13 +383,13 @@ namespace Bloxstrap.Integrations
                     //   - Nilai 1 (sebelumnya): terlalu rendah — senter/torch yang bergerak
                     //     tidak bisa update posisi cahaya cukup cepat, area sekitar jadi hitam
                     //     permanen / bug gelap. Ini terutama parah di game horror/RPG.
-                    //   - Nilai 2: tetap terlalu agresif untuk banyak game modern.
-                    //   - Nilai 3/6: nilai yang lebih aman untuk menjaga lighting responsif
+                    //   - Nilai 2: minimum yang lebih aman untuk menjaga lighting responsif
                     //     tanpa mengorbankan performance terlalu banyak.
+                    //   - Nilai 4: cukup untuk senter bergerak smooth, tetap hemat vs default.
                     //   - Default Roblox: ~8-16 tergantung scene.
                     // Sumber: catb0x/Roblox-Potato-FFlags (confirmed 2026).
-                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "6");
-                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "3");
+                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
+                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
 
                     // DFIntTextureCompositorActiveJobs=1: batasi worker background yang
                     // meng-composite atlas tekstur ke 1 thread — mencegah tekstur compositor
@@ -501,6 +501,25 @@ namespace Bloxstrap.Integrations
             "FFlagDebugDisableTelemetryV2Counter",
             "FFlagDebugDisableTelemetryV2Event",
             "FFlagDebugDisableTelemetryV2Stat",
+
+            // ── UI-managed flags (FastFlagsViewModel properties) ────────────────────────
+            // DisableRobloxAnimations property
+            "FFlagRenderUIAnimations",
+            "FFlagRenderMenuTransitions",
+            "FFlagRenderInventoryEffects",
+
+            // EnableLowMemoryMode property
+            "FFlagLuaAppEnableLowMemoryMode",
+
+            // Network flags (ApplyRecommendedNetworkSettings & all presets)
+            "FIntRakNetPacketRateLimit",
+            "DFIntMaxReceivePPS",
+            "DFIntMaxSendPPS",
+            "DFIntConnectionMTUSize",
+            "DFIntOptimizeSendQueue",
+
+            // FPS monitor flag (set by Bootstrapper)
+            "FFlagDebugDisplayFPS",
         };
 
         /// <summary>
@@ -519,6 +538,7 @@ namespace Bloxstrap.Integrations
 
         // FastFlags yang aktif dikelola oleh preset saat ini.
         // Dipakai oleh RemoveOptimizations() untuk cleanup saat mode dimatikan.
+        // SINKRONISASI: setiap flag di sini HARUS juga ada di AllKnownManagedFlags.
         private static readonly string[] ManagedFlags =
         {
             // ── Texture quality ──────────────────────────────────────────────────────────
@@ -534,12 +554,12 @@ namespace Bloxstrap.Integrations
             "FIntRenderShadowIntensity",
             "DFFlagDebugPauseVoxelizer",
             "FIntCSGVoxelizerFadeRadius",
-            // FFlagNewLightAttenuation — DIHAPUS (mengubah model lighting game)
+
+            // ── Lighting technology ──────────────────────────────────────────────────────
+            "FFlagFastGPULightCulling3",
+            "FFlagNewLightAttenuation",
 
             // ── Sky, atmosphere & post-processing ────────────────────────────────────────
-            // FFlagDebugSkyGray       — DIHAPUS (merusak visual semua game)
-            // FFlagDisablePostFx      — DIHAPUS (merusak post-FX milik game)
-            // FFlagNewLightAttenuation — DIHAPUS (mengubah model lighting game)
             "FFlagDebugSSAOForce",
             "FIntSSAOMipLevels",
             "FIntRobloxGuiBlurIntensity",
@@ -558,21 +578,12 @@ namespace Bloxstrap.Integrations
             "DFIntCSGLevelOfDetailSwitchingDistanceL23",
             "DFIntCSGLevelOfDetailSwitchingDistanceL34",
             "DFIntCSGv2LodsToGenerate",
-            // DFIntDebugRestrictGCDistance — SENGAJA TIDAK DI-MANAGE karena tidak dipakai lagi
 
             // ── Terrain detail ────────────────────────────────────────────────────────────
             "FIntTerrainArraySliceSize",
 
-            // ── Water reflection / lighting technology ────────────────────────────────────
-            // DFFlagDebugRenderForceTechnologyVoxel — DIHAPUS (layar hitam di semua game ShadowMap/Future)
-
             // ── Grain scale & batch flush ─────────────────────────────────────────────────
-            "FIntRenderGrainScale",
             "FIntMaxBatchesPerFlush",
-
-            // ── Dynamic faces (FACS avatar animation) ────────────────────────────────────
-            // DFIntAnimationLodFacsDistanceMin/Max/Denominator — SENGAJA TIDAK DI-MANAGE
-            // karena tidak dipakai lagi (mematikan ini rusak voice activity indicator)
 
             // ── Task scheduler / FPS cap ──────────────────────────────────────────────────
             "DFIntTaskSchedulerTargetFps",
@@ -594,89 +605,132 @@ namespace Bloxstrap.Integrations
             "FFlagDebugDisableTelemetryV2Counter",
             "FFlagDebugDisableTelemetryV2Event",
             "FFlagDebugDisableTelemetryV2Stat",
+
+            // ── UI-managed flags (FastFlagsViewModel) ────────────────────────────────────
+            // DisableRobloxAnimations
+            "FFlagRenderUIAnimations",
+            "FFlagRenderMenuTransitions",
+            "FFlagRenderInventoryEffects",
+
+            // EnableLowMemoryMode
+            "FFlagLuaAppEnableLowMemoryMode",
+
+            // Network flags
+            "FIntRakNetPacketRateLimit",
+            "DFIntMaxReceivePPS",
+            "DFIntMaxSendPPS",
+            "DFIntConnectionMTUSize",
+            "DFIntOptimizeSendQueue",
+
+            // FPS monitor
+            "FFlagDebugDisplayFPS",
         };
 
         /// <summary>
-        /// Bersihkan ClientAppSettings.json di path Roblox default
-        /// (bukan path BoneFish) dari flag-flag yang pernah kita inject.
+        /// Bersihkan ClientAppSettings.json di path Roblox default DAN path BoneFish
+        /// dari flag-flag yang pernah kita inject.
         ///
         /// Masalah: BoneFish menulis flags ke path-nya sendiri, tapi jika user
         /// pernah pakai versi lama atau preset lama, sisa flags bisa tertinggal
-        /// di path Roblox standar (%localappdata%\Roblox\Versions\xxx\ClientSettings)
+        /// di multiple path:
+        ///   - %localappdata%\Roblox\Versions\xxx\ClientSettings (Roblox default)
+        ///   - %localappdata%\BoneFish\Modifications\ClientSettings
+        ///   - %localappdata%\BoneFish\Versions\WindowsPlayer\ClientSettings
         /// dan terus dibaca Roblox meski BoneFish sudah update.
         ///
         /// Dipanggil sekali saat BoneFish launch (dari Bootstrapper.Run) untuk
-        /// memastikan tidak ada kontaminasi flags lama di path Roblox.
+        /// memastikan tidak ada kontaminasi flags lama di semua path.
         /// </summary>
         public static void CleanupLegacyRobloxFlags()
         {
             try
             {
-                // Path Roblox default — berbeda dari path BoneFish
+                int totalCleanedFiles = 0;
+
+                // ── Path 1: Roblox default ───────────────────────────────────────────
                 string robloxVersionsDir = Path.Combine(Paths.LocalAppData, "Roblox", "Versions");
-                if (!Directory.Exists(robloxVersionsDir))
-                    return;
-
-                int cleanedFiles = 0;
-
-                // Scan semua folder version-xxx
-                foreach (string versionDir in Directory.GetDirectories(robloxVersionsDir, "version-*"))
+                if (Directory.Exists(robloxVersionsDir))
                 {
-                    string clientSettingsPath = Path.Combine(versionDir, "ClientSettings", "ClientAppSettings.json");
-                    if (!File.Exists(clientSettingsPath))
-                        continue;
-
-                    try
+                    // Scan semua folder version-xxx
+                    foreach (string versionDir in Directory.GetDirectories(robloxVersionsDir, "version-*"))
                     {
-                        string content = File.ReadAllText(clientSettingsPath).Trim();
-
-                        // Skip kalau sudah kosong
-                        if (content == "{}" || content == "{ }" || string.IsNullOrWhiteSpace(content))
-                            continue;
-
-                        // Parse dan hapus semua flag yang kita kelola
-                        var flags = System.Text.Json.JsonSerializer
-                            .Deserialize<Dictionary<string, object>>(content);
-
-                        if (flags == null || flags.Count == 0)
-                            continue;
-
-                        bool modified = false;
-                        foreach (string flag in AllKnownManagedFlags)
-                        {
-                            if (flags.Remove(flag))
-                                modified = true;
-                        }
-
-                        if (modified)
-                        {
-                            string cleaned = System.Text.Json.JsonSerializer
-                                .Serialize(flags, new System.Text.Json.JsonSerializerOptions
-                                {
-                                    WriteIndented = true
-                                });
-                            File.WriteAllText(clientSettingsPath, cleaned);
-                            cleanedFiles++;
-                            App.Logger.WriteLine(LOG_IDENT,
-                                $"Cleaned legacy flags from: {clientSettingsPath}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // Satu file gagal tidak menghentikan file lainnya
-                        App.Logger.WriteLine(LOG_IDENT,
-                            $"Could not clean {clientSettingsPath}: {ex.Message}");
+                        string clientSettingsPath = Path.Combine(versionDir, "ClientSettings", "ClientAppSettings.json");
+                        if (CleanupClientAppSettings(clientSettingsPath))
+                            totalCleanedFiles++;
                     }
                 }
 
-                if (cleanedFiles > 0)
+                // ── Path 2: BoneFish Modifications ───────────────────────────────────────
+                string bonefishModPath = Path.Combine(Paths.Modifications, "ClientSettings", "ClientAppSettings.json");
+                if (File.Exists(bonefishModPath) && CleanupClientAppSettings(bonefishModPath))
+                    totalCleanedFiles++;
+
+                // ── Path 3: BoneFish Versions\WindowsPlayer ──────────────────────────────
+                string bonefishVersionPath = Path.Combine(Paths.Base, "Versions", "WindowsPlayer", "ClientSettings", "ClientAppSettings.json");
+                if (File.Exists(bonefishVersionPath) && CleanupClientAppSettings(bonefishVersionPath))
+                    totalCleanedFiles++;
+
+                if (totalCleanedFiles > 0)
                     App.Logger.WriteLine(LOG_IDENT,
-                        $"Legacy flag cleanup done: {cleanedFiles} file(s) cleaned");
+                        $"Legacy flag cleanup done: {totalCleanedFiles} file(s) cleaned from all paths");
             }
             catch (Exception ex)
             {
                 App.Logger.WriteLine(LOG_IDENT, $"CleanupLegacyRobloxFlags failed (non-fatal): {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Bersihkan satu file ClientAppSettings.json dari flag-flag yang kita kelola.
+        /// Mengembalikan true jika file dimodifikasi, false jika tidak.
+        /// </summary>
+        private static bool CleanupClientAppSettings(string clientSettingsPath)
+        {
+            try
+            {
+                if (!File.Exists(clientSettingsPath))
+                    return false;
+
+                string content = File.ReadAllText(clientSettingsPath).Trim();
+
+                // Skip kalau sudah kosong
+                if (content == "{}" || content == "{ }" || string.IsNullOrWhiteSpace(content))
+                    return false;
+
+                // Parse dan hapus semua flag yang kita kelola
+                var flags = System.Text.Json.JsonSerializer
+                    .Deserialize<Dictionary<string, object>>(content);
+
+                if (flags == null || flags.Count == 0)
+                    return false;
+
+                bool modified = false;
+                foreach (string flag in AllKnownManagedFlags)
+                {
+                    if (flags.Remove(flag))
+                        modified = true;
+                }
+
+                if (modified)
+                {
+                    string cleaned = System.Text.Json.JsonSerializer
+                        .Serialize(flags, new System.Text.Json.JsonSerializerOptions
+                        {
+                            WriteIndented = true
+                        });
+                    File.WriteAllText(clientSettingsPath, cleaned);
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Cleaned legacy flags from: {clientSettingsPath}");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"Could not clean {clientSettingsPath}: {ex.Message}");
+            }
+
+            return false;
         }
 
         /// <summary>

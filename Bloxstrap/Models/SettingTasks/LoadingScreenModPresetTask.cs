@@ -6,18 +6,6 @@ namespace Bloxstrap.Models.SettingTasks
     {
         public LoadingScreenModPresetTask() : base("Mods", "CustomLoadingScreen") { }
 
-        public override bool Changed
-        {
-            get
-            {
-                if (!File.Exists(Paths.CustomLoadingScreen))
-                    return false;
-
-                using var fileStream = File.OpenRead(Paths.CustomLoadingScreen);
-                return MD5Hash.FromStream(fileStream) != OriginalState;
-            }
-        }
-
         public override void Execute()
         {
             if (String.IsNullOrEmpty(OriginalState))
