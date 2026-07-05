@@ -279,7 +279,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private void ApplyRecommendedFastFlags()
         {
             // Bersihkan semua flag lama sebelum apply preset baru.
+            // CleanupLegacyRobloxFlags bersihkan di DISK (path Roblox + BoneFish),
+            // PurgeAllKnownFlags bersihkan di MEMORY (App.FastFlags.Prop).
+            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
+            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            NightVisionEnabled = false;
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
@@ -294,8 +299,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
             EnableLowMemoryMode = true;
 
             SelectedPreset = "AutoOptimize";
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            try { App.FastFlags.Save(); } catch { }
+            try { App.Settings.Save(); } catch { }
             Notify("✅ Mode aktif: Auto-Optimize (deteksi hardware + optimasi otomatis).");
+            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
         private void ApplyRecommendedNetworkSettings()
@@ -310,27 +317,60 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("DFIntConnectionMTUSize", "1500");
             App.FastFlags.SetValue("DFIntOptimizeSendQueue", "1");
 
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            try { App.FastFlags.Save(); } catch { }
+            try { App.Settings.Save(); } catch { }
             Notify("Auto-optimize jaringan & No Delay telah diterapkan.");
+            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
         private void ApplyRecommendedStabilityPreset()
         {
-            ApplyRecommendedFastFlags();
-            ApplyRecommendedNetworkSettings();
+            // ── Cleanup (sekali vs sebelumnya ter-delegate 3x save/notify/reload) ─────
+            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            NightVisionEnabled = false;
 
+            // ── AutoOptimize base ────────────────────────────────────────────────────────
+            UseFastFlagManager = true;
+            FixDisplayScaling = true;
+            SelectedRenderingMode = RenderingMode.D3D11;
+            SelectedMSAALevel = MSAAMode.x1;
+            SelectedTextureQuality = TextureQuality.Level0;
+            MeshQualityEnabled = true;
+            MeshQuality = 0;
+            FRMQualityOverrideEnabled = true;
+            FRMQualityOverride = 21;
+            DisableRobloxAnimations = true;
+            EnableLowMemoryMode = true;
+
+            // ── Network ────────────────────────────────────────────────────────────────
+            App.Settings.Prop.EnableBetterMatchmaking = true;
+            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
+            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
+            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
+            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
+            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
+            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
+
+            // ── Stability-specific ──────────────────────────────────────────────────
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
 
+            // ── Finalize: save sekali, notify sekali, reload sekali ──────────────────
             SelectedPreset = "Stable";
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            try { App.FastFlags.Save(); } catch { }
+            try { App.Settings.Save(); } catch { }
             Notify("✅ Mode aktif: Stable (lebih aman, visual lebih bersih, performa lebih seimbang).");
+            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
         private void ApplyUltraLowSpecPreset()
         {
-            // Bersihkan semua flag lama sebelum apply preset baru.
+            // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
+            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
+            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            NightVisionEnabled = false;
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
@@ -375,13 +415,17 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.Settings.Save(); } catch { }
 
             SelectedPreset = "UltraLow";
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
             Notify("✅ Mode aktif: Ultra Low (lebih ringan, visual dikurangi, cocok untuk spek sangat rendah).");
+            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
-        private void ApplyBalancedPreset()        {
-            // Bersihkan semua flag lama sebelum apply preset baru.
+        private void ApplyBalancedPreset()
+        {
+            // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
+            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
+            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            NightVisionEnabled = false;
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
@@ -397,11 +441,20 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetPreset("Rendering.LightingMode", "Default");
             App.FastFlags.SetPreset("Terrain.GridV2", "False");
 
-            ApplyRecommendedNetworkSettings();
+            // Network flags langsung (jangan panggil ApplyRecommendedNetworkSettings untuk avoid reload interrupt)
+            App.Settings.Prop.EnableBetterMatchmaking = true;
+            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
+            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
+            App.FastFlags.SetValue("DFIntMaxReceivePPS", "50000");
+            App.FastFlags.SetValue("DFIntMaxSendPPS", "50000");
+            App.FastFlags.SetValue("DFIntConnectionMTUSize", "1500");
+            App.FastFlags.SetValue("DFIntOptimizeSendQueue", "1");
 
             SelectedPreset = "Balanced";
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            try { App.FastFlags.Save(); } catch { }
+            try { App.Settings.Save(); } catch { }
             Notify("✅ Mode aktif: Balanced (keseimbangan visual dan performa).");
+            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
@@ -421,8 +474,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
         /// </summary>
         private void ApplyExtremePerformancePreset()
         {
-            // Bersihkan semua flag lama sebelum apply preset baru.
+            // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
+            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
+            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            NightVisionEnabled = false;
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
@@ -529,8 +585,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.Settings.Save(); } catch { }
 
             SelectedPreset = "ExtremePerformance";
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
             Notify("🥔 Mode aktif: Potato Mode / Extreme Performance (lebih cepat, visual dikurangi, grass/wind tetap ada).");
+            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
         // ── Clear ClientAppSettings ───────────────────────────────────────────────────────
@@ -556,12 +612,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (result != System.Windows.MessageBoxResult.Yes)
                 return;
 
-            // 1. Clear via FastFlagManager (path BoneFish)
+            // 1. Clear via FastFlagManager (path BoneFish) — bersihkan MEMORY
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
             App.FastFlags.Prop.Clear();
             try { App.FastFlags.Save(); } catch { }
 
-            // 2. Clear path Roblox juga
+            // 2. Clear path Roblox + BoneFish via DISK scan
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
 
             // 3. Reset preset indicator
@@ -572,8 +628,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             try { App.Settings.Save(); } catch { }
 
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
             Notify("✅ ClientAppSettings berhasil dibersihkan. Pilih preset untuk memulai ulang.");
+            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
         // ── Night Vision ──────────────────────────────────────────────────────────────────
@@ -643,10 +699,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 // Night Vision OVERRIDE nilai itu ke True saat aktif.
                 App.FastFlags.SetValue("FFlagNewLightAttenuation", "True");
 
-                // FIntRenderLocalLightUpdatesMax=8: naikkan dari 6 (potato mode) ke 8 agar
+                // FIntRenderLocalLightUpdatesMax=8: naikkan dari 4 (potato mode) ke 8 agar
                 // senter/torch update lebih sering → radius cahaya terasa lebih luas & responsif.
                 App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "8");
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "3");
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
 
                 NightVisionEnabled = true;
                 try { App.FastFlags.Save(); } catch { }
@@ -660,9 +716,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 // Cukup hapus flag ini sehingga Roblox pakai model lighting default-nya sendiri.
                 App.FastFlags.SetValue("FFlagFastGPULightCulling3", null);
                 App.FastFlags.SetValue("FFlagNewLightAttenuation", null);
-                // Kembalikan light updates ke nilai Potato Mode yang lebih aman
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "6");
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "3");
+                // Kembalikan light updates ke nilai Potato Mode
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
+                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
 
                 NightVisionEnabled = false;
                 try { App.FastFlags.Save(); } catch { }

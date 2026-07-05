@@ -6,18 +6,6 @@ namespace Bloxstrap.Models.SettingTasks
     {
         public BackgroundModPresetTask() : base("Mods", "CustomBackground") { }
 
-        public override bool Changed
-        {
-            get
-            {
-                if (!File.Exists(Paths.CustomBackground))
-                    return false;
-
-                using var fileStream = File.OpenRead(Paths.CustomBackground);
-                return MD5Hash.FromStream(fileStream) != OriginalState;
-            }
-        }
-
         public override void Execute()
         {
             if (String.IsNullOrEmpty(OriginalState))

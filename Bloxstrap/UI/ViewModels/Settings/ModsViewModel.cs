@@ -84,6 +84,30 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ModsViewModel()
         {
+            // Persistensi: restore state dari disk.
+            // OriginalState setter otomatis sync ke NewState, jadi UI
+            // akan menampilkan tombol "Remove" + preview, bukan "Choose".
+            if (File.Exists(Paths.CustomLoadingScreen))
+            {
+                LoadingScreenTask.OriginalState = Paths.CustomLoadingScreen;
+
+                // Load preview — silent fail jika file corrupted, user bisa re-select
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(Paths.CustomLoadingScreen);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.DecodePixelWidth = 400;
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    LoadingScreenPreview = bitmap;
+                }
+                catch
+                {
+                    // Preview corrupted — user lihat tombol Remove tanpa preview, OK
+                }
+            }
         }
 
         private void ManageCustomLoadingScreen()
