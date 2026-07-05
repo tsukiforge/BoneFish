@@ -190,6 +190,19 @@ namespace Bloxstrap.Integrations
                 if (!App.Settings.Prop.OptimizeForLowEnd)
                     return;
 
+                // Jika user sudah memilih preset manual dari UI (bukan AutoOptimize/None),
+                // JANGAN override — biarkan preset user yang menentukan semua flag.
+                // Ini mencegah ApplyAggressiveOptimizations OVERWRITE FRM/shadow/etc
+                // yang sudah dipilih user di settings (penyebab utama game gelap).
+                string preset = App.Settings.Prop.SelectedPerformancePreset ?? "None";
+                bool userHasManualPreset = preset is "UltraLow" or "Balanced" or "Stable" or "ExtremePerformance";
+
+                if (userHasManualPreset)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"User has manual preset '{preset}' — skipping aggressive overrides to respect user choice.");
+                    return;
+                }
+
                 tier ??= DetectSystemTier();
                 bool isExtreme = tier == SystemTier.ExtremePerformance;
                 bool isUltraOrExtreme = tier == SystemTier.UltraLow || isExtreme;
@@ -212,37 +225,28 @@ namespace Bloxstrap.Integrations
                 App.FastFlags.SetValue("FIntTextureCompositorLowResFactor", "1");
 
                 // ── FRM QUALITY OVERRIDE ──────────────────────────────────────────────────
-                // DFIntDebugFRMQualityLevelOverride=1: kualitas render paling rendah —
-                // resolusi internal diturunkan, LOD semua objek ke minimum, kurangi beban GPU.
-                // Dipertahankan di level 1 (sudah minimum), tidak diturunkan lebih jauh.
+                // DFIntDebugFRMQualityLevelOverride=3: kualitas render rendah tapi MASIH
+                // menjaga lighting pipeline. Nilai 1 (sebelumnya) MEMATIKAN lighting baked
+                // dan menyebabkan game jadi HITAM di area yang seharusnya terang.
+                // Nilai 3 adalah sweet spot: masih sangat ringan tapi game tetap bisa dilihat.
                 // Sumber: Firebladedoge229 gist, catb0x/Roblox-Potato-FFlags (confirmed 2026).
-                App.FastFlags.SetValue("DFIntDebugFRMQualityLevelOverride", "1");
+                App.FastFlags.SetValue("DFIntDebugFRMQualityLevelOverride", "3");
 
                 // FIntRomarkStartWithGraphicQualityLevel=1: paksa slider kualitas grafis
                 // di in-game menu mulai dari level 1, mencegah Roblox auto-detect ke level tinggi.
                 // Sumber: Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
-
-                // ── SHADOW RENDERING ─────────────────────────────────────────────────────
-                // FIntRenderShadowIntensity=0: set intensitas shadow ke 0, bayangan objek
-                // tidak ter-render sama sekali — penghematan GPU draw-call paling besar.
-                // Sumber: catb0x/Roblox-Potato-FFlags, Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("FIntRenderShadowIntensity", "0");
-
-                // DFFlagDebugPauseVoxelizer=True: hentikan voxelizer sehingga baked/voxel
-                // shadows tidak dihitung. Bekerja bersama FIntRenderShadowIntensity=0.
-                // Sumber: catb0x/Roblox-Potato-FFlags, Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("DFFlagDebugPauseVoxelizer", "True");
-
-                // FIntCSGVoxelizerFadeRadius=0: matikan fade radius voxelizer sehingga
-                // tidak ada komputasi transisi shadow yang sia-sia.
-                // Sumber: Firebladedoge229 gist (confirmed 2026).
-                App.FastFlags.SetValue("FIntCSGVoxelizerFadeRadius", "0");
-
-                // FFlagNewLightAttenuation: SENGAJA TIDAK DISET.
-                // Mengubah model attenuation bisa merusak lighting game yang didesain
-                // khusus untuk model tertentu — visual jadi gelap/terang tidak wajar.
-
+                App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");                // ── SHADOW & VOXELIZER: TIDAK DIMATIKAN ─────────────────────────────────
+                // CATATAN KRITIS (PENYEBAB GAME GELAP):
+                // FIntRenderShadowIntensity=0 + DFFlagDebugPauseVoxelizer=True sebelumnya
+                // digunakan bersama FRM=1. Kombinasi ini MEMATIKAN seluruh pipeline lighting:
+                //   - Shadow=0: tidak ada bayangan sama sekali → area yang seharusnya terang
+                //     jadi gelap karena tidak ada ambient occlusion / shadow mapping.
+                //   - Voxelizer paused: baked voxel lighting tidak dihitung → game horror/RPG
+                //     yang bergantung pada dynamic light dari senter/torch jadi hitam.
+                //
+                // FIX: Kedua flag DIHAPUS. FRM=3 sudah cukup ringan untuk mengurangi
+                // shadow quality tanpa mematikannya. Biarkan Roblox handle shadow
+                // dan voxelizer dengan default behavior (scaled down by FRM).
                 // ── SKY, ATMOSPHERE & POST-PROCESSING ────────────────────────────────────
                 // CATATAN: FFlagDebugSkyGray dan FFlagDisablePostFx SENGAJA TIDAK DIPAKAI.
                 //
