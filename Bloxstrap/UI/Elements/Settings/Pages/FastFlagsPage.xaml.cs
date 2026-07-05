@@ -28,6 +28,11 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
             _viewModel.OpenFlagEditorEvent += OpenFlagEditor;
             _viewModel.RequestPageReloadEvent += (_, _) => SetupViewModel();
             _viewModel.RequestNotificationEvent += (_, message) => ShowFastFlagsNotification(message);
+            _viewModel.RequestCloseWindowEvent += (_, _) =>
+            {
+                if (Window.GetWindow(this) is Window win)
+                    win.Close();
+            };
 
             DataContext = _viewModel;
         }
