@@ -285,6 +285,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
             NightVisionEnabled = false;
+            // ForceExtremeMode harus di-reset saat pindah ke preset lain,
+            // agar AutoOptimizeService.DetectSystemTier() tidak memaksa ExtremePerformance
+            // di launch berikutnya walau user sudah pilih preset lain.
+            App.Settings.Prop.ForceExtremeMode = false;
+            OnPropertyChanged(nameof(ForceExtremeMode));
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
@@ -329,6 +334,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
             NightVisionEnabled = false;
+            App.Settings.Prop.ForceExtremeMode = false;
+            OnPropertyChanged(nameof(ForceExtremeMode));
 
             // ── AutoOptimize base ────────────────────────────────────────────────────────
             UseFastFlagManager = true;
@@ -371,6 +378,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
             NightVisionEnabled = false;
+            App.Settings.Prop.ForceExtremeMode = false;
+            OnPropertyChanged(nameof(ForceExtremeMode));
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
@@ -426,6 +435,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
             NightVisionEnabled = false;
+            App.Settings.Prop.ForceExtremeMode = false;
+            OnPropertyChanged(nameof(ForceExtremeMode));
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
@@ -563,8 +574,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", fpsCap.ToString());
 
             // ── BoneFish settings ────────────────────────────────────────────────────────
-            App.Settings.Prop.ForceExtremeMode = true;
-            OnPropertyChanged(nameof(ForceExtremeMode));
+            // CATATAN: ForceExtremeMode TIDAK di-hardcode true di sini.
+            // ForceExtremeMode adalah toggle INDEPENDEN — user bisa menyalakannya
+            // secara manual jika ingin mode ini dipaksa pada launch berikutnya.
+            // Sebelumnya baris ini memaksa ForceExtremeMode=true setiap kali preset
+            // Extreme dipilih, menyebabkan preset lain (Balanced, UltraLow, Stable)
+            // tetap kena override Extreme saat Roblox di-launch ulang — lihat
+            // AutoOptimizeService.DetectSystemTier() yang cek ForceExtremeMode duluan.
             DisableRobloxAnimations = true;
             EnableLowMemoryMode = true;
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
