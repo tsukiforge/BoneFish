@@ -342,19 +342,23 @@ namespace Bloxstrap
                 State.Load();
                 RobloxState.Load();
 
-                // ── MIGASI PRESET v4.5.0 ──────────────────────────────────────────────────
-                // Preset "UltraLow" (Ultra low-spec + Anti Crash) digabung ke
-                // "ExtremePerformance" (Anti Not-Responding Long Session) di v4.5.0.
-                // Auto-convert: user yang sebelumnya memilih "UltraLow" akan di-upgrade
-                // ke "ExtremePerformance" di launch berikutnya. Settings.json di-overwrite.
-                // Idempotent — kalau sudah "ExtremePerformance" atau preset lain, tidak diubah.
-                if (Settings.Prop.SelectedPerformancePreset == "UltraLow")
-                {
-                    Logger.WriteLine("App::OnStartup",
-                        "Migrating preset 'UltraLow' → 'ExtremePerformance' (UI consolidation in this release)");
-                    Settings.Prop.SelectedPerformancePreset = "ExtremePerformance";
-                    Settings.Save();
-                }
+                // ── Preset migration REMOVED in v5.0.0 ───────────────────────────────────────
+                // v4.5.0 punya blok migrasi yang auto-overwrite Settings.SelectedPerformancePreset
+                // dari "UltraLow" ke "ExtremePerformance" karena di v4.5.0 kedua preset tersebut
+                // digabung jadi satu. v5.0.0 merestrukturisasi UI kembali ke 2 preset terpisah
+                // (UltraLow + ExtremePerformance) — lihat CHANGELOG.md v5.0.0 dan
+                // FastFlagsViewModel.ApplyUltraLowSpecPreset().
+                //
+                // Blok migrasi lama akan jadi FOOTGUN di v5.0.0: setiap user yang klik tombol
+                // UltraLow dari UI (pilihan valid post-sync) akan di-overwrite ke
+                // "ExtremePerformance" tiap launch — membuat UltraLow button praktis tidak
+                // bisa dipakai. Karena itu blok dihapus seluruhnya di v5.0.0.
+                //
+                // Catatan untuk kontributor masa depan: JANGAN reintroduce migrasi UltraLow →
+                // ExtremePerformance tanpa re-check architecture preset saat ini.
+                // Daftar preset valid di v5.0.0: UltraLow, Balanced, Stable,
+                // ExtremePerformance, AutoOptimize, None — semuanya tidak di-overwrite
+                // oleh block mana pun di OnStartup().
                 FastFlags.Load();
                 GlobalSettings.Load();
 
