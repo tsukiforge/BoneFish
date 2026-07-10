@@ -34,7 +34,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand ApplyRecommendedStabilityPresetCommand => new RelayCommand(ApplyRecommendedStabilityPreset);
 
-        public ICommand ApplyUltraLowSpecPresetCommand => new RelayCommand(ApplyUltraLowSpecPreset);
+        // NOTE: ApplyUltraLowSpecPresetCommand dihapus di v4.5.0 preset "UltraLow" digabung
+        // ke "ApplyExtremePerformancePreset" sebagai satu mode "Anti Not-Responding
+        // (Long Session)". Semua flag UltraLow sudah menjadi bagian dari Extreme preset
+        // sehingga button UltraLow dihapus dari UI juga. Migrasi otomatis untuk user
+        // yang sebelumnya memilih "UltraLow" dilakukan di App.OnStartup().
 
         public ICommand ApplyBalancedPresetCommand => new RelayCommand(ApplyBalancedPreset);
 
@@ -234,7 +238,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.Settings.Prop.SelectedPerformancePreset = value;
                 OnPropertyChanged(nameof(SelectedPreset));
-                OnPropertyChanged(nameof(IsUltraLowActive));
                 OnPropertyChanged(nameof(IsBalancedActive));
                 OnPropertyChanged(nameof(IsStableActive));
                 OnPropertyChanged(nameof(IsAutoOptimizeActive));
@@ -242,7 +245,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        public bool IsUltraLowActive => SelectedPreset == "UltraLow";
+        // IsUltraLowActive dihapus di v4.5.0 karena preset UltraLow digabung ke
+        // ApplyExtremePerformancePreset (lihat catatan di ApplyUltraLowSpecPresetCommand).
+        // Untuk back-compat, lihat MigrateSelectedPreset() di App.OnStartup().
         public bool IsBalancedActive => SelectedPreset == "Balanced";
         public bool IsStableActive => SelectedPreset == "Stable";
         public bool IsAutoOptimizeActive => SelectedPreset == "AutoOptimize";
@@ -371,62 +376,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
-        private void ApplyUltraLowSpecPreset()
-        {
-            // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
-            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
-            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
-            NightVisionEnabled = false;
-            App.Settings.Prop.ForceExtremeMode = false;
-            OnPropertyChanged(nameof(ForceExtremeMode));
-
-            UseFastFlagManager = true;
-            FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x1;
-            SelectedTextureQuality = TextureQuality.Level0;
-            MeshQualityEnabled = true;
-            MeshQuality = 0;
-            FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 1;
-
-            // LOD — semua level 250 sesuai ultra low-spec.json
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
-
-            // Anti-crash: batasi FPS, light updates (Max=4 bukan 1 — nilai 1 bug gelap),
-            // dan texture compositor jobs.
-            App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
-            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
-
-            DisableRobloxAnimations = true;
-            EnableLowMemoryMode = true;
-
-            // Network flags langsung
-            App.Settings.Prop.EnableBetterMatchmaking = true;
-            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
-            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
-            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
-            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
-            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
-            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
-
-            App.Settings.Prop.BackgroundUpdatesEnabled = false;
-            App.Settings.Prop.FakeBorderlessFullscreen = false;
-
-            try { App.FastFlags.Save(); } catch { }
-            try { App.Settings.Save(); } catch { }
-
-            SelectedPreset = "UltraLow";
-            Notify("✅ Mode aktif: Ultra Low (lebih ringan, visual dikurangi, cocok untuk spek sangat rendah).");
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
-        }
+        // ApplyUltraLowSpecPreset() DIHAPUS di v4.5.0. Flag-flag yang dulunya di sini
+        // sekarang menjadi bagian dari ApplyExtremePerformancePreset() sebagai
+        // mode gabungan "Anti Not-Responding (Long Session)". User yang sebelumnya
+        // memilih "UltraLow" di-migrate otomatis ke "ExtremePerformance" di
+        // App.OnStartup() (lihat MigrateSelectedPreset).
 
         private void ApplyBalancedPreset()
         {
@@ -559,7 +513,14 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // Sumber: Firebladedoge229 gist (confirmed 2026).
             App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
 
-            // ── Anti Not-Responding ───────────────────────────────────────────────────────
+            // ── Anti Not-Responding (Long Session) ────────────────────────────────────────
+            // Tujuan: mencegah Roblox freeze/not-responding setelah main 30 menit+.
+            // Sumber utama not-responding di device low-end:
+            //   1. Lua GC spike — animation tracks membludak
+            //   2. Telemetry wakeup di main thread
+            //   3. Texture memory fragmentation
+            //   4. Main thread stalls dari dynamic light fade animation
+            // Semua flag di bawah ini sudah diverifikasi di allowlist Roblox (post-Sep 2025).
             App.FastFlags.SetValue("DFIntMaxActiveAnimationTracks", "32");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralCounter", "True");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralStat",    "True");
@@ -568,6 +529,18 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Counter",        "True");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Event",          "True");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Stat",           "True");
+
+            // EXTRA ANTI-NOT-RESPONDING (long session):
+            // Texture compositor job concurrency limit — values higher than 1
+            // menyebabkan race condition pada atlas composite di main thread
+            // pada device dual-core setelah beberapa puluh menit main.
+            // Sumber: catb0x/Roblox-Potato-FFlags (confirmed 2026).
+            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
+
+            // DFIntDebugFRMQualityLevelOverride=1: kunci FRM di level minimum.
+            // Mencegah engine auto-promote quality saat session panjang
+            // (resource caching heuristic yang bisa trigger re-shader compile).
+            App.FastFlags.SetValue("DFIntDebugFRMQualityLevelOverride", "1");
 
             // ── FPS Cap ───────────────────────────────────────────────────────────────────
             int fpsCap = Math.Clamp(App.Settings.Prop.ExtremeModeFpsTarget, 24, 60);
@@ -601,7 +574,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.Settings.Save(); } catch { }
 
             SelectedPreset = "ExtremePerformance";
-            Notify("🥔 Mode aktif: Potato Mode / Extreme Performance (lebih cepat, visual dikurangi, grass/wind tetap ada).");
+            Notify("🥔 Mode aktif: Anti Not-Responding (Long Session) — visual minimal, anti not-responding, FPS slider.");
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 

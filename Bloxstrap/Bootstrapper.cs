@@ -275,18 +275,39 @@ namespace Bloxstrap
                     if (App.LaunchSettings.BackgroundUpdaterFlag.Active)
                         backgroundUpdaterMutexOpen = false; // we want to actually update lol
 
-                    App.Logger.WriteLine(LOG_IDENT, $"Background updater running: {backgroundUpdaterMutexOpen}");
+                    // ─── ROBLOX "OLD VERSION" FIX ────────────────────────────────────
+                    // Untuk Player launch, jika VersionGuid lokal tidak match dengan
+                    // server latest, kita HARUS paksa upgrade synchronous. Background
+                    // updater akan launch versi lama dulu sambil download versi baru
+                    // di background — Roblox server-side handshake akan tolak client
+                    // lama dengan notif "You're using an old version of Roblox".
+                    //
+                    // Studio launch tidak kena masalah ini (server handshake lebih
+                    // permissive), jadi studio boleh tetap pakai background updater.
+                    bool forceSyncUpgrade = !IsStudioLaunch
+                        && AppData.State.VersionGuid != _latestVersionGuid;
 
-                    if (backgroundUpdaterMutexOpen && _mustUpgrade)
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Background updater running: {backgroundUpdaterMutexOpen}, " +
+                        $"forceSyncUpgrade: {forceSyncUpgrade} (Player & version mismatch)");
+
+                    if (backgroundUpdaterMutexOpen && (forceSyncUpgrade || _mustUpgrade))
                     {
-                        // I am Forced Upgrade, killer of Background Updates
+                        if (forceSyncUpgrade)
+                            App.Logger.WriteLine(LOG_IDENT,
+                                "Killing background updater — forcing sync upgrade " +
+                                "to prevent Roblox 'old version' warning at launch");
+                        else
+                            App.Logger.WriteLine(LOG_IDENT,
+                                "I am Forced Upgrade, killer of Background Updates");
+
                         Utilities.KillBackgroundUpdater();
                         backgroundUpdaterMutexOpen = false;
                     }
-                   
+
                     if (!backgroundUpdaterMutexOpen)
                     {
-                        if (IsEligibleForBackgroundUpdate())
+                        if (!forceSyncUpgrade && IsEligibleForBackgroundUpdate())
                             StartBackgroundUpdater();
                         else
                             await UpgradeRoblox();
