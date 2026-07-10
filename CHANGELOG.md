@@ -202,6 +202,12 @@ Sistem 3-layer proteksi terhadap freeze/crash di perangkat low-end:
 
 ## v4.5.0 - Fix "Old Version" Warning, Gabung Potato+UltraLow jadi Anti Not-Responding
 
+> **ℹ️ SUPERSEDED by v5.0.0:** Preset UI consolidation yang digambarkan di section ini ("Anti Not-Responding (Long Session)") sudah di-reverse oleh v5.0.0. v5.0.0 merestrukturisasi UI kembali ke 2 preset terpisah (UltraLow + ExtremePerformance) dengan pendekatan berbeda — lihat section v5.0.0 di bawah untuk arsitektur saat ini. Section ini disimpan sebagai historical record dari pendekatan eksperimen yang ternyata perlu di-revert setelah sync dengan conflict game-dark-fix dari remote.
+>
+> Fitur v4.5.0 yang di-preserve di v5.0.0:
+> - `Bootstrapper. forceSyncUpgrade` — bypass BackgroundUpdater untuk Player launch saat VersionGuid mismatch (mencegah warning "you're using an old version of Roblox")
+> - Migrasi preset `UltraLow → ExtremePerformance` di `App.OnStartup` — **dihapus di f423397** karena bentrok dengan ApplyUltraLowSpecPreset yang di-restore v5.0.0
+
 Release date: 2026-07-10
 
 Minor release — memperbaiki notifikasi "You're using an old version of Roblox" yang muncul saat launch, dan menggabungkan preset **Ultra Low-Spec** dan **Extreme Performance (Potato Mode)** menjadi satu mode tunggal bernama 🥔 **Anti Not-Responding (Long Session)** yang fokus mencegah freeze/exit saat main lama di device low-end.
