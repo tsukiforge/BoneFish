@@ -82,6 +82,36 @@ ProgressRing + teks "Menerapkan preset..." muncul saat user mengklik preset, men
 
 **Fix:** Early-return check di `ApplyAggressiveOptimizations()`: jika user sudah memilih preset manual (UltraLow/Balanced/Stable/ExtremePerformance), **skip semua aggressive overrides** dan return. Preset user dihormati.
 
+### Bug Fixes — 🔁 Auto-Upgrade Downgrade Loop pada HandleUpgrade()
+
+**Gejala:** Dialog `InstallChecker_VersionLessThanInstalled` ("Versi BoneFish yang kamu jalankan adalah versi lama…") muncul **tiap kali launch** untuk user yang menjalankan BoneFish dari staging path auto-updater (`%localappdata%\Temp\BoneFish\Updates\BoneFish.exe`). Bukan cuma spam dialog — kalau user klik **Yes**, kode `HandleUpgrade()` di `Installer.cs` tetap lanjut ke `File.Copy(Paths.Process, Paths.Application, true)`, yaitu **staging binary di-copy ke lokasi install canonical**. Kalau staging binary lebih lama dari installed, **install canonical di-downgrade**. Launch berikutnya: dialog fire lagi → user klik Yes → downgrade lagi. Loop tak berhingga sampai user secara manual hapus staging binary atau reinstall penuh.
+
+**Akar masalah:** Di `HandleUpgrade()`, logika lama memblok `File.Copy` hanya kalau MD5 paths cocok atau kalau user klik No pada dialog. Untuk auto-upgrade session, dialog tetap ditampilkan (tidak di-skip meskipun `isAutoUpgrade=true`), dan setelah Yes, tidak ada cek apakah `currentVer < existingVer` (running < installed) — yang justru adalah kondisi downgrade yang harus di-block.
+
+**Fix yang diterapkan di `Bloxstrap/Installer.cs` `HandleUpgrade()`:**
+
+1. **Pre-dialog early-return khusus auto-upgrade.** Jika `isAutoUpgrade=true` AND `currentVer < existingVer`, langsung `return` sebelum dialog pertama sempat fire. Tidak ada `File.Copy`, tidak ada downgrade, tidak ada yes/no dialog.
+2. **Log informatif 4 baris** menggantikan dialog — user bisa langsung baca dari `BoneFish_*.log` apa yang terjadi dan bagaimana cara recover:
+   - Versi running vs installed
+   - Path staging vs path install
+   - Penyebab umum (stale staging binary dari versi sebelumnya)
+   - Solusi: hapus staging binary atau reinstall untuk membuat install canonical jadi build aktif
+3. **Manual downgrade flow tetap utuh.** Untuk run non-auto-upgrade (user klik kanan exe dari folder atau dari shortcut ke lokasi lama), dialog "older version" tetap ditampilkan dengan perilaku existing — supaya user tetap aware kalau mereka sengaja menjalankan binary lama.
+
+**Skenario yang sekarang ter-handle benar:**
+
+| Skenario | Sebelum fix | Sesudah fix |
+|---|---|---|
+| Auto-upgrade dengan staging lebih lama (running < installed) | Dialog Yes/No → kalau Yes, install canonical DOWNGRADE → loop | Silent abort + log informatif + no copy |
+| Auto-upgrade dengan staging lebih baru (running > installed) | Quiet upgrade — sudah benar sebelumnya | Quiet upgrade — tetap |
+| Auto-upgrade dengan staging = installed (MD5 match) | Early-return no-op — sudah benar sebelumnya | Early-return no-op — tetap |
+| Manual run dengan binary lebih lama dari install | Dialog Yes/No — sudah benar sebelumnya | Dialog Yes/No — tetap (perilaku existing dipertahankan) |
+
+**Cara recover user yang sudah terkena downgrade loop:**
+1. Delete `%localappdata%\Temp\BoneFish\Updates\BoneFish.exe`
+2. Run installer BoneFish dari canonical install location (`%localappdata%\Programs\BoneFish\BoneFish.exe`) — sekarang akan rebuild staging fresh dengan versi sama dengan install
+3. Atau reinstall penuh via `unins000.exe` + install dari distribusi terbaru
+
 ### Performance Presets — Deskripsi Lengkap
 
 BoneFish menyediakan 5 preset performa untuk menyesuaikan Roblox dengan spesifikasi perangkat:
