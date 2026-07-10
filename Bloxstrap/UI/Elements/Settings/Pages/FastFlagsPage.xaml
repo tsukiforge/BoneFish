@@ -47,13 +47,10 @@
             </StackPanel>
         </ui:CardAction>
 
-        <ui:CardAction Margin="0,8,0,0" Icon="Delete28" Command="{Binding ApplyUltraLowSpecPresetCommand}">
-            <StackPanel>
-                <TextBlock FontSize="14" Text="Ultra low-spec (sangat ringan) + Anti Crash" />
-                <TextBlock Margin="0,2,0,0" FontSize="12" Text="Untuk PC kentang (i3 Gen 4, RAM 8GB, HDD). Rendering minimal &amp; No Delay Network." Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" Text="[ ACTIVE ]" Visibility="{Binding IsUltraLowActive, Converter={StaticResource BoolToVis}}" />
-            </StackPanel>
-        </ui:CardAction>
+        <!-- Tombol "Ultra low-spec + Anti Crash" DIHAPUS di v4.5.0.
+             Flag-nya digabung ke tombol "Anti Not-Responding (Extreme Performance)"
+             di bawah (lihat ApplyExtremePerformancePreset).             Untuk migrasi preset lama "UltraLow" → "ExtremePerformance", lihat
+             App.OnStartup() blok MIGASI PRESET v4.5.0. -->
 
         <ui:CardAction Margin="0,8,0,0" Icon="AppsAddIn28" Command="{Binding ApplyBalancedPresetCommand}">
             <StackPanel>
@@ -63,21 +60,21 @@
             </StackPanel>
         </ui:CardAction>
 
-        <!-- ═══ EXTREME PERFORMANCE (POTATO MODE) ════════════════════════════════════ -->
+        <!-- ═══ ANTI NOT-RESPONDING (POTATO MODE / LONG SESSION) ════════════════════════ -->
         <ui:CardAction Margin="0,8,0,0" Icon="Flash24" Command="{Binding ApplyExtremePerformancePresetCommand}"
                        Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="🥔 Extreme Performance (Potato Mode)" />
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="🥔 Anti Not-Responding (Long Session)" />
                     <Border Margin="8,0,0,0" Padding="6,2" Background="#CC3300" CornerRadius="4">
                         <TextBlock FontSize="10" FontWeight="Bold" Foreground="White" Text="PALING AGRESIF" />
                     </Border>
                 </StackPanel>
                 <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="Untuk laptop kentang: dual-core, RAM &lt;4GB, tanpa GPU dedicated. Matikan semua shadow, post-FX, SSAO, foliage, terrain detail, water reflection, dan dynamic faces." />
+                           Text="Untuk laptop kentang: dual-core, RAM &lt;4GB, tanpa GPU dedicated. Tujuan utama: mencegah Roblox freeze/not-responding setelah main lama. Matikan shadow, post-FX, SSAO, telemetry, anim track, dynamic faces. Gabungan flag Potato + Ultra Low." />
                 <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="Orange"
-                           Text="[ ACTIVE — POTATO MODE 🥔 ]"
+                           Text="[ ACTIVE — ANTI NOT-RESPONDING 🥔 ]"
                            Visibility="{Binding IsExtremePerformanceActive, Converter={StaticResource BoolToVis}}" />
             </StackPanel>
         </ui:CardAction>

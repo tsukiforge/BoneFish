@@ -1,5 +1,87 @@
 # BoneFish Release Notes
 
+## v4.5.0 - Fix "Old Version" Warning, Gabung Potato+UltraLow jadi Anti Not-Responding
+
+Release date: 2026-07-10
+
+Minor release — memperbaiki notifikasi "You're using an old version of Roblox" yang muncul saat launch, dan menggabungkan preset **Ultra Low-Spec** dan **Extreme Performance (Potato Mode)** menjadi satu mode tunggal bernama 🥔 **Anti Not-Responding (Long Session)** yang fokus mencegah freeze/exit saat main lama di device low-end.
+
+### Bug Fixes — Notifikasi "Versi Lama" Roblox Saat Launch
+
+Akar masalah: `Bootstrapper.cs` punya jalur `Background Updater` yang bisa launch Roblox dengan versi lama sambil download versi baru di background. Pada Player launch (Roblox strict server-side handshake), Roblox server akan **tolak** client lama dengan banner **"You're using an old version of Roblox"** karena binary di disk != binary yang server expects.
+
+- **Fiks**: Untuk **Player launch** ketika `VersionGuid` lokal tidak match dengan server latest, **always force synchronous `UpgradeRoblox()`**. Background updater (kalau jalan) di-kill dulu; jalur async di-bypass. Studio launch tetap boleh pakai background updater (server handshake lebih permissive).
+- **Implementasi**: Di `Bootstrapper.cs`, tambah variabel `forceSyncUpgrade = !IsStudioLaunch && AppData.State.VersionGuid != _latestVersionGuid`. Logika: kill background updater kalau `forceSyncUpgrade || _mustUpgrade`, lalu jatuh ke `await UpgradeRoblox()`.
+- **Edge cases ter-handle**: Studio launch tidak terpengaruh, path Studio tetap viable untuk background updates; cancel flow tetap fungsional via existing mutex; first-time install path `UpgradeRoblox()` selalu dipanggil karena `_mustUpgrade = true` saat `String.IsNullOrEmpty(VersionGuid)` atau `!File.Exists(ExecutablePath)`.
+
+### Feature — 🥔 Anti Not-Responding (Long Session) Konsolidasi
+
+Preset UI **"Ultra low-spec + Anti Crash" (UltraLow)** dan **"Extreme Performance (Potato Mode) (ExtremePerformance)"** digabung menjadi satu button: **🥔 Anti Not-Responding (Long Session)**. Tujuan utama mode baru: mencegah Roblox freeze/not-responding setelah main 30+ menit di device dual-core / RAM <4GB.
+
+- **Apa yang ditambahkan ke preset Extreme**:
+  - `DFIntTextureCompositorActiveJobs=1` — batasi atlas composite ke 1 worker (sebelumnya khusus UltraLow, sekarang ikut Extreme). Race condition pada atlas composite di main thread setelah beberapa puluh menit main.
+  - `DFIntDebugFRMQualityLevelOverride=1` — kunci FRM quality di minimum agar engine auto-promote tidak trigger re-shader compile saat session panjang.
+- **Apa yang sudah ada di Extreme (dari versi sebelumnya)**: 7 telemetry flags, `DFIntMaxActiveAnimationTracks=32`, shadow off, SSAO off, LOD 250/500/750, FPS cap mengikuti slider (default 30, range 24-60).
+- **UX**: Tombol Potato Mode tetap ada di UI dengan badge **"PALING AGRESIF"**:
+
+  > 🥔 Anti Not-Responding (Long Session)
+  > Untuk laptop kentang: dual-core, RAM <4GB, tanpa GPU dedicated. Tujuan utama: mencegah Roblox freeze/not-responding setelah main lama. Matikan shadow, post-FX, SSAO, telemetry, anim track, dynamic faces. Gabungan flag Potato + Ultra Low.
+
+- **Toggle & slider yang tetap**: Force Extreme Mode override, Target FPS slider (24–60), Night Vision toggle. Semua referensi ke preset lama di-update.
+
+### Migration Otomatis — "UltraLow" → "ExtremePerformance"
+
+User yang sebelumnya memilih `SelectedPerformancePreset = "UltraLow"` di-launch berikutnya otomatis di-migrate ke `"ExtremePerformance"` (mode gabungan baru). Migrasi idempotent — kalau preset sudah `"ExtremePerformance"` atau preset lain, tidak diubah.
+
+- **Implementasi**: Di `App.OnStartup()`, setelah `Settings.Load()`:
+  ```csharp
+  if (Settings.Prop.SelectedPerformancePreset == "UltraLow") {
+      Settings.Prop.SelectedPerformancePreset = "ExtremePerformance";
+      Settings.Save();
+  }
+  ```
+- **Logging**: Migrasi log ke `BoneFish_*.log` dengan identifier `App::OnStartup` agar debugging mudah.
+
+### Changelog (Technical)
+
+- `Bloxstrap/Bloxstrap.csproj`: `Version` & `FileVersion` 4.4.0 → **4.5.0**
+- `Bloxstrap/Bootstrapper.cs`: tambah logic `forceSyncUpgrade` di sekitar blok upgrade detection; kill background updater kalau flag aktif; force `await UpgradeRoblox()` di Player launch saat `VersionGuid` mismatch
+- `Bloxstrap/UI/ViewModels/Settings/FastFlagsViewModel.cs`:
+  - Hapus `ApplyUltraLowSpecPresetCommand` dan method `ApplyUltraLowSpecPreset()`
+  - Hapus property `IsUltraLowActive` (update `SelectedPreset` setter untuk tidak reference lagi)
+  - Tambah 2 flag anti-not-responding di `ApplyExtremePerformancePreset()`: `DFIntTextureCompositorActiveJobs=1` dan `DFIntDebugFRMQualityLevelOverride=1`
+  - Update Notify message: dari "Potato Mode" jadi "Anti Not-Responding (Long Session)"
+- `Bloxstrap/UI/Elements/Settings/Pages/FastFlagsPage.xaml`:
+  - Hapus CardAction untuk "Ultra low-spec" button
+  - Rename Potato button: judul jadi "🥔 Anti Not-Responding (Long Session)", deskripsi update
+- `Bloxstrap/App.xaml.cs`: tambah migrasi preset `UltraLow → ExtremePerformance` setelah `Settings.Load()` di `OnStartup()`
+
+### Edge Cases Handled
+
+- **Studio launch** — tidak terpengaruh forceSyncUpgrade, tetap pakai background updater.
+- **Multiple preset application (race)** — urutan di tiap preset tetap: Cleanup → Purge → set flags → Save → Reload.
+- **User dengan preset lama `"UltraLow"`** — auto-migrate di launch berikutnya tanpa intervensi user.
+- **Auto-detect AutoOptimizeService** — `SystemTier.UltraLow` (enum) tetap dipakai untuk auto-detect hardware; jalur `isUltraOrExtreme` di `ApplyAggressiveOptimizations()` masih aktif jadi device UltraLow otomatis mendapat flag yang sama.
+- **First-time install** — `UpgradeRoblox()` selalu dipanggil karena `_mustUpgrade = !File.Exists(ExecutablePath)`.
+
+### Audit "Black Flag" — Tidak Ada Flag Game-Breaking di v4.5.0
+
+Cross-check 7 flag yang pernah menyebabkan masalah di v3.9.0 (layar hitam, atmosphere rusak, post-FX game mati, not-responding additional, mic rusak). Semuanya **diverifikasi tidak ada di consolidated preset**:
+
+| Flag Berbahaya | Efek | Status v4.5.0 |
+|---|---|---|
+| `DFFlagDebugRenderForceTechnologyVoxel` | Layar hitam total (ShadowMap/Future) | ❌ TIDAK di-set (ada di AllKnownManagedFlags untuk purge saja) |
+| `FFlagDebugSkyGray` | Sky abu-abu datar | ❌ TIDAK di-set |
+| `FFlagDisablePostFx` | Post-FX game (bloom milik game) mati | ❌ TIDAK di-set |
+| `FFlagNewLightAttenuation=False` | Harsh black lighting model | ❌ TIDAK di-set ke False. (=True HANYA di Night Vision toggle dengan dialog konfirmasi) |
+| `DFIntDebugRestrictGCDistance=1` | GC aggressive → not-responding tambahan | ❌ TIDAK di-set |
+| `DFIntAnimationLodFacsDistanceMin/Max/VisibilityDenominator=0` | Pipeline FACS mati → mic rusak | ❌ TIDAK di-set |
+| Bayangan/shadow off tanpa lighting model rusak | Aman jika **tanpa** Voxel | ✅ Konsisten — pakai `FIntRenderShadowIntensity=0` PAIRED dengan `DFFlagDebugPauseVoxelizer=True`, tidak paksa Voxel |
+
+**Verdict**: Konsolidasi preset v4.5.0 AMAN. Semua flag yang aktif di `ApplyExtremePerformancePreset()` dan `AutoOptimizeService.ApplyAggressiveOptimizations()` adalah flag **proven-aman** yang hanya menurunkan beban render/CPU/RAM tanpa mengubah model lighting atau visual game.
+
+---
+
 ## v4.4.1 - Fix Custom Loading Screen: Registrasi Pertama, Persistensi & Preview
 
 Release date: 2026-07-05
