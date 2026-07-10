@@ -16,11 +16,26 @@ namespace Bloxstrap.UI.ViewModels.Settings
     {
         private Dictionary<string, object>? _preResetFlags;
 
+        private bool _isApplying;
+        public bool IsApplying
+        {
+            get => _isApplying;
+            set
+            {
+                _isApplying = value;
+                OnPropertyChanged(nameof(IsApplying));
+                OnPropertyChanged(nameof(IsNotApplying));
+            }
+        }
+        public bool IsNotApplying => !IsApplying;
+
         public event EventHandler? RequestPageReloadEvent;
         
         public event EventHandler? OpenFlagEditorEvent;
 
         public event EventHandler<string>? RequestNotificationEvent;
+
+        public event EventHandler? RequestCloseWindowEvent;
 
         private void OpenFastFlagEditor() => OpenFlagEditorEvent?.Invoke(this, EventArgs.Empty);
 
@@ -34,11 +49,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand ApplyRecommendedStabilityPresetCommand => new RelayCommand(ApplyRecommendedStabilityPreset);
 
-        // NOTE: ApplyUltraLowSpecPresetCommand dihapus di v4.5.0 preset "UltraLow" digabung
-        // ke "ApplyExtremePerformancePreset" sebagai satu mode "Anti Not-Responding
-        // (Long Session)". Semua flag UltraLow sudah menjadi bagian dari Extreme preset
-        // sehingga button UltraLow dihapus dari UI juga. Migrasi otomatis untuk user
-        // yang sebelumnya memilih "UltraLow" dilakukan di App.OnStartup().
+        public ICommand ApplyUltraLowSpecPresetCommand => new RelayCommand(ApplyUltraLowSpecPreset);
 
         public ICommand ApplyBalancedPresetCommand => new RelayCommand(ApplyBalancedPreset);
 
@@ -47,6 +58,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ICommand ToggleNightVisionCommand => new RelayCommand(ToggleNightVision);
 
         public ICommand ClearClientAppSettingsCommand => new RelayCommand(ClearClientAppSettings);
+
+        public ICommand ApplyAndRestartRobloxCommand => new RelayCommand(ApplyAndRestartRoblox);
+
         public bool UseFastFlagManager
         {
             get => App.Settings.Prop.UseFastFlagManager;
@@ -238,6 +252,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.Settings.Prop.SelectedPerformancePreset = value;
                 OnPropertyChanged(nameof(SelectedPreset));
+                OnPropertyChanged(nameof(IsUltraLowActive));
                 OnPropertyChanged(nameof(IsBalancedActive));
                 OnPropertyChanged(nameof(IsStableActive));
                 OnPropertyChanged(nameof(IsAutoOptimizeActive));
@@ -245,9 +260,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        // IsUltraLowActive dihapus di v4.5.0 karena preset UltraLow digabung ke
-        // ApplyExtremePerformancePreset (lihat catatan di ApplyUltraLowSpecPresetCommand).
-        // Untuk back-compat, lihat MigrateSelectedPreset() di App.OnStartup().
+        public bool IsUltraLowActive => SelectedPreset == "UltraLow";
         public bool IsBalancedActive => SelectedPreset == "Balanced";
         public bool IsStableActive => SelectedPreset == "Stable";
         public bool IsAutoOptimizeActive => SelectedPreset == "AutoOptimize";
@@ -311,7 +324,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             SelectedPreset = "AutoOptimize";
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
-            Notify("✅ Mode aktif: Auto-Optimize (deteksi hardware + optimasi otomatis).");
+            VerifyAndNotify("Auto-Optimize");
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
@@ -372,15 +385,73 @@ namespace Bloxstrap.UI.ViewModels.Settings
             SelectedPreset = "Stable";
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
-            Notify("✅ Mode aktif: Stable (lebih aman, visual lebih bersih, performa lebih seimbang).");
+            VerifyAndNotify("Stable");
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
-        // ApplyUltraLowSpecPreset() DIHAPUS di v4.5.0. Flag-flag yang dulunya di sini
-        // sekarang menjadi bagian dari ApplyExtremePerformancePreset() sebagai
-        // mode gabungan "Anti Not-Responding (Long Session)". User yang sebelumnya
-        // memilih "UltraLow" di-migrate otomatis ke "ExtremePerformance" di
-        // App.OnStartup() (lihat MigrateSelectedPreset).
+        private void ApplyUltraLowSpecPreset()
+        {
+            // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
+            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
+            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            NightVisionEnabled = false;
+            App.Settings.Prop.ForceExtremeMode = false;
+            OnPropertyChanged(nameof(ForceExtremeMode));
+
+            UseFastFlagManager = true;
+            FixDisplayScaling = true;
+            SelectedRenderingMode = RenderingMode.D3D11;
+            SelectedMSAALevel = MSAAMode.x1;
+            SelectedTextureQuality = TextureQuality.Level0;
+            MeshQualityEnabled = true;
+            MeshQuality = 0;
+            FRMQualityOverrideEnabled = true;
+            FRMQualityOverride = 5;
+
+            // LOD — semua level 250 sesuai ultra low-spec.json
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "250");
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
+
+            // Anti-crash: batasi FPS, light updates (Max=4 bukan 1 — nilai 1 bug gelap),
+            // dan texture compositor jobs.
+            App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
+            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
+            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
+            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
+
+            DisableRobloxAnimations = true;
+            EnableLowMemoryMode = true;
+
+            // Network flags langsung
+            App.Settings.Prop.EnableBetterMatchmaking = true;
+            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
+            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
+            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
+            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
+            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
+            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
+
+            App.Settings.Prop.BackgroundUpdatesEnabled = false;
+            App.Settings.Prop.FakeBorderlessFullscreen = false;
+
+            // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
+            // Agar value "UltraLow" tertulis ke disk. Saat bootstrapper restart,
+            // AutoOptimizeService.CheckAndApply() baca SelectedPerformancePreset dari disk.
+            // Jika "UltraLow" tidak ada di disk, service ini OVERWRITE semua flag
+            // dengan FRM=1 + shadow=0 + voxelizer=True → game GELAP.
+            SelectedPreset = "UltraLow";
+
+            // Save semua flag ke disk SEBELUM page reload agar tidak ada flag yang hilang
+            try { App.FastFlags.Save(); } catch { }
+            try { App.Settings.Save(); } catch { }
+
+            VerifyAndNotify("Ultra Low");
+            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+        }
 
         private void ApplyBalancedPreset()
         {
@@ -418,7 +489,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             SelectedPreset = "Balanced";
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
-            Notify("✅ Mode aktif: Balanced (keseimbangan visual dan performa).");
+            VerifyAndNotify("Balanced");
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
@@ -453,14 +524,18 @@ namespace Bloxstrap.UI.ViewModels.Settings
             MeshQualityEnabled = true;
             MeshQuality = 0;
             FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 1;
+            FRMQualityOverride = 3;
 
-            // ── Shadow: matikan intensitas bayangan (aman, tidak ubah lighting mode) ──────
-            App.FastFlags.SetValue("FIntRenderShadowIntensity", "0");
-            App.FastFlags.SetValue("DFFlagDebugPauseVoxelizer", "True");
-            App.FastFlags.SetValue("FIntCSGVoxelizerFadeRadius", "0");
-
-            // ── Light updates: Max=4 agar senter/torch tidak bug gelap ────────────────────
+            // ── Shadow: TIDAK dimatikan sepenuhnya ──────────────────────────────────────
+            // CATATAN SEBELUMNYA (PENYEBAB GAME GELAP):
+            // FIntRenderShadowIntensity=0 + DFFlagDebugPauseVoxelizer=True + FRM=1
+            // menghapus SEMUA bayangan dan lighting baked → game jadi HITAM.
+            // Terutama parah di game ShadowMap/Future (Phasmophobia, horror games).
+            //
+            // FIX: FRM=3 masih sangat ringan tapi preserve basic lighting pipeline.
+            // Shadow intensity DIHAPUS (biarkan default Roblox), voxelizer TIDAK dipause.
+            //
+            // Light updates Max=4 agar senter/torch tidak bug gelap.
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
             App.FastFlags.SetValue("FIntRenderLocalLightFadeInMs", "0");
@@ -513,14 +588,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // Sumber: Firebladedoge229 gist (confirmed 2026).
             App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
 
-            // ── Anti Not-Responding (Long Session) ────────────────────────────────────────
-            // Tujuan: mencegah Roblox freeze/not-responding setelah main 30 menit+.
-            // Sumber utama not-responding di device low-end:
-            //   1. Lua GC spike — animation tracks membludak
-            //   2. Telemetry wakeup di main thread
-            //   3. Texture memory fragmentation
-            //   4. Main thread stalls dari dynamic light fade animation
-            // Semua flag di bawah ini sudah diverifikasi di allowlist Roblox (post-Sep 2025).
+            // ── Anti Not-Responding ───────────────────────────────────────────────────────
             App.FastFlags.SetValue("DFIntMaxActiveAnimationTracks", "32");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralCounter", "True");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralStat",    "True");
@@ -529,18 +597,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Counter",        "True");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Event",          "True");
             App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Stat",           "True");
-
-            // EXTRA ANTI-NOT-RESPONDING (long session):
-            // Texture compositor job concurrency limit — values higher than 1
-            // menyebabkan race condition pada atlas composite di main thread
-            // pada device dual-core setelah beberapa puluh menit main.
-            // Sumber: catb0x/Roblox-Potato-FFlags (confirmed 2026).
-            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
-
-            // DFIntDebugFRMQualityLevelOverride=1: kunci FRM di level minimum.
-            // Mencegah engine auto-promote quality saat session panjang
-            // (resource caching heuristic yang bisa trigger re-shader compile).
-            App.FastFlags.SetValue("DFIntDebugFRMQualityLevelOverride", "1");
 
             // ── FPS Cap ───────────────────────────────────────────────────────────────────
             int fpsCap = Math.Clamp(App.Settings.Prop.ExtremeModeFpsTarget, 24, 60);
@@ -569,13 +625,154 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
             App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
 
+            // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
+            // Agar value "ExtremePerformance" tertulis ke disk. Lihat komentar di ApplyUltraLowSpecPreset.
+            SelectedPreset = "ExtremePerformance";
+
             // Save semua flag ke disk SEBELUM page reload agar tidak ada flag yang hilang
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
 
-            SelectedPreset = "ExtremePerformance";
-            Notify("🥔 Mode aktif: Anti Not-Responding (Long Session) — visual minimal, anti not-responding, FPS slider.");
+            VerifyAndNotify("Potato Mode");
             RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+        }
+
+        // ── Flag Verification ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Verifikasi bahwa semua FastFlag benar-benar tertulis ke disk.
+        /// Membaca kembali ClientAppSettings.json dan menghitung jumlah flag.
+        /// Memberikan notifikasi detail ke user agar yakin flag sudah diterapkan.
+        /// </summary>
+        private void VerifyAndNotify(string presetName)
+        {
+            try
+            {
+                string filePath = Path.Combine(Paths.Modifications, "ClientSettings", "ClientAppSettings.json");
+                if (File.Exists(filePath))
+                {
+                    string json = File.ReadAllText(filePath);
+                    var flags = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+                    int count = flags?.Count ?? 0;
+                    Notify($"✅ {presetName} aktif — {count} FastFlag berhasil ditulis ke disk.");
+                }
+                else
+                {
+                    Notify($"✅ {presetName} aktif — file ClientAppSettings.json akan dibuat saat Roblox launch.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Notify($"✅ {presetName} aktif — (verifikasi gagal: {ex.Message})");
+            }
+        }
+
+        // ── Apply & Restart Roblox ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Simpan semua FastFlag + Settings, kill Roblox + watcher, lalu restart.
+        /// Async agar UI tidak freeze saat proses kill.
+        /// </summary>
+        private async void ApplyAndRestartRoblox()
+        {
+            const string LOG_IDENT = "FastFlagsViewModel::ApplyAndRestartRoblox";
+
+            if (IsApplying) return;
+            IsApplying = true;
+
+            var result = System.Windows.MessageBox.Show(
+                "🚀 Apply & Restart Roblox\n\n" +
+                "Ini akan MENYIMPAN semua FastFlag dan SETTING yang sudah kamu pilih,\n" +
+                "lalu menutup paksa Roblox (termasuk system tray),\n" +
+                "dan menjalankan ulang BoneFish.\n\n" +
+                "Setelah restart, klik game Roblox seperti biasa untuk main.\n\n" +
+                "Lanjutkan?",
+                "Apply & Restart Roblox",
+                System.Windows.MessageBoxButton.YesNo,
+                System.Windows.MessageBoxImage.Question
+            );
+
+            if (result != System.Windows.MessageBoxResult.Yes)
+            {
+                IsApplying = false;
+                return;
+            }
+
+            // 1. Save semua flag ke disk
+            try
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Saving FastFlags and Settings...");
+                App.FastFlags.Save();
+                App.Settings.Save();
+                App.Logger.WriteLine(LOG_IDENT, "FastFlags saved successfully.");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException(LOG_IDENT, ex);
+                Notify($"❌ Gagal menyimpan FastFlag: {ex.Message}");
+                IsApplying = false;
+                return;
+            }
+
+            // 2. Kill RobloxPlayerBeta + RobloxCrashHandler (async supaya UI tidak freeze)
+            App.Logger.WriteLine(LOG_IDENT, "Killing Roblox processes...");
+            await Task.Run(() =>
+            {
+                foreach (string name in new[] { "RobloxPlayerBeta", "RobloxCrashHandler" })
+                {
+                    try
+                    {
+                        foreach (var proc in Process.GetProcessesByName(name))
+                        {
+                            proc.Kill();
+                            if (!proc.WaitForExit(500))
+                                App.Logger.WriteLine(LOG_IDENT, $"{name} (pid={proc.Id}) did not exit within 500ms, continuing.");
+                            else
+                                App.Logger.WriteLine(LOG_IDENT, $"Killed {name} (pid={proc.Id})");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Logger.WriteException(LOG_IDENT, ex);
+                    }
+                }
+            });
+
+            // 3. Signal watcher to exit (clean up system tray)
+            App.Logger.WriteLine(LOG_IDENT, "Signalling watcher to exit...");
+            try
+            {
+                using var exitEvent = System.Threading.EventWaitHandle.OpenExisting("BoneFish-WatcherExitEvent");
+                exitEvent.Set();
+                App.Logger.WriteLine(LOG_IDENT, "Watcher exit event signalled.");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+
+            // 4. Launch BoneFish bootstrapper to reload with new flags
+            App.Logger.WriteLine(LOG_IDENT, "Restarting BoneFish bootstrapper...");
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = Paths.Process,
+                    Arguments = "-player",
+                    UseShellExecute = true
+                });
+                App.Logger.WriteLine(LOG_IDENT, "Bootstrapper launched.");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException(LOG_IDENT, ex);
+                Notify($"❌ Gagal restart BoneFish: {ex.Message}");
+                IsApplying = false;
+                return;
+            }
+
+            // 5. Tutup settings window — soalnya bootstrapper udah jalan
+            RequestCloseWindowEvent?.Invoke(this, EventArgs.Empty);
         }
 
         // ── Clear ClientAppSettings ───────────────────────────────────────────────────────

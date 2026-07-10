@@ -111,16 +111,33 @@ jobs:
       - name: Rename binaries
         run: mv release/BoneFish.exe BoneFish.exe
 
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          # Extract the section for this version from CHANGELOG.md
+          # Match from '## v{VERSION}' to the next '## v' or end of file
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## v[0-9]/ { found=0 }
+            $0 ~ "^## v" ver "[ \t-]" || $0 ~ "^## v" ver "$" { found=1; print; next }
+            found && /^## v[0-9]/ { exit }
+            found { print }
+          ' CHANGELOG.md)
+          
+          if [ -z "$NOTES" ]; then
+            NOTES="No changelog entry found for v$VERSION. See CHANGELOG.md for details."
+          fi
+          
+          # Write to file to avoid shell escaping issues
+          echo "$NOTES" > /tmp/release_body.md
+          echo "has_changelog=true" >> $GITHUB_OUTPUT
+
       - name: Create auto release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.get_version.outputs.version }}
           name: BoneFish v${{ steps.get_version.outputs.version }}
-          body: |
-            Automatic release for BoneFish v${{ steps.get_version.outputs.version }}
-
-            Built from commit: ${{ github.sha }}
-            Branch: ${{ github.ref_name }}
+          body_path: /tmp/release_body.md
           files: BoneFish.exe
           draft: false
           prerelease: false
