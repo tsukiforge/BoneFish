@@ -341,6 +341,20 @@ namespace Bloxstrap
                 Settings.Load();
                 State.Load();
                 RobloxState.Load();
+
+                // ── MIGASI PRESET v4.5.0 ──────────────────────────────────────────────────
+                // Preset "UltraLow" (Ultra low-spec + Anti Crash) digabung ke
+                // "ExtremePerformance" (Anti Not-Responding Long Session) di v4.5.0.
+                // Auto-convert: user yang sebelumnya memilih "UltraLow" akan di-upgrade
+                // ke "ExtremePerformance" di launch berikutnya. Settings.json di-overwrite.
+                // Idempotent — kalau sudah "ExtremePerformance" atau preset lain, tidak diubah.
+                if (Settings.Prop.SelectedPerformancePreset == "UltraLow")
+                {
+                    Logger.WriteLine("App::OnStartup",
+                        "Migrating preset 'UltraLow' → 'ExtremePerformance' (UI consolidation in this release)");
+                    Settings.Prop.SelectedPerformancePreset = "ExtremePerformance";
+                    Settings.Save();
+                }
                 FastFlags.Load();
                 GlobalSettings.Load();
 
