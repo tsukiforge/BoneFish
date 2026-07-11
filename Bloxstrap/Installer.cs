@@ -460,44 +460,34 @@ namespace Bloxstrap
             if (MD5Hash.FromFile(Paths.Process) == MD5Hash.FromFile(Paths.Application))
                 return;
 
-            // ── Block auto-upgrade downgrade loop ────────────────────────────────
-            // Bug history: when running binary (staging atau any auto-upgrade path)
-            // ternyata LEBIH LAMA dari installed binary, logika lama tetap
-            // menampilkan dialog "versi lama" dan — jika user klik Yes — lanjut
-            // ke File.Copy(running → installed). Itu overwrite install yang lebih
-            // baru dengan versi lama, lalu di launch berikutnya dialog fire lagi
-            // dan install kembali di-downgrade. Loop tak berhingga.
-            //
-            // Fix: untuk auto-upgrade session, JANGAN tampilkan dialog dan JANGAN
-            // copy. Cukup log supaya user tahu apa yang terjadi dan bisa recover
-            // (hapus staging file atau reinstall manual).
-            if (isAutoUpgrade
-                && currentVer is not null && existingVer is not null
-                && Utilities.CompareVersions(currentVer, existingVer) == VersionComparison.LessThan)
+            VersionComparison versionComparison = VersionComparison.Equal;
+
+            if (currentVer is not null && existingVer is not null)
+                versionComparison = Utilities.CompareVersions(currentVer, existingVer);
+
+            // ── Block downgrade overwrite loops ────────────────────────────────
+            // If the binary being launched is older than the installed copy, we must
+            // not overwrite the newer install with an older build. This was causing
+            // stale or downloaded launchers to silently downgrade BoneFish back to an
+            // older release.
+            if (versionComparison == VersionComparison.LessThan)
             {
                 App.Logger.WriteLine(LOG_IDENT,
-                    $"Auto-upgrade aborted: staging binary '{currentVer}' is older than installed '{existingVer}'.");
+                    $"Upgrade aborted: launched binary '{currentVer}' is older than installed '{existingVer}'.");
                 App.Logger.WriteLine(LOG_IDENT,
-                    $"Staging path: {Paths.Process}");
+                    $"Launched path: {Paths.Process}");
                 App.Logger.WriteLine(LOG_IDENT,
                     $"Installed path: {Paths.Application}");
                 App.Logger.WriteLine(LOG_IDENT,
-                    "This usually means a stale staging binary from a previous version. " +
-                    "To recover, either delete the staging binary or reinstall BoneFish " +
-                    "so the canonical install becomes the active build.");
-                return;
-            }
+                    "This usually means a stale launcher or older installer is being used. " +
+                    "Please run the latest BoneFish release or reinstall from the current install.");
 
-            if (currentVer is not null && existingVer is not null && Utilities.CompareVersions(currentVer, existingVer) == VersionComparison.LessThan)
-            {
-                var result = Frontend.ShowMessageBox(
+                Frontend.ShowMessageBox(
                     Strings.InstallChecker_VersionLessThanInstalled,
-                    MessageBoxImage.Question,
-                    MessageBoxButton.YesNo
+                    MessageBoxImage.Warning
                 );
 
-                if (result != MessageBoxResult.Yes)
-                    return;
+                return;
             }
 
             // silently upgrade version if the command line flag is set or if we're launching from an auto update

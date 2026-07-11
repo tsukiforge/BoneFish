@@ -1,5 +1,11 @@
 # BoneFish Changelog
 
+## v5.0.1 - FIx Installers 
+
+Release date: 2026-07
+
+1. Mmerpbaiki Error Yang menimpa versi terbaru
+
 ## v5.0.0 - Apply & Restart, Dark Game Fix, Flag Verification & Auto-Optimize Guard
 
 Release date: 2026-07-05
