@@ -1,6 +1,6 @@
 # BoneFish Changelog
 
-## v5.0.1 - FIx Installers 
+## v5.0.1 - FIx Installers
 
 Release date: 2026-07
 
