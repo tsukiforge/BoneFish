@@ -1,10 +1,59 @@
 # BoneFish Changelog
 
-## v5.0.1 - FIx Installers
+## v5.1.0 — Crosshair, Hotkey, Turbo Mode + Cleanup 🧹
 
-Release date: 2026-07
+Release date: 2026-07-12
 
-1. Mmerpbaiki Error Yang menimpa versi terbaru
+### 🎯 Crosshair Overlay — Bikin Sendiri Crosshair Lo!
+
+Bosan sama crosshair game yang jelek? Sekarang lo bisa bikin **crosshair kustom** sendiri! Overlay transparan di tengah layar yang bisa lo:
+
+- **Ganti style** — ada 4: Cross, Dot, Circle, sama CrossDot (campuran Cross + Dot)
+- **Ganti warna** — tinggal pencet salah satu dari 8 warna preset, dari ijo lime sampe putih
+- **Atur ukuran** — dari kecil (20px) sampe gede (200px)
+- **Atur transparansi** — dari 10% sampe 100%
+- **Drag & drop** — tinggal klik & geser ke posisi mana aja, posisinya bakal keinget terus
+- **Toggle pake hotkey** — pencet `Ctrl+Shift+C` buat munculin/sembunyiin
+
+**Dimana?** Settings → Experimental → Crosshair. Tinggal enable, langsung muncul!
+
+### ⌨️ Global Hotkeys — Pake Keyboard Buat Semua!
+
+Bosan harus alt-tab ke settings buat matiin/ngewaktifin fitur? Sekarang lo bisa pake **keyboard shortcut**! Works meski BoneFish di-minimize ke system tray:
+
+| Tombol | Fungsi |
+|--------|--------|
+| `Ctrl+Shift+C` | Tampilin/Sembunyiin Crosshair |
+| `Ctrl+Shift+F` | Tampilin/Sembunyiin FPS Monitor |
+| `Ctrl+Shift+N` | Aktifin/Nonaktifin Night Vision |
+
+Bisa lo matiin kalo ganggu di **Settings → Experimental → Enable Hotkeys**.
+
+### 🚀 Turbo Mode — Satu Klik, PC Lo Ngebut!
+
+**Fitur paling gacor buat laptop kentang!** Tinggal toggle ON, dan BoneFish langsung:
+
+- **Paksa Extreme Performance mode** — sama kayak Potato Mode paling agresif
+- **Turunin kualitas render** — tekstur low-res, shadow dikurangin, FRM dipaksa minimum
+- **Matiin telemetry & animasi** — kurangi beban CPU buat game lo
+- **Auto-reset pas restart** — pas lo buka BoneFish lagi, Turbo Mode balik ke OFF otomatis. Gak bakal ngehek settingan permanen lo!
+
+**Pas di-click OFF** — semua balik normal, settingan lo gak ilang. Aman cuy!
+
+### 🗑️ Bersih-Bersih Code — Wallpaper Service Dihapus
+
+Fitur **ganti wallpaper desktop pas launch** udah dihapus total. Kenapa? Karena:
+- Gak relevan — lo buka BoneFish buat main Roblox, bukan buat ganti wallpaper
+- Bikin berat — nambah CPU usage tanpa guna
+- Jarang dipake — based on feedback, hampir gak ada yang pake
+
+Semua file wallpaper (AppBackgroundService, WallpaperService, gambar JPG, dll) udah dibersihin semua. Hasil: **ukuran installer lebih kecil**!
+
+### 🔧 Fix Lainnya
+
+- **HandleUpgrade Auto-Redirect** — pas lo jalanin BoneFish versi lama dari folder download, sekarang otomatis ngarahin ke yang udah ke-install. Gak bakal muncul dialog aneh-aneh lagi.
+
+---
 
 ## v5.0.0 - Apply & Restart, Dark Game Fix, Flag Verification & Auto-Optimize Guard
 

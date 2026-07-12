@@ -317,6 +317,34 @@ namespace Bloxstrap
                 if (_cancelTokenSource.IsCancellationRequested)
                     return;
 
+                // Turbo Mode: auto-reset pada restart (turbo mode adalah temporary performance boost
+                // yang harus dikembalikan ke normal setiap kali aplikasi di-restart).
+                try
+                {
+                    if (App.Settings.Prop.EnableTurboMode)
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, "Turbo Mode was enabled last session — auto-resetting on restart");
+
+                        App.Settings.Prop.EnableTurboMode = false;
+                        App.Settings.Prop.OptimizeForLowEnd = false;
+                        App.Settings.Prop.ForceExtremeMode = false;
+
+                        if (App.Settings.Prop.UseFastFlagManager)
+                        {
+                            Integrations.AutoOptimizeService.RemoveOptimizations();
+
+                            if (App.FastFlags.Changed)
+                                App.FastFlags.Save();
+                        }
+
+                        try { App.Settings.Save(); } catch { }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteException(LOG_IDENT, ex);
+                }
+
                 // auto-detect low-end systems and apply performance FastFlags BEFORE modifications are written,
                 // so the optimizations actually take effect for this launch
                 try

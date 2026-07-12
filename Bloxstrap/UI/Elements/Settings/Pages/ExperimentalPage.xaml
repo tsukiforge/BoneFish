@@ -16,6 +16,41 @@
     <StackPanel Margin="0,0,14,14">
         <TextBlock Margin="0,0,0,16" Text="Fitur experimental yang sedang dikembangkan." FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
+        <TextBlock Text="Global Hotkeys" FontSize="20" FontWeight="Medium" Margin="0,0,0,0" />
+        <TextBlock Text="Gunakan keyboard shortcut untuk toggle fitur dengan cepat saat bermain. Hotkeys bekerja meski BoneFish di-minimize." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
+
+        <controls:OptionControl 
+            Header="Aktifkan Global Hotkeys" 
+            Description="Izinkan penggunaan keyboard shortcut untuk mengontrol fitur BoneFish.">
+            <ui:ToggleSwitch IsChecked="{Binding EnableHotkeys, Mode=TwoWay}" />
+        </controls:OptionControl>
+
+        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="16" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8">⌨️ Daftar Hotkey</TextBlock>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + Shift + C" FontWeight="Bold" FontFamily="Courier New" FontSize="13" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="Toggle Crosshair Overlay" Margin="10,0,0,4" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl + Shift + F" FontWeight="Bold" FontFamily="Courier New" FontSize="13" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="Toggle FPS Monitor" Margin="10,0,0,4" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl + Shift + N" FontWeight="Bold" FontFamily="Courier New" FontSize="13" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="Toggle Night Vision" Margin="10,0,0,0" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
         <controls:OptionControl 
             Header="System Tray saat Roblox ditutup" 
             Description="Saat kamu keluar dari Roblox (klik tombol X), BoneFish tidak akan keluar tapi minimize ke System Tray Windows.">
@@ -71,25 +106,90 @@
             <ui:ToggleSwitch IsChecked="{Binding OptimizeForLowEnd, Mode=TwoWay}" />
         </controls:OptionControl>
 
-        <TextBlock Text="Wallpaper Launcher" FontSize="20" FontWeight="Medium" Margin="0,24,0,0" />
-        <TextBlock Text="Ubah background aplikasi BoneFish setiap kali membuka atau pilih secara manual di bawah." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+        <TextBlock Text="Crosshair Overlay" FontSize="20" FontWeight="Medium" Margin="0,24,0,0" />
+        <TextBlock Text="Tampilkan crosshair di tengah layar — berguna untuk game FPS tanpa crosshair bawaan. Crosshair tetap aktif selama BoneFish berjalan (tidak harus sedang main Roblox)." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
 
         <controls:OptionControl 
-            Header="Aktifkan Background Acak" 
-            Description="Background akan berubah acak setiap kali aplikasi BoneFish dibuka.">
-            <ui:ToggleSwitch IsChecked="{Binding EnableWallpaperLauncher, Mode=TwoWay}" />
+            Header="Aktifkan Crosshair" 
+            Description="Tampilkan crosshair overlay transparan di tengah layar. Drag untuk memindahkan posisi.">
+            <ui:ToggleSwitch IsChecked="{Binding EnableCrosshair, Mode=TwoWay}" />
         </controls:OptionControl>
 
-        <StackPanel Orientation="Vertical" Margin="0,8,0,0">
-            <TextBlock Text="Pilih Background Sekarang:" FontSize="13" FontWeight="Medium" Margin="0,0,0,8" />
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <ui:Button Content="Wallpaper 1 (Default)" Command="{Binding SelectWallpaper1Command, Mode=OneTime}" Appearance="Primary" Margin="0,0,8,0" MinWidth="140" />
-                <ui:Button Content="Wallpaper 2 (Cool)" Command="{Binding SelectWallpaper2Command, Mode=OneTime}" Margin="0,0,8,0" MinWidth="140" />
-                <ui:Button Content="Wallpaper 3 (Quality)" Command="{Binding SelectWallpaper3Command, Mode=OneTime}" Margin="0,0,8,0" MinWidth="140" />
-                <ui:Button Content="Wallpaper 4 (Extra)" Command="{Binding SelectWallpaper4Command, Mode=OneTime}" MinWidth="140" />
+        <controls:OptionControl 
+            Header="Bentuk Crosshair" 
+            Description="Pilih bentuk crosshair yang diinginkan.">
+            <ComboBox SelectedItem="{Binding CrosshairStyle, Mode=TwoWay}" ItemsSource="{Binding CrosshairStyles}" MinWidth="140" />
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="Ukuran Crosshair" 
+            Description="Atur besar kecil crosshair (20 - 200px).">
+            <Slider Minimum="20" Maximum="200" Value="{Binding CrosshairSize, Mode=TwoWay}" Width="200" TickFrequency="10" IsSnapToTickEnabled="True" />
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="Opacity Crosshair" 
+            Description="Atur transparansi crosshair (0.1 = hampir transparan, 1.0 = solid).">
+            <Slider Minimum="0.1" Maximum="1.0" Value="{Binding CrosshairOpacity, Mode=TwoWay}" Width="200" TickFrequency="0.1" IsSnapToTickEnabled="True" />
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="Warna Crosshair" 
+            Description="Pilih warna crosshair. Pilih warna yang kontras dengan background game.">
+            <StackPanel Orientation="Horizontal">
+                <Border Width="28" Height="28" CornerRadius="14" Background="#00FF00" Margin="0,0,6,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Cursor" Value="Hand" />
+                        </Style>
+                    </Border.Style>
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCrosshairColorCommand}" CommandParameter="#00FF00" />
+                    </Border.InputBindings>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14" Background="#FF0000" Margin="0,0,6,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCrosshairColorCommand}" CommandParameter="#FF0000" />
+                    </Border.InputBindings>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14" Background="#FFFFFF" Margin="0,0,6,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCrosshairColorCommand}" CommandParameter="#FFFFFF" />
+                    </Border.InputBindings>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14" Background="#00FFFF" Margin="0,0,6,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCrosshairColorCommand}" CommandParameter="#00FFFF" />
+                    </Border.InputBindings>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14" Background="#FFFF00" Margin="0,0,6,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCrosshairColorCommand}" CommandParameter="#FFFF00" />
+                    </Border.InputBindings>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14" Background="#FF00FF" Margin="0,0,6,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCrosshairColorCommand}" CommandParameter="#FF00FF" />
+                    </Border.InputBindings>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14" Background="#FF8800" Margin="0,0,6,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCrosshairColorCommand}" CommandParameter="#FF8800" />
+                    </Border.InputBindings>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14" Background="#888888" Margin="0,0,6,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCrosshairColorCommand}" CommandParameter="#888888" />
+                    </Border.InputBindings>
+                </Border>
             </StackPanel>
-            <TextBlock x:Name="WallpaperStatusText" Margin="0,0,0,0" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding WallpaperStatus, Mode=OneWay}" />
-        </StackPanel>
+        </controls:OptionControl>
+
+        <controls:OptionControl 
+            Header="🚀 Turbo Mode" 
+            Description="Override semua setting ke performa maksimal — cocok untuk FPS darurat. Turbo Mode RESET ke normal saat Roblox di-restart (tidak permanen).">
+            <ui:ToggleSwitch IsChecked="{Binding EnableTurboMode, Mode=TwoWay}" />
+        </controls:OptionControl>
 
     </StackPanel>
 </ui:UiPage>

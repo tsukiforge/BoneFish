@@ -5,7 +5,6 @@ using System.Windows.Shell;
 using System.Windows.Threading;
 
 using Microsoft.Win32;
-using Bloxstrap.Integrations;
 
 namespace Bloxstrap
 {
@@ -361,27 +360,6 @@ namespace Bloxstrap
                 // oleh block mana pun di OnStartup().
                 FastFlags.Load();
                 GlobalSettings.Load();
-
-                // Initialize app background on startup
-                try
-                {
-                    Logger.WriteLine(LOG_IDENT, "Initializing app background");
-                    
-                    // Validate and set random app background if enabled
-                    if (App.Settings.Prop.EnableWallpaperLauncher)
-                    {
-                        bool isValid = AppBackgroundService.ValidateBackgroundFiles();
-                        
-                        if (isValid)
-                        {
-                            Logger.WriteLine(LOG_IDENT, "App background files validated");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.WriteLine(LOG_IDENT, $"App background initialization failed: {ex.Message}");
-                }
 
                 if (Settings.Prop.AllowCookieAccess)
                     Task.Run(Cookies.LoadCookies);

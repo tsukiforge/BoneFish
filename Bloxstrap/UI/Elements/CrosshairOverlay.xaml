@@ -1,0 +1,19 @@
+<Window x:Class="Bloxstrap.UI.Elements.CrosshairOverlay"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Crosshair"
+        Width="80"
+        Height="80"
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ResizeMode="NoResize"
+        MouseDown="Window_MouseDown"
+        MouseMove="Window_MouseMove"
+        MouseUp="Window_MouseUp">
+    <Canvas Name="CrosshairCanvas" Width="80" Height="80">
+        <!-- Dynamic shapes drawn in code-behind -->
+    </Canvas>
+</Window>

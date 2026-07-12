@@ -23,6 +23,10 @@ namespace Bloxstrap
 
         public readonly FpsMonitorService? FpsMonitor;
 
+        public readonly CrosshairService? Crosshair;
+
+        public readonly HotkeyService? Hotkeys;
+
         public Watcher()
         {
             const string LOG_IDENT = "Watcher";
@@ -163,6 +167,19 @@ namespace Bloxstrap
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Initializing FPS Monitor");
                     FpsMonitor = new(ActivityWatcher, _watcherData.ProcessId);
+                }
+
+                // Crosshair service — independent overlay, not tied to activity
+                App.Logger.WriteLine(LOG_IDENT, "Initializing Crosshair Service");
+                Crosshair = new CrosshairService();
+                Crosshair.Start();
+
+                // Global hotkey service — register Ctrl+Shift+C/F/N
+                if (App.Settings.Prop.EnableHotkeys)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Initializing Hotkey Service");
+                    Hotkeys = new HotkeyService();
+                    Hotkeys.Start();
                 }
             }
             else if (App.Settings.Prop.EnableActivityTracking)
@@ -366,6 +383,10 @@ namespace Bloxstrap
             Notification?.Dispose();
 
             FpsMonitor?.Dispose();
+
+            Crosshair?.Dispose();
+
+            Hotkeys?.Dispose();
 
             App.State.Prop.WatcherRunning = false;
 
