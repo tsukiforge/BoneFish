@@ -134,51 +134,8 @@ namespace Bloxstrap
 
             App.Settings.Save();
 
-            // Extract wallpaper files from embedded resources to install directory
-            ExtractWallpapers();
-
             App.Logger.WriteLine(LOG_IDENT, "Installation finished");
 
-        }
-
-        private static void ExtractWallpapers()
-        {
-            const string LOG_IDENT = "Installer::ExtractWallpapers";
-
-            var wallpapers = new Dictionary<string, string>
-            {
-                { "wallpapers.jpg",  "Bloxstrap.Resources.Wallpapers.wallpapers.jpg"  },
-                { "wallpapersC.jpg", "Bloxstrap.Resources.Wallpapers.wallpapersC.jpg" },
-                { "wallpapersQ.jpg", "Bloxstrap.Resources.Wallpapers.wallpapersQ.jpg" },
-                { "wallpapersE.jpg", "Bloxstrap.Resources.Wallpapers.wallpapersE.jpg" },
-            };
-
-            string destDir = Path.Combine(Paths.Base, "Resources", "Wallpapers");
-            Directory.CreateDirectory(destDir);
-
-            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-
-            foreach (var (fileName, resourceName) in wallpapers)
-            {
-                string destFile = Path.Combine(destDir, fileName);
-                try
-                {
-                    using var stream = assembly.GetManifestResourceStream(resourceName);
-                    if (stream is null)
-                    {
-                        App.Logger.WriteLine(LOG_IDENT, $"Embedded resource not found: {resourceName}");
-                        continue;
-                    }
-
-                    using var fs = File.Create(destFile);
-                    stream.CopyTo(fs);
-                    App.Logger.WriteLine(LOG_IDENT, $"Extracted {fileName} to {destFile}");
-                }
-                catch (Exception ex)
-                {
-                    App.Logger.WriteLine(LOG_IDENT, $"Failed to extract {fileName}: {ex.Message}");
-                }
-            }
         }
 
         private bool ValidateLocation()
@@ -470,24 +427,130 @@ namespace Bloxstrap
             // not overwrite the newer install with an older build. This was causing
             // stale or downloaded launchers to silently downgrade BoneFish back to an
             // older release.
+            //
+            // Instead of immediately blocking the user with a dead-end warning, we
+            // first attempt an auto-redirect: launch the installed (newer) binary
+            // with the same command-line args plus "-redirected", then terminate.
+            // The "-redirected" flag prevents infinite redirect loops if the newer
+            // binary also detects a mismatch.
+            //
+            // If auto-redirect is impossible (installed binary missing/corrupt) or
+            // already a redirected launch, we show a Yes/No dialog giving the user
+            // the choice to continue with the old binary (without overwriting) or exit.
             if (versionComparison == VersionComparison.LessThan)
             {
                 App.Logger.WriteLine(LOG_IDENT,
-                    $"Upgrade aborted: launched binary '{currentVer}' is older than installed '{existingVer}'.");
+                    $"Launched binary '{currentVer}' is older than installed '{existingVer}'.");
                 App.Logger.WriteLine(LOG_IDENT,
                     $"Launched path: {Paths.Process}");
                 App.Logger.WriteLine(LOG_IDENT,
                     $"Installed path: {Paths.Application}");
-                App.Logger.WriteLine(LOG_IDENT,
-                    "This usually means a stale launcher or older installer is being used. " +
-                    "Please run the latest BoneFish release or reinstall from the current install.");
 
-                Frontend.ShowMessageBox(
+                // ── Step 1: Try auto-redirect to the installed version ─────
+                // Skip if this process is already a redirect result (anti-loop guard)
+                if (!App.LaunchSettings.RedirectedFlag.Active)
+                {
+                    bool canRedirect = true;
+
+                    // Validate the installed binary exists and is not corrupt
+                    if (!File.Exists(Paths.Application))
+                    {
+                        App.Logger.WriteLine(LOG_IDENT,
+                            "Auto-redirect skipped: installed binary not found at " + Paths.Application);
+                        canRedirect = false;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var installedInfo = new FileInfo(Paths.Application);
+                            if (installedInfo.Length == 0)
+                            {
+                                App.Logger.WriteLine(LOG_IDENT,
+                                    "Auto-redirect skipped: installed binary is empty (0 bytes)");
+                                canRedirect = false;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"Auto-redirect skipped: cannot read installed binary info — {ex.Message}");
+                            canRedirect = false;
+                        }
+                    }
+
+                    if (canRedirect)
+                    {
+                        App.Logger.WriteLine(LOG_IDENT,
+                            $"Attempting auto-redirect from old binary to installed version at {Paths.Application}");
+                        App.Logger.WriteLine(LOG_IDENT,
+                            $"  Old version: {currentVer}, New version: {existingVer}");
+                        App.Logger.WriteLine(LOG_IDENT,
+                            $"  Old path: {Paths.Process}, New path: {Paths.Application}");
+
+                        try
+                        {
+                            // Build argument list: replicate current args + -redirected flag
+                            var argsList = new List<string>(App.LaunchSettings.Args);
+                            argsList.Add("-redirected");
+
+                            var psi = new ProcessStartInfo
+                            {
+                                FileName = Paths.Application,
+                                UseShellExecute = true
+                            };
+
+                            foreach (var arg in argsList)
+                                psi.ArgumentList.Add(arg);
+
+                            Process.Start(psi);
+
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"Auto-redirect SUCCESS: started process from {Paths.Application} " +
+                                $"with {argsList.Count} arg(s). Terminating current (old) process.");
+                            App.Terminate(ErrorCode.ERROR_SUCCESS);
+                            return;
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"Auto-redirect FAILED: could not start {Paths.Application} — {ex.Message}");
+                            App.Logger.WriteException(LOG_IDENT, ex);
+                            // Fall through to fallback dialog below
+                        }
+                    }
+
+                    App.Logger.WriteLine(LOG_IDENT,
+                        "Auto-redirect was not possible or failed. Falling back to manual prompt.");
+                }
+                else
+                {
+                    App.Logger.WriteLine(LOG_IDENT,
+                        "Already a redirected process — skipping auto-redirect to avoid loop. " +
+                        "Showing fallback dialog.");
+                }
+
+                // ── Step 2: Fallback dialog (redirect failed or skipped) ──
+                // The string already asks "Are you sure you want to continue?",
+                // so we use YesNo buttons to give the user a real choice.
+                var userChoice = Frontend.ShowMessageBox(
                     Strings.InstallChecker_VersionLessThanInstalled,
-                    MessageBoxImage.Warning
+                    MessageBoxImage.Warning,
+                    MessageBoxButton.YesNo
                 );
 
-                return;
+                if (userChoice != MessageBoxResult.Yes)
+                {
+                    App.Logger.WriteLine(LOG_IDENT,
+                        "User chose to exit. Terminating without downgrading.");
+                    App.Terminate(ErrorCode.ERROR_CANCELLED);
+                    return;
+                }
+
+                App.Logger.WriteLine(LOG_IDENT,
+                    "User chose to continue with the older binary despite the version mismatch. " +
+                    "Proceeding without overwriting the installed version (anti-downgrade protection active).");
+                return; // skip the upgrade flow entirely
             }
 
             // silently upgrade version if the command line flag is set or if we're launching from an auto update

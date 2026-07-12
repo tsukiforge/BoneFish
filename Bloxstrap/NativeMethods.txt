@@ -9,3 +9,5 @@ SetWindowText
 SetWinEventHook
 SendMessage
 SHObjectProperties
+RegisterHotKey
+UnregisterHotKey

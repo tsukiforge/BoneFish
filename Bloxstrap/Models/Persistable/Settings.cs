@@ -63,8 +63,8 @@ namespace Bloxstrap.Models.Persistable
         public double FpsMonitorY { get; set; } = 0;
         public bool OptimizeForLowEnd { get; set; } = false; // when true, reduce timers and visual updates to save CPU on older devices
 
-        // wallpaper launcher (app background, not desktop)
-        public bool EnableWallpaperLauncher { get; set; } = false;
+        // Turbo Mode — temporary performance boost, resets on restart
+        public bool EnableTurboMode { get; set; } = false;
 
         // performance preset
         public string SelectedPerformancePreset { get; set; } = "None";
@@ -80,6 +80,18 @@ namespace Bloxstrap.Models.Persistable
         // Night Vision mode untuk Potato Mode — terangkan area gelap client-side.
         // Client-side only, tidak mempengaruhi gameplay atau pemain lain.
         public bool EnableNightVision { get; set; } = false;
+
+        // Global hotkey settings
+        public bool EnableHotkeys { get; set; } = true;
+
+        // Crosshair overlay settings
+        public bool EnableCrosshair { get; set; } = false;
+        public string CrosshairStyle { get; set; } = "Cross";      // Dot, Cross, Circle, CrossDot
+        public string CrosshairColor { get; set; } = "#00FF00";    // Lime green default
+        public double CrosshairSize { get; set; } = 40;             // 20-200px
+        public double CrosshairOpacity { get; set; } = 0.8;         // 0.1-1.0
+        public double CrosshairX { get; set; } = 0;                 // screen position
+        public double CrosshairY { get; set; } = 0;
 
         // custom background
         public string CustomBackgroundPath { get; set; } = "";

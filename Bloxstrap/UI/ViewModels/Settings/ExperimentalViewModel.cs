@@ -1,18 +1,13 @@
 using System;
-using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using Bloxstrap.Integrations;
-using Bloxstrap.UI.Elements.Settings;
 
 namespace Bloxstrap.UI.ViewModels.Settings
 {
     public class ExperimentalViewModel : NotifyPropertyChangedViewModel
     {
-        private string _wallpaperStatus = "Background akan berubah secara acak saat aplikasi dibuka.";
-
         public bool EnableSystemTrayOnClose
         {
             get => App.Settings.Prop.EnableSystemTrayOnClose;
@@ -85,114 +80,122 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        public bool EnableWallpaperLauncher
+        public bool EnableHotkeys
         {
-            get => App.Settings.Prop.EnableWallpaperLauncher;
+            get => App.Settings.Prop.EnableHotkeys;
             set
             {
-                App.Settings.Prop.EnableWallpaperLauncher = value;
-                OnPropertyChanged(nameof(EnableWallpaperLauncher));
+                App.Settings.Prop.EnableHotkeys = value;
+                OnPropertyChanged(nameof(EnableHotkeys));
                 try { App.Settings.Save(); } catch { }
             }
         }
 
-        public string WallpaperStatus
+        public bool EnableCrosshair
         {
-            get => _wallpaperStatus;
+            get => App.Settings.Prop.EnableCrosshair;
             set
             {
-                if (_wallpaperStatus != value)
-                {
-                    _wallpaperStatus = value;
-                    OnPropertyChanged(nameof(WallpaperStatus));
-                }
+                App.Settings.Prop.EnableCrosshair = value;
+                OnPropertyChanged(nameof(EnableCrosshair));
+                try { App.Settings.Save(); } catch { }
+                
+                // Notify CrosshairService to apply/remove overlay
+                CrosshairService.Instance?.ApplySettings();
             }
         }
 
-        public IAsyncRelayCommand SelectWallpaper1Command { get; }
-        public IAsyncRelayCommand SelectWallpaper2Command { get; }
-        public IAsyncRelayCommand SelectWallpaper3Command { get; }
-        public IAsyncRelayCommand SelectWallpaper4Command { get; }
-
-        public ExperimentalViewModel()
+        public string CrosshairStyle
         {
-            SelectWallpaper1Command = new AsyncRelayCommand(SelectWallpaper1);
-            SelectWallpaper2Command = new AsyncRelayCommand(SelectWallpaper2);
-            SelectWallpaper3Command = new AsyncRelayCommand(SelectWallpaper3);
-            SelectWallpaper4Command = new AsyncRelayCommand(SelectWallpaper4);
-
-            UpdateWallpaperStatus();
-        }
-
-        private async Task SelectWallpaper1()
-        {
-            await SelectBackground(AppBackgroundService.BackgroundType.Default);
-        }
-
-        private async Task SelectWallpaper2()
-        {
-            await SelectBackground(AppBackgroundService.BackgroundType.Cool);
-        }
-
-        private async Task SelectWallpaper3()
-        {
-            await SelectBackground(AppBackgroundService.BackgroundType.Quality);
-        }
-
-        private async Task SelectWallpaper4()
-        {
-            await SelectBackground(AppBackgroundService.BackgroundType.Extra);
-        }
-
-        private async Task SelectBackground(AppBackgroundService.BackgroundType type)
-        {
-            try
+            get => App.Settings.Prop.CrosshairStyle;
+            set
             {
-                App.Logger.WriteLine("ExperimentalViewModel", $"SelectBackground called with type: {type}");
+                App.Settings.Prop.CrosshairStyle = value;
+                OnPropertyChanged(nameof(CrosshairStyle));
+                try { App.Settings.Save(); } catch { }
                 
-                var backgroundImage = AppBackgroundService.GetBackground(type);
-                
-                App.Logger.WriteLine("ExperimentalViewModel", $"Background image loaded: {backgroundImage != null}");
-                
-                if (backgroundImage != null)
-                {
-                    // Apply to current window immediately
-                    await Application.Current.Dispatcher.InvokeAsync(() =>
-                    {
-                        var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
-                        if (mainWindow != null)
-                        {
-                            App.Logger.WriteLine("ExperimentalViewModel", "Applying background to MainWindow");
-                            mainWindow.Background = new System.Windows.Media.ImageBrush(backgroundImage)
-                            {
-                                Stretch = System.Windows.Media.Stretch.UniformToFill
-                            };
-                            App.Logger.WriteLine("ExperimentalViewModel", "Background applied successfully");
-                        }
-                        else
-                        {
-                            App.Logger.WriteLine("ExperimentalViewModel", "MainWindow not found!");
-                        }
-                    });
+                CrosshairService.Instance?.ApplySettings();
+            }
+        }
 
-                    WallpaperStatus = $"✓ Background diubah ke: {type}";
+        public double CrosshairSize
+        {
+            get => App.Settings.Prop.CrosshairSize;
+            set
+            {
+                App.Settings.Prop.CrosshairSize = value;
+                OnPropertyChanged(nameof(CrosshairSize));
+                try { App.Settings.Save(); } catch { }
+                
+                CrosshairService.Instance?.ApplySettings();
+            }
+        }
+
+        public double CrosshairOpacity
+        {
+            get => App.Settings.Prop.CrosshairOpacity;
+            set
+            {
+                App.Settings.Prop.CrosshairOpacity = value;
+                OnPropertyChanged(nameof(CrosshairOpacity));
+                try { App.Settings.Save(); } catch { }
+                
+                CrosshairService.Instance?.ApplySettings();
+            }
+        }
+
+        // Available crosshair styles for the ComboBox
+        public string[] CrosshairStyles { get; } = new[] { "Cross", "Dot", "Circle", "CrossDot" };
+
+        public ICommand SelectCrosshairColorCommand { get; }
+
+        private void SelectCrosshairColor(object? param)
+        {
+            if (param is string color && !string.IsNullOrEmpty(color))
+            {
+                App.Settings.Prop.CrosshairColor = color;
+                try { App.Settings.Save(); } catch { }
+                CrosshairService.Instance?.ApplySettings();
+            }
+        }
+
+        public bool EnableTurboMode
+        {
+            get => App.Settings.Prop.EnableTurboMode;
+            set
+            {
+                App.Settings.Prop.EnableTurboMode = value;
+                OnPropertyChanged(nameof(EnableTurboMode));
+
+                if (value)
+                {
+                    // Turbo Mode ON: force extreme optimizations
+                    App.Settings.Prop.OptimizeForLowEnd = true;
+                    App.Settings.Prop.ForceExtremeMode = true;
+                    OnPropertyChanged(nameof(OptimizeForLowEnd));
+
+                    AutoOptimizeService.ApplyAggressiveOptimizations(AutoOptimizeService.SystemTier.ExtremePerformance);
                 }
                 else
                 {
-                    WallpaperStatus = $"✗ Gagal mengubah background ke: {type}";
+                    // Turbo Mode OFF: restore normal settings
+                    App.Settings.Prop.OptimizeForLowEnd = false;
+                    App.Settings.Prop.ForceExtremeMode = false;
+                    OnPropertyChanged(nameof(OptimizeForLowEnd));
+
+                    AutoOptimizeService.RemoveOptimizations();
                 }
-            }
-            catch (Exception ex)
-            {
-                WallpaperStatus = $"✗ Error: {ex.Message}";
-                App.Logger.WriteLine("ExperimentalViewModel", $"Error selecting background: {ex.Message}");
-                App.Logger.WriteLine("ExperimentalViewModel", $"Stack trace: {ex.StackTrace}");
+
+                try { App.Settings.Save(); } catch { }
+
+                if (App.FastFlags.Changed)
+                    App.FastFlags.Save();
             }
         }
 
-        private void UpdateWallpaperStatus()
+        public ExperimentalViewModel()
         {
-            WallpaperStatus = "Background akan berubah secara acak saat aplikasi dibuka.";
+            SelectCrosshairColorCommand = new RelayCommand<string?>(SelectCrosshairColor);
         }
     }
 }

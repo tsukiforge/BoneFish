@@ -42,6 +42,8 @@ namespace Bloxstrap
 
         public LaunchFlag ForceFlag                 { get; } = new("force");
 
+        public LaunchFlag RedirectedFlag            { get; } = new("redirected");
+
         public LaunchFlag BloxshadeFlag { get; } = new("bloxshade");
 
 #if DEBUG
