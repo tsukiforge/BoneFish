@@ -271,6 +271,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             SelectWallpaperCoolCommand = new RelayCommand(OnSelectWallpaperCool);
             SelectWallpaperQualityCommand = new RelayCommand(OnSelectWallpaperQuality);
             SelectWallpaperExtraCommand = new RelayCommand(OnSelectWallpaperExtra);
+
+            // Auto-load wallpaper pas halaman ini di-load
+            if (App.Settings.Prop.EnableWallpaperLauncher)
+            {
+                _ = LoadRandomBackgroundAsync();
+            }
         }
     }
 }
