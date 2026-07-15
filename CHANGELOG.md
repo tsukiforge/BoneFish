@@ -52,6 +52,7 @@ Semua file wallpaper (AppBackgroundService, WallpaperService, gambar JPG, dll) u
 ### 🔧 Fix Lainnya
 
 - **HandleUpgrade Auto-Redirect** — pas lo jalanin BoneFish versi lama dari folder download, sekarang otomatis ngarahin ke yang udah ke-install. Gak bakal muncul dialog aneh-aneh lagi.
+- **🐛 Wallpaper auto-load di startup** — sebelumnya wallpaper cuma muncul kalo user toggle ON/OFF manual. Sekarang otomatis loading pas buka halaman FastFlag New! (fix: pindahin loading dari MainWindow yang salah DataContext ke ExperimentalViewModel).
 
 ---
 
