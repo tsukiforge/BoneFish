@@ -1,6 +1,6 @@
 # BoneFish Changelog
 
-## v5.1.0 — Crosshair, Hotkey, Turbo Mode + Cleanup 🧹
+## v5.1.0 — Crosshair, Hotkey, Turbo Mode, Wallpaper Restore + Memory Fix 🧹
 
 Release date: 2026-07-12
 
@@ -15,7 +15,7 @@ Bosan sama crosshair game yang jelek? Sekarang lo bisa bikin **crosshair kustom*
 - **Drag & drop** — tinggal klik & geser ke posisi mana aja, posisinya bakal keinget terus
 - **Toggle pake hotkey** — pencet `Ctrl+Shift+C` buat munculin/sembunyiin
 
-**Dimana?** Settings → Experimental → Crosshair. Tinggal enable, langsung muncul!
+**Dimana?** Settings → FastFlag New → Crosshair. Tinggal enable, langsung muncul!
 
 ### ⌨️ Global Hotkeys — Pake Keyboard Buat Semua!
 
@@ -27,27 +27,53 @@ Bosan harus alt-tab ke settings buat matiin/ngewaktifin fitur? Sekarang lo bisa 
 | `Ctrl+Shift+F` | Tampilin/Sembunyiin FPS Monitor |
 | `Ctrl+Shift+N` | Aktifin/Nonaktifin Night Vision |
 
-Bisa lo matiin kalo ganggu di **Settings → Experimental → Enable Hotkeys**.
+Bisa lo matiin kalo ganggu di **Settings → FastFlag New → Enable Hotkeys**.
 
 ### 🚀 Turbo Mode — Satu Klik, PC Lo Ngebut!
 
 **Fitur paling gacor buat laptop kentang!** Tinggal toggle ON, dan BoneFish langsung:
 
 - **Paksa Extreme Performance mode** — sama kayak Potato Mode paling agresif
-- **Turunin kualitas render** — tekstur low-res, shadow dikurangin, FRM dipaksa minimum
-- **Matiin telemetry & animasi** — kurangi beban CPU buat game lo
+- **Terapin FastFlags agresif** — turunin render quality, tekstur low-res, shadow dikurangin
 - **Auto-reset pas restart** — pas lo buka BoneFish lagi, Turbo Mode balik ke OFF otomatis. Gak bakal ngehek settingan permanen lo!
 
-**Pas di-click OFF** — semua balik normal, settingan lo gak ilang. Aman cuy!
+**Pas di-click OFF** — semua balik normal + FastFlags dihapus. Aman cuy!
 
-### 🗑️ Bersih-Bersih Code — Wallpaper Service Dihapus
+### 🖼️ Wallpaper Background — Restored & Fixed!
 
-Fitur **ganti wallpaper desktop pas launch** udah dihapus total. Kenapa? Karena:
-- Gak relevan — lo buka BoneFish buat main Roblox, bukan buat ganti wallpaper
-- Bikin berat — nambah CPU usage tanpa guna
-- Jarang dipake — based on feedback, hampir gak ada yang pake
+Fitur wallpaper background di halaman FastFlag New balik lagi! Sekarang pake **async loading** jadi **gak bikin UI lemot**. Bisa pilih 4 wallpaper: Default, Cool, Quality, Extra.
 
-Semua file wallpaper (AppBackgroundService, WallpaperService, gambar JPG, dll) udah dibersihin semua. Hasil: **ukuran installer lebih kecil**!
+**Yang di-fix:**
+- ✅ Loading pake async + MemoryStream — gak blocking UI thread kayak dulu
+- ✅ Auto-load pas buka halaman (sebelumnya cuma muncul kalo toggle manual)
+- ✅ Cache 4 gambar — gak loading ulang tiap ganti halaman
+
+### 🐛 Bug Fixes — Crosshair & Hotkeys Gak Jalan
+
+**Masalah:** CrosshairService & HotkeyService di-init di DALEM blok `EnableActivityTracking`. Artinya:
+- Kalo user matiin Activity Tracking → Crosshair & Hotkeys **GAK PERNAH JALAN**
+- Kalo file log Roblox ilang (self-update) → Crosshair & Hotkeys **GAK PERNAH JALAN**
+
+**Fix:** Pindahin inisialisasi ke LUAR blok ActivityTracking. Sekarang Crosshair & Hotkeys jalan **INDEPENDEN** — gak peduli tracking hidup/mati.
+
+### 🏷️ Rename: "Experimental" → "FastFlag New"
+
+Halaman Experimental sekarang bernama **FastFlag New** biar lebih jelas isinya.
+
+### 🧠 Optimasi Memory — Lazy Start & Anti Leak
+
+**1. CrosshairService — Lazy Start 🎯**
+- Dulu: thread + dispatcher jalan TERUS meski crosshair mati (boros ~2-5 MB)
+- Sekarang: thread cuma dibuat kalo EnableCrosshair ON. Kalo user pencet hotkey `Ctrl+Shift+C`, auto lazy-start.
+
+**2. ActivityWatcher History — Auto-Prune 📜**
+- History game yang pernah lo mainin sekarang auto di-prune ke max 50 entries. Gak bakal numpuk sampe ribuan.
+
+**3. DNS Cache — Auto Cleanup 🌐**
+- Cache DNS yang expired (>5 menit) otomatis dibersihin tiap kali lookup. Gak numpuk.
+
+**4. HotkeyService — Constructor Pattern 🔧**
+- Instance sekarang di-set di constructor (konsisten sama CrosshairService).
 
 ### 🔧 Fix Lainnya
 
