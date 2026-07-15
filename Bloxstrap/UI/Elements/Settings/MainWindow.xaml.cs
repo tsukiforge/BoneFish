@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 
 using Wpf.Ui.Controls.Interfaces;
 using Wpf.Ui.Mvvm.Contracts;
@@ -11,6 +12,7 @@ using Wpf.Ui.Controls;
 using Bloxstrap.UI.Elements.Settings.Pages;
 using SharpVectors.Scripting;
 using System.Drawing;
+using Bloxstrap.Integrations;
 
 namespace Bloxstrap.UI.Elements.Settings
 {
@@ -53,6 +55,13 @@ namespace Bloxstrap.UI.Elements.Settings
                 if (Data.KillFlags)
                     fastflags.PageType = typeof(FastFlagsDisabled);
             });
+
+            // ── Load background wallpaper secara ASYNC ─────────────────────
+            // Gak blocking UI thread. Wallpaper muncul setelah selesai di-load.
+            if (App.Settings.Prop.EnableWallpaperLauncher)
+            {
+                _ = LoadWallpaperAsync();
+            }
 
             if (lastPage != null)
                 SafeNavigate(lastPage);
@@ -97,6 +106,19 @@ namespace Bloxstrap.UI.Elements.Settings
                 return; // prevent from navigating onto disabled page
 
             Navigate(page);
+        }
+
+        private async Task LoadWallpaperAsync()
+        {
+            try
+            {
+                var bg = await AppBackgroundService.GetRandomBackgroundAsync();
+                if (bg != null && DataContext is ExperimentalViewModel vm)
+                {
+                    vm.BackgroundImage = bg;
+                }
+            }
+            catch { }
         }
 
         private async void ShowAlreadyRunningSnackbar()

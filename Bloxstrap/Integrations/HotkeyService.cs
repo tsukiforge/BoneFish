@@ -62,7 +62,7 @@ namespace Bloxstrap.Integrations
                 };
 
                 _hwndSource = new HwndSource(sourceParams);
-                _hwndSource.AddHook(WndProc);
+                _hwndSource!.AddHook(WndProc);
                 _hotkeyHwnd = (HWND)_hwndSource.Handle;
 
                 // Daftarkan semua hotkey
@@ -171,8 +171,8 @@ namespace Bloxstrap.Integrations
                 PInvoke.UnregisterHotKey(_hotkeyHwnd, HOTKEY_FPS);
                 PInvoke.UnregisterHotKey(_hotkeyHwnd, HOTKEY_NIGHTVISION);
 
-                _hwndSource.RemoveHook(WndProc);
-                _hwndSource.Dispose();
+                _hwndSource!.RemoveHook(WndProc);
+                _hwndSource!.Dispose();
                 _hwndSource = null;
                 _hotkeyHwnd = HWND.Null;
 

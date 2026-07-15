@@ -191,5 +191,44 @@
             <ui:ToggleSwitch IsChecked="{Binding EnableTurboMode, Mode=TwoWay}" />
         </controls:OptionControl>
 
+        <TextBlock Text="Wallpaper Background" FontSize="20" FontWeight="Medium" Margin="0,24,0,0" />
+        <TextBlock Text="Tampilkan wallpaper keren di background settings biar makin aesthetic. Loading pakai teknologi ASYNC jadi gak bikin lemot! 🫨" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
+
+        <controls:OptionControl 
+            Header="Aktifkan Wallpaper" 
+            Description="Pajang wallpaper aesthetic di background settings. Async loading, gak bikin loading lama.">
+            <ui:ToggleSwitch IsChecked="{Binding EnableWallpaperLauncher, Mode=TwoWay}" />
+        </controls:OptionControl>
+
+        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="16" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8">🖼️ Pilih Wallpaper</TextBlock>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Default" VerticalAlignment="Center" Margin="0,0,0,4" />
+                    <ui:Button Grid.Row="0" Grid.Column="1" Content="Pilih" Command="{Binding SelectWallpaperDefaultCommand}" Margin="0,0,0,4" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Cool" VerticalAlignment="Center" Margin="0,0,0,4" />
+                    <ui:Button Grid.Row="1" Grid.Column="1" Content="Pilih" Command="{Binding SelectWallpaperCoolCommand}" Margin="0,0,0,4" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Quality" VerticalAlignment="Center" Margin="0,0,0,4" />
+                    <ui:Button Grid.Row="2" Grid.Column="1" Content="Pilih" Command="{Binding SelectWallpaperQualityCommand}" Margin="0,0,0,4" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Extra" VerticalAlignment="Center" />
+                    <ui:Button Grid.Row="3" Grid.Column="1" Content="Pilih" Command="{Binding SelectWallpaperExtraCommand}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
     </StackPanel>
 </ui:UiPage>

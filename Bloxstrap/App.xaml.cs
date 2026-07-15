@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Shell;
 using System.Windows.Threading;
 
+using Bloxstrap.Integrations;
 using Microsoft.Win32;
 
 namespace Bloxstrap
@@ -376,6 +377,25 @@ namespace Bloxstrap
                     Installer.HandleUpgrade();
 
                 Task.Run(App.RemoteData.LoadData); // ok
+
+                // Initialize app background on startup (async — gak block UI thread)
+                if (App.Settings.Prop.EnableWallpaperLauncher)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            Logger.WriteLine(LOG_IDENT, "Validating app background files...");
+                            bool isValid = await AppBackgroundService.ValidateBackgroundFilesAsync();
+                            if (isValid)
+                                Logger.WriteLine(LOG_IDENT, "App background files validated");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.WriteLine(LOG_IDENT, $"App background validation failed: {ex.Message}");
+                        }
+                    });
+                }
 
                 WindowsRegistry.RegisterApis(); // we want to register those early on
                                                 // so we wont have any issues with bloxshade

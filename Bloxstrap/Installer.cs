@@ -134,8 +134,51 @@ namespace Bloxstrap
 
             App.Settings.Save();
 
+            // Extract wallpaper files from embedded resources to install directory
+            ExtractWallpapers();
+
             App.Logger.WriteLine(LOG_IDENT, "Installation finished");
 
+        }
+
+        private static void ExtractWallpapers()
+        {
+            const string LOG_IDENT = "Installer::ExtractWallpapers";
+
+            var wallpapers = new Dictionary<string, string>
+            {
+                { "wallpapers.jpg",  "Bloxstrap.Resources.Wallpapers.wallpapers.jpg"  },
+                { "wallpapersC.jpg", "Bloxstrap.Resources.Wallpapers.wallpapersC.jpg" },
+                { "wallpapersQ.jpg", "Bloxstrap.Resources.Wallpapers.wallpapersQ.jpg" },
+                { "wallpapersE.jpg", "Bloxstrap.Resources.Wallpapers.wallpapersE.jpg" },
+            };
+
+            string destDir = Path.Combine(Paths.Base, "Resources", "Wallpapers");
+            Directory.CreateDirectory(destDir);
+
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+
+            foreach (var (fileName, resourceName) in wallpapers)
+            {
+                string destFile = Path.Combine(destDir, fileName);
+                try
+                {
+                    using var stream = assembly.GetManifestResourceStream(resourceName);
+                    if (stream is null)
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, $"Embedded resource not found: {resourceName}");
+                        continue;
+                    }
+
+                    using var fs = File.Create(destFile);
+                    stream.CopyTo(fs);
+                    App.Logger.WriteLine(LOG_IDENT, $"Extracted {fileName} to {destFile}");
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Failed to extract {fileName}: {ex.Message}");
+                }
+            }
         }
 
         private bool ValidateLocation()
