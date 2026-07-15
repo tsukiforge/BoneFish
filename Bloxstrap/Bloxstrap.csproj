@@ -64,6 +64,10 @@
     <EmbeddedResource Include="Resources\Mods\Sounds\OldWalk.mp3" />
     <EmbeddedResource Include="Resources\Mods\Sounds\Empty.mp3" />
     <EmbeddedResource Include="Resources\Mods\OldAvatarBackground.rbxl" />
+    <EmbeddedResource Include="Resources\Wallpapers\wallpapers.jpg" />
+    <EmbeddedResource Include="Resources\Wallpapers\wallpapersC.jpg" />
+    <EmbeddedResource Include="Resources\Wallpapers\wallpapersQ.jpg" />
+    <EmbeddedResource Include="Resources\Wallpapers\wallpapersE.jpg" />
   </ItemGroup>
 
   <ItemGroup>

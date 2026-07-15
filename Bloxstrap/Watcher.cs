@@ -169,24 +169,27 @@ namespace Bloxstrap
                     FpsMonitor = new(ActivityWatcher, _watcherData.ProcessId);
                 }
 
-                // Crosshair service — independent overlay, not tied to activity
-                App.Logger.WriteLine(LOG_IDENT, "Initializing Crosshair Service");
-                Crosshair = new CrosshairService();
-                Crosshair.Start();
-
-                // Global hotkey service — register Ctrl+Shift+C/F/N
-                if (App.Settings.Prop.EnableHotkeys)
-                {
-                    App.Logger.WriteLine(LOG_IDENT, "Initializing Hotkey Service");
-                    Hotkeys = new HotkeyService();
-                    Hotkeys.Start();
-                }
             }
             else if (App.Settings.Prop.EnableActivityTracking)
             {
                 // Activity tracking is enabled but the log file is missing (e.g. Roblox self-updated).
                 // The tray icon will still be created below; tracking-dependent features are skipped this session.
                 App.Logger.WriteLine(LOG_IDENT, "Activity tracking enabled but log file is unavailable; skipping tracking, tray icon will still appear");
+            }
+
+            // Crosshair & Hotkeys adalah fitur INDEPENDEN — tidak butuh ActivityTracking.
+            // Inisialisasi di sini (di luar blok EnableActivityTracking) agar tetap jalan
+            // meski user matiin tracking atau log file Roblox gak ketemu.
+            App.Logger.WriteLine(LOG_IDENT, "Initializing Crosshair Service");
+            Crosshair = new CrosshairService();
+            Crosshair.Start();
+
+            // Global hotkey service — register Ctrl+Shift+C/F/N
+            if (App.Settings.Prop.EnableHotkeys)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Initializing Hotkey Service");
+                Hotkeys = new HotkeyService();
+                Hotkeys.Start();
             }
 
             // Always initialize the tray icon last; guard it so a failure here

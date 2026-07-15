@@ -93,6 +93,9 @@ namespace Bloxstrap.Models.Persistable
         public double CrosshairX { get; set; } = 0;                 // screen position
         public double CrosshairY { get; set; } = 0;
 
+        // wallpaper background
+        public bool EnableWallpaperLauncher { get; set; } = false;
+
         // custom background
         public string CustomBackgroundPath { get; set; } = "";
     }
