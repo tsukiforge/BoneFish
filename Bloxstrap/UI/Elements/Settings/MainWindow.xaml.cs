@@ -56,12 +56,8 @@ namespace Bloxstrap.UI.Elements.Settings
                     fastflags.PageType = typeof(FastFlagsDisabled);
             });
 
-            // ── Load background wallpaper secara ASYNC ─────────────────────
-            // Gak blocking UI thread. Wallpaper muncul setelah selesai di-load.
-            if (App.Settings.Prop.EnableWallpaperLauncher)
-            {
-                _ = LoadWallpaperAsync();
-            }
+            // Wallpaper otomatis di-load oleh ExperimentalViewModel (FastFlag New page)
+            // saat halaman tersebut dibuka — gak perlu preload dari MainWindow.
 
             if (lastPage != null)
                 SafeNavigate(lastPage);
@@ -106,19 +102,6 @@ namespace Bloxstrap.UI.Elements.Settings
                 return; // prevent from navigating onto disabled page
 
             Navigate(page);
-        }
-
-        private async Task LoadWallpaperAsync()
-        {
-            try
-            {
-                var bg = await AppBackgroundService.GetRandomBackgroundAsync();
-                if (bg != null && DataContext is ExperimentalViewModel vm)
-                {
-                    vm.BackgroundImage = bg;
-                }
-            }
-            catch { }
         }
 
         private async void ShowAlreadyRunningSnackbar()
