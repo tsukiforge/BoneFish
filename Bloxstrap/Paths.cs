@@ -33,6 +33,28 @@
 
         public static string Application { get; private set; } = "";
 
+        public static string WallpapersDir => Path.Combine(Base, "Resources", "Wallpapers");
+
+        public static string ResolveWallpapersDir()
+        {
+            // Coba beberapa lokasi yang mungkin
+            string[] possiblePaths = new[]
+            {
+                Path.Combine(Base, "Resources", "Wallpapers"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Wallpapers"),
+                Path.Combine(Path.GetDirectoryName(Paths.Process)!, "Resources", "Wallpapers")
+            };
+
+            foreach (var path in possiblePaths)
+            {
+                if (Directory.Exists(path))
+                    return path;
+            }
+
+            // Fallback ke lokasi Base
+            return Path.Combine(Base, "Resources", "Wallpapers");
+        }
+
         public static string CustomFont => Path.Combine(Modifications, "content\\fonts\\CustomFont.ttf");
         public static string CustomBackground => Path.Combine(Modifications, "content\\textures\\ui\\Shell\\CustomBackground.png");
         public static string CustomLoadingScreen => Path.Combine(Modifications, "content\\textures\\loading\\CustomLoading.png");

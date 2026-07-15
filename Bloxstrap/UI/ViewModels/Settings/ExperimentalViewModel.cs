@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.Input;
 using Bloxstrap.Integrations;
 
@@ -8,6 +9,76 @@ namespace Bloxstrap.UI.ViewModels.Settings
 {
     public class ExperimentalViewModel : NotifyPropertyChangedViewModel
     {
+        // ── Wallpaper Properties ────────────────────────────────────────────────
+        private BitmapImage? _backgroundImage;
+        public BitmapImage? BackgroundImage
+        {
+            get => _backgroundImage;
+            set { _backgroundImage = value; OnPropertyChanged(nameof(BackgroundImage)); }
+        }
+
+        private bool _isBackgroundLoading;
+        public bool IsBackgroundLoading
+        {
+            get => _isBackgroundLoading;
+            set { _isBackgroundLoading = value; OnPropertyChanged(nameof(IsBackgroundLoading)); }
+        }
+
+        public bool EnableWallpaperLauncher
+        {
+            get => App.Settings.Prop.EnableWallpaperLauncher;
+            set
+            {
+                App.Settings.Prop.EnableWallpaperLauncher = value;
+                OnPropertyChanged(nameof(EnableWallpaperLauncher));
+                try { App.Settings.Save(); } catch { }
+
+                if (value)
+                    _ = LoadRandomBackgroundAsync();
+                else
+                    BackgroundImage = null;
+            }
+        }
+
+        public async Task LoadRandomBackgroundAsync()
+        {
+            if (!EnableWallpaperLauncher)
+                return;
+
+            IsBackgroundLoading = true;
+            try
+            {
+                BackgroundImage = await AppBackgroundService.GetRandomBackgroundAsync();
+            }
+            finally
+            {
+                IsBackgroundLoading = false;
+            }
+        }
+
+        public async Task SelectBackground(AppBackgroundService.BackgroundType type)
+        {
+            IsBackgroundLoading = true;
+            try
+            {
+                BackgroundImage = await AppBackgroundService.GetBackgroundAsync(type);
+            }
+            finally
+            {
+                IsBackgroundLoading = false;
+            }
+        }
+
+        // ── ICommand for wallpaper background selector ───────────────────────────
+        public ICommand SelectWallpaperDefaultCommand { get; }
+        public ICommand SelectWallpaperCoolCommand { get; }
+        public ICommand SelectWallpaperQualityCommand { get; }
+        public ICommand SelectWallpaperExtraCommand { get; }
+
+        private async void OnSelectWallpaperDefault() => await SelectBackground(AppBackgroundService.BackgroundType.Default);
+        private async void OnSelectWallpaperCool() => await SelectBackground(AppBackgroundService.BackgroundType.Cool);
+        private async void OnSelectWallpaperQuality() => await SelectBackground(AppBackgroundService.BackgroundType.Quality);
+        private async void OnSelectWallpaperExtra() => await SelectBackground(AppBackgroundService.BackgroundType.Extra);
         public bool EnableSystemTrayOnClose
         {
             get => App.Settings.Prop.EnableSystemTrayOnClose;
@@ -196,6 +267,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ExperimentalViewModel()
         {
             SelectCrosshairColorCommand = new RelayCommand<string?>(SelectCrosshairColor);
+            SelectWallpaperDefaultCommand = new RelayCommand(OnSelectWallpaperDefault);
+            SelectWallpaperCoolCommand = new RelayCommand(OnSelectWallpaperCool);
+            SelectWallpaperQualityCommand = new RelayCommand(OnSelectWallpaperQuality);
+            SelectWallpaperExtraCommand = new RelayCommand(OnSelectWallpaperExtra);
         }
     }
 }
