@@ -29,12 +29,17 @@ namespace Bloxstrap.Integrations
         private Thread? _thread;
         private bool _isRunning = false;
 
+        public CrosshairService()
+        {
+            // Set Instance di constructor, jadi hotkey bisa akses meski Start() belum dipanggil.
+            // Thread + dispatcher cuma dibuat pas Start() — lazy initialization.
+            Instance = this;
+        }
+
         public void Start()
         {
             if (_isRunning)
                 return;
-
-            Instance = this;
 
             try
             {

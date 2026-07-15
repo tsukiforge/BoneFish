@@ -295,6 +295,10 @@
                     Data.TimeLeft = DateTime.Now;
                     History.Insert(0, Data);
 
+                    // Auto-prune: jaga biar History gak numpuk (>50 entries buang yang paling tua)
+                    if (History.Count > 50)
+                        History.RemoveRange(50, History.Count - 50);
+
                     InGame = false;
                     Data = new();
 

@@ -37,7 +37,9 @@ namespace Bloxstrap.Integrations
         {
             try
             {
-                // 1. Cek cache dulu (valid 5 menit)
+                // 1. Bersihin cache expired dulu (biar gak numpuk), baru cek cache
+                CleanupExpiredCache();
+
                 lock (_cacheLock)
                 {
                     if (_dnsCache.TryGetValue(hostname, out var cached))
@@ -191,6 +193,22 @@ namespace Bloxstrap.Integrations
         }
 
         public static int GetLastMeasuredLatency() => _networkLatency;
+
+        /// <summary>
+        /// Cleanup expired cache entries — dipanggil otomatis pas lookup biar gak numpuk.
+        /// </summary>
+        private static void CleanupExpiredCache()
+        {
+            lock (_cacheLock)
+            {
+                var expired = _dnsCache.Where(kv => (DateTime.UtcNow - kv.Value.Item2).TotalMinutes >= 5).Select(kv => kv.Key).ToList();
+                foreach (var key in expired)
+                    _dnsCache.Remove(key);
+
+                if (expired.Count > 0)
+                    App.Logger.WriteLine(LOG_IDENT, $"Cleaned up {expired.Count} expired DNS cache entries");
+            }
+        }
 
         /// <summary>
         /// Clear DNS cache (manual reset)
