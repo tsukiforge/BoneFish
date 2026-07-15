@@ -36,14 +36,19 @@ namespace Bloxstrap.Integrations
         /// </summary>
         public static HotkeyService? Instance { get; private set; }
 
+        public HotkeyService()
+        {
+            // Set Instance di constructor biar bisa diakses bahkan sebelum Start() dipanggil
+            // (sama kayak CrosshairService biar konsisten)
+            Instance = this;
+        }
+
         public void Start(Window? ownerWindow = null)
         {
             const string LOG_IDENT_FULL = "HotkeyService::Start";
 
             if (_registered)
                 return;
-
-            Instance = this;
 
             try
             {

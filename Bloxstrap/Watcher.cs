@@ -180,9 +180,16 @@ namespace Bloxstrap
             // Crosshair & Hotkeys adalah fitur INDEPENDEN — tidak butuh ActivityTracking.
             // Inisialisasi di sini (di luar blok EnableActivityTracking) agar tetap jalan
             // meski user matiin tracking atau log file Roblox gak ketemu.
-            App.Logger.WriteLine(LOG_IDENT, "Initializing Crosshair Service");
+            //
+            // ★ LAZY START: CrosshairService constructor cuma set Instance (biar hotkey bisa akses).
+            // Thread + dispatcher cuma dibuat kalo Start() dipanggil — yaitu kalo EnableCrosshair = true.
+            // Kalo crosshair mati, user tinggal pencet Ctrl+Shift+C → Toggle() → lazy-start otomatis.
             Crosshair = new CrosshairService();
-            Crosshair.Start();
+            if (App.Settings.Prop.EnableCrosshair)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Starting Crosshair Service");
+                Crosshair.Start();
+            }
 
             // Global hotkey service — register Ctrl+Shift+C/F/N
             if (App.Settings.Prop.EnableHotkeys)
