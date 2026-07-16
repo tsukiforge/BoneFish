@@ -1,5 +1,98 @@
 # BoneFish Changelog
 
+## v5.3.0 — Optimasi Total: Rounding Fix, HDD Detection, Custom Wallpaper, Memory Leak Fix 🚀
+
+Release date: 2026-07-12
+
+### 🎯 PART 1 — Optimasi Performa Laptop Low-End
+
+#### 🔧 Rounding Trap Fix — RAM 8GB Gak Kesiplah!
+
+Dulu: `totalMemGB = bytes / (1024^3)` → integer division truncate ke bawah. Laptop 8GB yang lapor 7.6GB (karena reserved BIOS/iGPU) kebaca jadi **7GB** → salah klasifikasi ke LowEnd! 😤
+
+**Sekarang:** Pake **MB comparison** dengan toleransi:
+- 8GB class → `totalMemMB >= 7800` (toleransi ~200MB reserved)
+- 16GB class → `totalMemMB >= 15600`
+- 4GB class → `totalMemMB < 3800`
+
+Laptop 8GB lo sekarang bener-bener kebaca sebagai **MidRange**! ✅
+
+#### 💾 HDD Detection — Bukan Tebak-Tebakan Lagi!
+
+Dulu: Tebak vendor name via WMI ("Samsung", "WDC", "Kingston" dll) — **sering salah**, apalagi kalo vendor bikin HDD + SSD.
+
+**Sekarang:** `DeviceIoControl` + `IOCTL_STORAGE_QUERY_PROPERTY` + `StorageDeviceSeekPenaltyProperty`:
+- Buka `\\.\C:` via `CreateFile` (volume handle, **gak perlu admin**)
+- Tanya driver storage: "lo punya seek penalty?" → `IncursSeekPenalty = 0` = **SSD**, `1` = **HDD**
+- **100% presisi**, zero dependencies (`System.Management` dihapus ✅)
+- Cache di static field — query cuma sekali seumur proses
+
+#### 🚀 HDD Balanced Preset — Otomatis Aktif!
+
+Kalo storage lo **HDD** + tier **LowEnd/MidRange** + belom pilih preset manual → **HDD Balanced otomatis ON**!
+
+**Basis visual:** SAMA dengan ExtremePerformance (FRM=3, texture rendah, SSAO off, LOD 250) — **sudah terbukti gak bikin game gelap**
+
+**+ I/O khusus HDD:**
+- Thread dibatasi (`FIntRuntimeMaxNumOfThreads=4`) — head HDD gak oleng
+- Async compression (`DFFlagEnableRequestAsyncCompression=True`) — aset cepet di-download
+- Texture compositor 2 thread (`DFIntTextureCompositorActiveJobs=2`) — komposisi lancar
+- FPS cap 30 — kurangi render frame = kurangi I/O pipeline
+- Telemetry mati total — kurangi write ke disk
+
+#### 💾 Persistence Fix — Setting Lo Gak Ilang Lagi!
+
+- **ForceExtremeMode** + **ExtremeModeFpsTarget**: Sekarang auto `Save()` tiap kali diubah 🛡️
+- **MainWindow closing**: `App.Settings.Save()` dipanggil **sebelum** window beneran nutup — gak ada lagi setting ilang 🎯
+
+### 🎨 PART 2 — Wallpaper System Overhaul
+
+#### 🖼️ WallpaperService.cs — **DIHAPUS!**
+
+Service yang ganti wallpaper **DESKTOP WINDOWS** lo (bukan background app) udah dihapus total. 0 references, 0 sisa.
+
+#### 🎨 Custom Background — Pake Gambar Lo Sendiri!
+
+Sekarang lo bisa pilih **gambar kustom** dari komputer lo sebagai wallpaper background BoneFish!
+
+**Cara pake:**
+1. Buka Settings → FastFlag New → Wallpaper Background
+2. Klik **Browse...** → pilih file `.jpg` / `.jpeg` / `.png`
+3. Langsung muncul! Background random mode otomatis mati
+
+**Validasi otomatis:** Kalo file ilang / rusak → fallback ke Default + log error
+
+#### 💾 Background Persistence — Gak Lupa Lagi!
+
+- `SelectedBackgroundType` + `BackgroundRandomMode` = background lo keinget terus
+- **Mode Random ON:** Ganti background tiap buka app
+- **Mode Random OFF:** Background tetap sesuai pilihan terakhir (Default/Cool/Quality/Extra/Custom)
+- **Startup auto-load:** Kalo random mode ON → random. Kalo ada saved type → load saved
+- **Exit pre-select:** Pas app ditutup, kalo random mode ON → pilih random untuk sesi berikutnya
+
+### 🧹 Memory Leak Fix — CrosshairService Lazy Start
+
+- **Dulu:** Thread + dispatcher CrosshairService jalan TERUS meski EnableCrosshair = false (boros ~2-5 MB)
+- **Sekarang:** `Instance` di-set di constructor, `Start()` cuma dipanggil kalo crosshair beneran ON
+- Hotkey `Ctrl+Shift+C` tetep bisa lazy-start via `Toggle()` 🎯
+
+### Files Changed (13 files)
+
+| File | Perubahan |
+|------|-----------|
+| `AutoOptimizeService.cs` | Rounding trap fix, DeviceIoControl HDD detection, HDD Balanced preset, `UserHasManualPreset()` |
+| `Bloxstrap.csproj` | Version 5.1.0 → 5.3.0, hapus `System.Management` NuGet |
+| `Settings.cs` | +`SelectedBackgroundType`, +`BackgroundRandomMode` |
+| `FastFlagsViewModel.cs` | +`try/catch Save()` di ForceExtremeMode + ExtremeModeFpsTarget |
+| `MainWindow.xaml.cs` | +`App.Settings.Save()` di Closing |
+| `AppBackgroundService.cs` | +Custom type, +GetCustomBackgroundAsync(), +`_customCache` |
+| `ExperimentalViewModel.cs` | +Custom/Browse commands, +LoadSavedBackgroundAsync(), +BackgroundRandomMode |
+| `ExperimentalPage.xaml` | +Custom row, +Browse button, +Mode Random toggle |
+| `App.xaml.cs` | +Startup pre-select, +exit pre-select di SoftTerminate() |
+| `WallpaperService.cs` | **DELETED** |
+
+---
+
 ## v5.1.0 — Crosshair, Hotkey, Turbo Mode, Wallpaper Restore + Memory Fix 🧹
 
 Release date: 2026-07-12

@@ -22,12 +22,16 @@ namespace Bloxstrap.Integrations
         // Cache biar gak loading ulang tiap kali ganti halaman
         private static readonly Dictionary<BackgroundType, BitmapImage?> _imageCache = new();
 
+        // Cache khusus custom background (pisah dari enum biar gak pake magic number)
+        private static BitmapImage? _customCache;
+
         public enum BackgroundType
         {
             Default = 0,
             Cool = 1,
             Quality = 2,
-            Extra = 3
+            Extra = 3,
+            Custom = 4
         }
 
         /// <summary>
@@ -43,20 +47,11 @@ namespace Bloxstrap.Integrations
                     if (_imageCache.TryGetValue(type, out var cached) && cached != null)
                         return cached;
 
-                    string wallpaperPath = Paths.ResolveWallpapersDir();
+                    string? imagePath = GetImagePath(type);
 
-                    string imagePath = type switch
+                    if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath))
                     {
-                        BackgroundType.Default => Path.Combine(wallpaperPath, "wallpapers.jpg"),
-                        BackgroundType.Cool => Path.Combine(wallpaperPath, "wallpapersC.jpg"),
-                        BackgroundType.Quality => Path.Combine(wallpaperPath, "wallpapersQ.jpg"),
-                        BackgroundType.Extra => Path.Combine(wallpaperPath, "wallpapersE.jpg"),
-                        _ => Path.Combine(wallpaperPath, "wallpapers.jpg")
-                    };
-
-                    if (!File.Exists(imagePath))
-                    {
-                        App.Logger.WriteLine(LOG_IDENT, $"Background image not found: {imagePath}");
+                        App.Logger.WriteLine(LOG_IDENT, $"Background image not found: {imagePath ?? "(path empty/null)"}");
                         return null;
                     }
 
@@ -88,13 +83,17 @@ namespace Bloxstrap.Integrations
         }
 
         /// <summary>
-        /// Get random background ASYNC
+        /// Get random background ASYNC — skip Custom karena itu pilihan user.
         /// </summary>
         public static async Task<BitmapImage?> GetRandomBackgroundAsync()
         {
             try
             {
-                var backgroundTypes = Enum.GetValues(typeof(BackgroundType)).Cast<BackgroundType>().ToList();
+                var backgroundTypes = Enum.GetValues(typeof(BackgroundType))
+                    .Cast<BackgroundType>()
+                    .Where(t => t != BackgroundType.Custom)
+                    .ToList();
+
                 var randomType = backgroundTypes[Random.Shared.Next(backgroundTypes.Count)];
 
                 App.Logger.WriteLine(LOG_IDENT, $"Selected random background: {randomType}");
@@ -108,11 +107,75 @@ namespace Bloxstrap.Integrations
         }
 
         /// <summary>
+        /// Get custom background ASYNC dari path yang disimpan di Settings.
+        /// Fallback ke Default kalo file gak ada / rusak.
+        /// </summary>
+        public static async Task<BitmapImage?> GetCustomBackgroundAsync()
+        {
+            try
+            {
+                string? customPath = App.Settings.Prop.CustomBackgroundPath;
+
+                if (string.IsNullOrEmpty(customPath) || !File.Exists(customPath))
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Custom background path invalid or not found: {customPath}. Falling back to Default.");
+                    return await GetBackgroundImageAsync(BackgroundType.Default);
+                }
+
+                // Cek cache custom dulu
+                if (_customCache != null)
+                    return _customCache;
+
+                byte[] imageBytes = await Task.Run(() => File.ReadAllBytes(customPath));
+
+                var bitmap = new BitmapImage();
+                using (var ms = new MemoryStream(imageBytes))
+                {
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.StreamSource = ms;
+                    bitmap.EndInit();
+                }
+                bitmap.Freeze();
+
+                _customCache = bitmap;
+                return bitmap;
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Error loading custom background: {ex.Message}. Falling back to Default.");
+                return await GetBackgroundImageAsync(BackgroundType.Default);
+            }
+        }
+
+        /// <summary>
         /// Get specific background ASYNC
         /// </summary>
         public static Task<BitmapImage?> GetBackgroundAsync(BackgroundType type)
         {
-            return GetBackgroundImageAsync(type);
+            return type == BackgroundType.Custom
+                ? GetCustomBackgroundAsync()
+                : GetBackgroundImageAsync(type);
+        }
+
+        /// <summary>
+        /// Resolve image path berdasarkan BackgroundType
+        /// </summary>
+        private static string? GetImagePath(BackgroundType type)
+        {
+            if (type == BackgroundType.Custom)
+                return App.Settings.Prop.CustomBackgroundPath;
+
+            string wallpaperPath = Paths.ResolveWallpapersDir();
+
+            return type switch
+            {
+                BackgroundType.Default => Path.Combine(wallpaperPath, "wallpapers.jpg"),
+                BackgroundType.Cool => Path.Combine(wallpaperPath, "wallpapersC.jpg"),
+                BackgroundType.Quality => Path.Combine(wallpaperPath, "wallpapersQ.jpg"),
+                BackgroundType.Extra => Path.Combine(wallpaperPath, "wallpapersE.jpg"),
+                _ => Path.Combine(wallpaperPath, "wallpapers.jpg")
+            };
         }
 
         /// <summary>
@@ -128,17 +191,12 @@ namespace Bloxstrap.Integrations
 
                     foreach (BackgroundType type in Enum.GetValues(typeof(BackgroundType)))
                     {
-                        string wallpaperPath = Paths.ResolveWallpapersDir();
-                        string imagePath = type switch
-                        {
-                            BackgroundType.Default => Path.Combine(wallpaperPath, "wallpapers.jpg"),
-                            BackgroundType.Cool => Path.Combine(wallpaperPath, "wallpapersC.jpg"),
-                            BackgroundType.Quality => Path.Combine(wallpaperPath, "wallpapersQ.jpg"),
-                            BackgroundType.Extra => Path.Combine(wallpaperPath, "wallpapersE.jpg"),
-                            _ => Path.Combine(wallpaperPath, "wallpapers.jpg")
-                        };
+                        if (type == BackgroundType.Custom)
+                            continue; // custom path divalidasi pas dipake, bukan di sini
 
-                        if (!File.Exists(imagePath))
+                        string? imagePath = GetImagePath(type);
+
+                        if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath))
                         {
                             App.Logger.WriteLine(LOG_IDENT, $"Missing background image: {type} at {imagePath}");
                             allExist = false;
@@ -146,7 +204,7 @@ namespace Bloxstrap.Integrations
                     }
 
                     if (allExist)
-                        App.Logger.WriteLine(LOG_IDENT, "All background images validated successfully");
+                        App.Logger.WriteLine(LOG_IDENT, "All built-in background images validated successfully");
 
                     return allExist;
                 }
@@ -164,6 +222,7 @@ namespace Bloxstrap.Integrations
         public static void ClearCache()
         {
             _imageCache.Clear();
+            _customCache = null;
         }
     }
 }

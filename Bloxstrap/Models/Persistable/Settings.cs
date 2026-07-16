@@ -98,5 +98,11 @@ namespace Bloxstrap.Models.Persistable
 
         // custom background
         public string CustomBackgroundPath { get; set; } = "";
+
+        // persistence untuk selected background type (Default/Cool/Quality/Extra/Custom)
+        public string SelectedBackgroundType { get; set; } = "";
+
+        // kalo true, background ganti random tiap buka app
+        public bool BackgroundRandomMode { get; set; } = true;
     }
 }

@@ -91,6 +91,27 @@ namespace Bloxstrap
 
             Logger.WriteLine("App::SoftTerminate", $"Terminating with exit code {exitCodeNum} ({exitCode})");
 
+            // Pre-select background untuk sesi berikutnya kalo random mode aktif
+            if (App.Settings?.Prop is not null && App.Settings.Prop.EnableWallpaperLauncher && App.Settings.Prop.BackgroundRandomMode)
+            {
+                try
+                {
+                    var types = (AppBackgroundService.BackgroundType[])Enum.GetValues(typeof(AppBackgroundService.BackgroundType));
+                    var nonCustomTypes = types.Where(t => t != AppBackgroundService.BackgroundType.Custom).ToList();
+                    if (nonCustomTypes.Count > 0)
+                    {
+                        var randomType = nonCustomTypes[Random.Shared.Next(nonCustomTypes.Count)];
+                        App.Settings.Prop.SelectedBackgroundType = randomType.ToString();
+                        App.Settings.Save();
+                        Logger.WriteLine("App::SoftTerminate", $"Pre-selected next background: {randomType}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.WriteLine("App::SoftTerminate", $"Failed to pre-select background: {ex.Message}");
+                }
+            }
+
             Current.Dispatcher.Invoke(() => Current.Shutdown(exitCodeNum));
         }
 
@@ -389,10 +410,25 @@ namespace Bloxstrap
                             bool isValid = await AppBackgroundService.ValidateBackgroundFilesAsync();
                             if (isValid)
                                 Logger.WriteLine(LOG_IDENT, "App background files validated");
+
+                            // Pre-load background untuk startup berikutnya
+                            // Kalo random mode ON, pilih random untuk sesi berikutnya
+                            if (App.Settings.Prop.BackgroundRandomMode)
+                            {
+                                var types = (AppBackgroundService.BackgroundType[])Enum.GetValues(typeof(AppBackgroundService.BackgroundType));
+                                var nonCustomTypes = types.Where(t => t != AppBackgroundService.BackgroundType.Custom).ToList();
+                                if (nonCustomTypes.Count > 0)
+                                {
+                                    var randomType = nonCustomTypes[Random.Shared.Next(nonCustomTypes.Count)];
+                                    App.Settings.Prop.SelectedBackgroundType = randomType.ToString();
+                                    try { App.Settings.Save(); } catch { }
+                                    Logger.WriteLine(LOG_IDENT, $"Pre-selected next background: {randomType} (random mode)");
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {
-                            Logger.WriteLine(LOG_IDENT, $"App background validation failed: {ex.Message}");
+                            Logger.WriteLine(LOG_IDENT, $"App background initialization failed: {ex.Message}");
                         }
                     });
                 }

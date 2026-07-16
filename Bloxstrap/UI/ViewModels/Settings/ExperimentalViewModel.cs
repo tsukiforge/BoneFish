@@ -24,6 +24,21 @@ namespace Bloxstrap.UI.ViewModels.Settings
             set { _isBackgroundLoading = value; OnPropertyChanged(nameof(IsBackgroundLoading)); }
         }
 
+        public bool BackgroundRandomMode
+        {
+            get => App.Settings.Prop.BackgroundRandomMode;
+            set
+            {
+                App.Settings.Prop.BackgroundRandomMode = value;
+                OnPropertyChanged(nameof(BackgroundRandomMode));
+                try { App.Settings.Save(); } catch { }
+
+                // Kalo random mode diaktifkan, langsung ganti random
+                if (value && EnableWallpaperLauncher)
+                    _ = LoadRandomBackgroundAsync();
+            }
+        }
+
         public bool EnableWallpaperLauncher
         {
             get => App.Settings.Prop.EnableWallpaperLauncher;
@@ -34,7 +49,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 try { App.Settings.Save(); } catch { }
 
                 if (value)
-                    _ = LoadRandomBackgroundAsync();
+                {
+                    // Load sesuai mode: random atau saved
+                    if (App.Settings.Prop.BackgroundRandomMode || string.IsNullOrEmpty(App.Settings.Prop.SelectedBackgroundType))
+                        _ = LoadRandomBackgroundAsync();
+                    else
+                        _ = LoadSavedBackgroundAsync();
+                }
                 else
                     BackgroundImage = null;
             }
@@ -49,6 +70,50 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try
             {
                 BackgroundImage = await AppBackgroundService.GetRandomBackgroundAsync();
+                
+                // Save ke Settings biar kalo random mode mati, background tetap
+                App.Settings.Prop.SelectedBackgroundType = "Random";
+                try { App.Settings.Save(); } catch { }
+            }
+            finally
+            {
+                IsBackgroundLoading = false;
+            }
+        }
+
+        public async Task LoadSavedBackgroundAsync()
+        {
+            if (!EnableWallpaperLauncher)
+                return;
+
+            string savedType = App.Settings.Prop.SelectedBackgroundType;
+            if (string.IsNullOrEmpty(savedType) || savedType == "Random")
+            {
+                // Belum pernah milih atau mode random → random
+                await LoadRandomBackgroundAsync();
+                return;
+            }
+
+            IsBackgroundLoading = true;
+            try
+            {
+                if (App.Settings.Prop.BackgroundRandomMode)
+                {
+                    // Random mode aktif: load random aja
+                    await LoadRandomBackgroundAsync();
+                }
+                else if (savedType == "Custom")
+                {
+                    BackgroundImage = await AppBackgroundService.GetCustomBackgroundAsync();
+                }
+                else if (Enum.TryParse<AppBackgroundService.BackgroundType>(savedType, out var parsedType))
+                {
+                    BackgroundImage = await AppBackgroundService.GetBackgroundAsync(parsedType);
+                }
+                else
+                {
+                    await LoadRandomBackgroundAsync();
+                }
             }
             finally
             {
@@ -62,6 +127,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try
             {
                 BackgroundImage = await AppBackgroundService.GetBackgroundAsync(type);
+                
+                // Persistence: simpan pilihan user
+                App.Settings.Prop.SelectedBackgroundType = type.ToString();
+                App.Settings.Prop.BackgroundRandomMode = false;
+                try { App.Settings.Save(); } catch { }
             }
             finally
             {
@@ -74,11 +144,47 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ICommand SelectWallpaperCoolCommand { get; }
         public ICommand SelectWallpaperQualityCommand { get; }
         public ICommand SelectWallpaperExtraCommand { get; }
+        public ICommand SelectWallpaperCustomCommand { get; }
+        public ICommand BrowseCustomBackgroundCommand { get; }
 
         private async void OnSelectWallpaperDefault() => await SelectBackground(AppBackgroundService.BackgroundType.Default);
         private async void OnSelectWallpaperCool() => await SelectBackground(AppBackgroundService.BackgroundType.Cool);
         private async void OnSelectWallpaperQuality() => await SelectBackground(AppBackgroundService.BackgroundType.Quality);
         private async void OnSelectWallpaperExtra() => await SelectBackground(AppBackgroundService.BackgroundType.Extra);
+        private async void OnSelectWallpaperCustom() => await SelectBackground(AppBackgroundService.BackgroundType.Custom);
+
+        private void OnBrowseCustomBackground()
+        {
+            try
+            {
+                var dialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Pilih gambar background kustom",
+                    Filter = "File gambar (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png|Semua file (*.*)|*.*",
+                    CheckFileExists = true,
+                    Multiselect = false
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    string selectedPath = dialog.FileName;
+                    App.Settings.Prop.CustomBackgroundPath = selectedPath;
+                    App.Settings.Prop.SelectedBackgroundType = "Custom";
+                    App.Settings.Prop.BackgroundRandomMode = false;
+                    try { App.Settings.Save(); } catch { }
+
+                    // Clear cache biar load ulang
+                    AppBackgroundService.ClearCache();
+
+                    // Load selected custom background
+                    _ = SelectBackground(AppBackgroundService.BackgroundType.Custom);
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine("ExperimentalViewModel", $"Browse custom background error: {ex.Message}");
+            }
+        }
         public bool EnableSystemTrayOnClose
         {
             get => App.Settings.Prop.EnableSystemTrayOnClose;
@@ -271,11 +377,18 @@ namespace Bloxstrap.UI.ViewModels.Settings
             SelectWallpaperCoolCommand = new RelayCommand(OnSelectWallpaperCool);
             SelectWallpaperQualityCommand = new RelayCommand(OnSelectWallpaperQuality);
             SelectWallpaperExtraCommand = new RelayCommand(OnSelectWallpaperExtra);
+            SelectWallpaperCustomCommand = new RelayCommand(OnSelectWallpaperCustom);
+            BrowseCustomBackgroundCommand = new RelayCommand(OnBrowseCustomBackground);
 
             // Auto-load wallpaper pas halaman ini di-load
+            // Pake persistence: kalo random mode ON atau belom pernah milih → random
+            // Kalo ada saved type → load sesuai saved type
             if (App.Settings.Prop.EnableWallpaperLauncher)
             {
-                _ = LoadRandomBackgroundAsync();
+                if (App.Settings.Prop.BackgroundRandomMode || string.IsNullOrEmpty(App.Settings.Prop.SelectedBackgroundType))
+                    _ = LoadRandomBackgroundAsync();
+                else
+                    _ = LoadSavedBackgroundAsync();
             }
         }
     }
