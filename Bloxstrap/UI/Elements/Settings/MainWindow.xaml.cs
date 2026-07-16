@@ -136,6 +136,13 @@ namespace Bloxstrap.UI.Elements.Settings
                     e.Cancel = true;
             }
 
+            // Save settings sebelum window benar-benar close
+            // App.Settings.Save() idempotent — aman dipanggil berkali-kali
+            if (!e.Cancel)
+            {
+                try { App.Settings.Save(); } catch { }
+            }
+
             _state.Width = this.Width;
             _state.Height = this.Height;
 
