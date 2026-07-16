@@ -226,9 +226,21 @@
 
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Extra" VerticalAlignment="Center" />
                     <ui:Button Grid.Row="3" Grid.Column="1" Content="Pilih" Command="{Binding SelectWallpaperExtraCommand}" />
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Custom" VerticalAlignment="Center" Margin="0,8,0,4" />
+                    <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,8,0,4">
+                        <ui:Button Content="Pilih" Command="{Binding SelectWallpaperCustomCommand}" Margin="0,0,8,0" />
+                        <ui:Button Content="Browse..." Command="{Binding BrowseCustomBackgroundCommand}" />
+                    </StackPanel>
                 </Grid>
             </StackPanel>
         </Border>
+
+        <controls:OptionControl 
+            Header="Mode Random" 
+            Description="Ganti background otomatis setiap kali aplikasi dibuka. Matikan untuk pakai background tetap.">
+            <ui:ToggleSwitch IsChecked="{Binding BackgroundRandomMode, Mode=TwoWay}" />
+        </controls:OptionControl>
 
     </StackPanel>
 </ui:UiPage>

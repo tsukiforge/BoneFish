@@ -277,6 +277,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.Settings.Prop.ForceExtremeMode = value;
                 OnPropertyChanged(nameof(ForceExtremeMode));
+                try { App.Settings.Save(); } catch { }
             }
         }
 
@@ -291,6 +292,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.Settings.Prop.ExtremeModeFpsTarget = Math.Clamp(value, 24, 60);
                 OnPropertyChanged(nameof(ExtremeModeFpsTarget));
+                try { App.Settings.Save(); } catch { }
             }
         }
 
