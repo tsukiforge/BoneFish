@@ -144,14 +144,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ICommand SelectWallpaperCoolCommand { get; }
         public ICommand SelectWallpaperQualityCommand { get; }
         public ICommand SelectWallpaperExtraCommand { get; }
-        public ICommand SelectWallpaperCustomCommand { get; }
         public ICommand BrowseCustomBackgroundCommand { get; }
 
         private async void OnSelectWallpaperDefault() => await SelectBackground(AppBackgroundService.BackgroundType.Default);
         private async void OnSelectWallpaperCool() => await SelectBackground(AppBackgroundService.BackgroundType.Cool);
         private async void OnSelectWallpaperQuality() => await SelectBackground(AppBackgroundService.BackgroundType.Quality);
         private async void OnSelectWallpaperExtra() => await SelectBackground(AppBackgroundService.BackgroundType.Extra);
-        private async void OnSelectWallpaperCustom() => await SelectBackground(AppBackgroundService.BackgroundType.Custom);
 
         private void OnBrowseCustomBackground()
         {
@@ -377,7 +375,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
             SelectWallpaperCoolCommand = new RelayCommand(OnSelectWallpaperCool);
             SelectWallpaperQualityCommand = new RelayCommand(OnSelectWallpaperQuality);
             SelectWallpaperExtraCommand = new RelayCommand(OnSelectWallpaperExtra);
-            SelectWallpaperCustomCommand = new RelayCommand(OnSelectWallpaperCustom);
             BrowseCustomBackgroundCommand = new RelayCommand(OnBrowseCustomBackground);
 
             // Auto-load wallpaper pas halaman ini di-load
