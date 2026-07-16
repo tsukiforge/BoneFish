@@ -1,5 +1,123 @@
 # BoneFish Changelog
 
+## v5.3.1 — HDD-Path Dedup + Hilangkan Tombol 'Pilih' Redundan 🧹
+
+Release date: 2026-07-16
+
+Hotfix v5.3.0 — review paska-push nemu 2 isu, dua-duanya di-address di sini: refactor kecil di AutoOptimizeService untuk hapus duplikasi ~37 baris flag, plus bug UX minor di halaman Wallpaper Custom yang bisa bikin user ngira fitur rusak.
+
+### 🧹 PART 1 — HDD-Path Deduplication (Refactor)
+
+#### 🐛 Isu yang Ditemukan Saat Review
+
+Pas review v5.3.0, ketauan: `ApplyHDDBalancedOptimizations()` itu **copy-paste** dari `ApplyAggressiveOptimizations()` — ~37 baris `App.FastFlags.SetValue(...)` di-duplikasi manual, cuma beda dikit di FPS cap & branch telemetry. Kalau besok ada yang update satu FastFlag (mis. ganti nilai `DFIntDebugFRMQualityLevelOverride`), harus inget update di 2 tempat — **kalau lupa satu**, dua preset jadi nggak sinkron diam-diam. Persis jenis dead-code-adjacent risk yang harusnya kita hindarin dari awal.
+
+#### 🔧 Fix: HDD Method Jadi Delegasi Penuh
+
+Bukan duplikasi lagi — `ApplyHDDBalancedOptimizations()` sekarang cuma manggil `ApplyAggressiveOptimizations(tier: SystemTier.LowEnd, hddIoTweaks: true, bypassLowEndGuard: true)` sebagai delegasi penuh:
+
+```csharp
+public static void ApplyHDDBalancedOptimizations()
+{
+    try
+    {
+        ApplyAggressiveOptimizations(tier: SystemTier.LowEnd,
+                                     hddIoTweaks: true,
+                                     bypassLowEndGuard: true);
+    }
+    catch (Exception ex)
+    {
+        App.Logger.WriteLine(LOG_IDENT, $"Error applying HDD balanced optimizations: {ex.Message}");
+    }
+}
+```
+
+Dua parameter opsional baru di `ApplyAggressiveOptimizations(...)`:
+
+- **`hddIoTweaks = false`** (default) — branch baru `else if (hddIoTweaks)` di tier picker, setelah base flag diterapkan, set 3 HDD-specific flag:
+  - `DFIntTextureCompositorActiveJobs=2` — komposisi atlas 2 thread (vs UltraLow=1, base LowEnd=tidak di-set)
+  - `FIntRenderLocalLightUpdatesMax=4` — light update max tetap ringan (seperti UltraOrExtreme)
+  - `FIntRenderLocalLightUpdatesMin=2` — light update min (seperti UltraOrExtreme)
+- **`bypassLowEndGuard = false`** (default) — wraps 2 early-return guards (`OptimizeForLowEnd` check + `UserHasManualPreset()` check) jadi `if (!bypassLowEndGuard) { ... }`. HDD path real precondition-nya: HDD detected + tier LowEnd/MidRange, tapi **bukan** `OptimizeForLowEnd=true` — jadi butuh bypass biar jalan sebelum user toggle "Optimalkan untuk perangkat low-end" ON.
+
+#### 📋 Verifikasi: 33 FastFlag Identik
+
+Side-by-side comparison OLD vs NEW `ApplyHDDBalancedOptimizations()` memastikan output **100% identik** — semua 33 flag yang di-set di OLD method tetap di-set dengan **nilai yang sama persis**:
+
+| # | Flag | OLD | NEW | Path di kode baru |
+|---|------|-----|-----|-------------------|
+| 1 | DFFlagTextureQualityOverrideEnabled | True | True | base |
+| 2 | DFIntTextureQualityOverride | 0 | 0 | base |
+| 3 | FIntTextureCompositorLowResFactor | 1 | 1 | base |
+| 4 | DFIntDebugFRMQualityLevelOverride | 3 | 3 | base |
+| 5 | FIntRomarkStartWithGraphicQualityLevel | 1 | 1 | base |
+| 6 | FFlagDebugSSAOForce | False | False | base |
+| 7 | FIntSSAOMipLevels | 0 | 0 | base |
+| 8 | FIntRobloxGuiBlurIntensity | 0 | 0 | base |
+| 9 | FIntRenderGrainScale | 0 | 0 | base |
+| 10 | DFIntCSGLevelOfDetailSwitchingDistance | 250 | 250 | base |
+| 11 | DFIntCSGLevelOfDetailSwitchingDistanceL12 | 250 | 250 | base |
+| 12 | DFIntCSGLevelOfDetailSwitchingDistanceL23 | 250 | 250 | base (not extreme → 250) |
+| 13 | DFIntCSGLevelOfDetailSwitchingDistanceL34 | 250 | 250 | base (not extreme → 250) |
+| 14 | DFIntCSGLevelOfDetailSwitchingDistanceStatic | 0 | 0 | base |
+| 15 | DFIntCSGv2LodsToGenerate | 0 | 0 | base |
+| 16 | FIntTerrainArraySliceSize | 0 | 0 | base |
+| 17 | FIntMaxBatchesPerFlush | 5000 | 5000 | base |
+| 18 | DFIntMaxFrameBufferSize | 4 | 4 | base |
+| 19 | FIntRuntimeMaxNumOfThreads | 4 | 4 | base |
+| 20 | DFFlagEnableRequestAsyncCompression | True | True | base |
+| 21 | **DFIntTextureCompositorActiveJobs** | **2** | **2** | **new `else if (hddIoTweaks)` branch** |
+| 22 | DFIntTaskSchedulerTargetFps | 30 | 30 | base (LowEnd → "30") |
+| 23 | DFIntMaxActiveAnimationTracks | 32 | 32 | base |
+| 24 | FIntRenderLocalLightFadeInMs | 0 | 0 | base |
+| 25 | **FIntRenderLocalLightUpdatesMax** | **4** | **4** | **new `else if (hddIoTweaks)` branch** |
+| 26 | **FIntRenderLocalLightUpdatesMin** | **2** | **2** | **new `else if (hddIoTweaks)` branch** |
+| 27 | FFlagDebugDisableTelemetryEphemeralCounter | True | True | base |
+| 28 | FFlagDebugDisableTelemetryEphemeralStat | True | True | base |
+| 29 | FFlagDebugDisableTelemetryEventIngest | True | True | base |
+| 30 | FFlagDebugDisableTelemetryPoint | True | True | base |
+| 31 | FFlagDebugDisableTelemetryV2Counter | True | True | base |
+| 32 | FFlagDebugDisableTelemetryV2Event | True | True | base |
+| 33 | FFlagDebugDisableTelemetryV2Stat | True | True | base |
+
+Zero drift, zero flag yang hilang, zero behavioural change — lo bisa update satu FastFlag di `ApplyAggressiveOptimizations()` sekarang dengan yakin HDD path ikut konsisten otomatis. ✅
+
+### 🎨 PART 2 — UX Fix: Tombol 'Pilih' Redundan di Custom Wallpaper
+
+#### 🐛 Bug UX yang Bikin User Ngira Fitur Rusak
+
+Di `ExperimentalPage.xaml` baris "Custom": ada **dua tombol** — "Pilih" 🆚 "Browse...". Tombol "Pilih" manggil `SelectBackground(BackgroundType.Custom)` langsung **tanpa buka file picker**.
+
+**Skenario yang bikin user bingung:**
+
+1. User klik "Pilih" **dulu** sebelum pernah klik "Browse..."
+2. `CustomBackgroundPath` masih kosong
+3. `AppBackgroundService.GetCustomBackground()` diam-diam fallback ke Default wallpaper 🫥
+4. **Nggak ada snackbar, nggak ada error log** — user cuma lihat gambar Default
+5. User ngira fitur Custom background **rusak** → complain di GitHub issue
+
+#### 🔧 Fix Opsi A — Hapus Tombol 'Pilih'
+
+Paling konsisten dengan pola command lain di ViewModel (semua command laen butuh file picker / toggle UI):
+
+- ✅ **Hapus** tombol "Pilih" di baris Custom → cukup **satu tombol "Browse..."** saja
+- ✅ **Hapus** `SelectWallpaperCustomCommand` ICommand property
+- ✅ **Hapus** `OnSelectWallpaperCustom` method
+- ✅ **Hapus** constructor init: `SelectWallpaperCustomCommand = new RelayCommand(OnSelectWallpaperCustom)`
+- ✅ Tambah `RowDefinition` ke-5 di wallpaper Grid (Default/Cool/Quality/Extra/Custom)
+
+Lo yang sebelumnya udah pernah set Custom background **gak kehilangan apa-apa** — `LoadSavedBackgroundAsync()` di `ExperimentalViewModel.OnNavigatedTo()` tetap load `CustomBackgroundPath` dari disk dan panggil `SelectBackground(Custom)` di belakang layar, jadi Custom wallpaper otomatis muncul lagi tiap buka halaman FastFlag New.
+
+### Files Changed (3 files)
+
+| File | Perubahan |
+|------|-----------|
+| `Bloxstrap/Integrations/AutoOptimizeService.cs` | +2 params (`hddIoTweaks`, `bypassLowEndGuard`), refactor HDD wrapper jadi delegasi penuh, −53 net lines |
+| `Bloxstrap/UI/Elements/Settings/Pages/ExperimentalPage.xaml` | −1 tombol "Pilih" di baris Custom, +1 `RowDefinition` untuk row baru Custom |
+| `Bloxstrap/UI/ViewModels/Settings/ExperimentalViewModel.cs` | −`SelectWallpaperCustomCommand`, −`OnSelectWallpaperCustom`, −constructor init |
+
+---
+
 ## v5.3.0 — Optimasi Total: Rounding Fix, HDD Detection, Custom Wallpaper, Memory Leak Fix 🚀
 
 Release date: 2026-07-12
