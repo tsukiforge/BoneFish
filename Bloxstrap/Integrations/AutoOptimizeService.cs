@@ -320,17 +320,23 @@ namespace Bloxstrap.Integrations
             }
         }
 
-        public static void ApplyAggressiveOptimizations(SystemTier? tier = null)
+        public static void ApplyAggressiveOptimizations(
+            SystemTier? tier = null,
+            bool hddIoTweaks = false,
+            bool bypassLowEndGuard = false)
         {
             try
             {
-                if (!App.Settings.Prop.OptimizeForLowEnd)
-                    return;
-
-                if (UserHasManualPreset())
+                if (!bypassLowEndGuard)
                 {
-                    App.Logger.WriteLine(LOG_IDENT, "User has manual preset — skipping aggressive overrides to respect user choice.");
-                    return;
+                    if (!App.Settings.Prop.OptimizeForLowEnd)
+                        return;
+
+                    if (UserHasManualPreset())
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, "User has manual preset — skipping aggressive overrides to respect user choice.");
+                        return;
+                    }
                 }
 
                 tier ??= DetectSystemTier();
@@ -402,6 +408,15 @@ namespace Bloxstrap.Integrations
                     string label = isExtreme ? "ExtremePerformance (Potato Mode)" : "UltraLow";
                     App.Logger.WriteLine(LOG_IDENT, $"Aggressive optimizations applied for {label}");
                 }
+                else if (hddIoTweaks)
+                {
+                    // HDD-specific I/O tweaks (only applied on top of LowEnd base, never Ultra/Extreme)
+                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
+                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
+                    App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "2");
+
+                    App.Logger.WriteLine(LOG_IDENT, "Rendering optimizations applied for low-end (with HDD I/O tweaks)");
+                }
                 else
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Rendering optimizations applied for low-end");
@@ -413,56 +428,21 @@ namespace Bloxstrap.Integrations
             }
         }
 
+        // HDD-path delegates ke ApplyAggressiveOptimizations supaya tidak ada duplikasi flag.
+        // bypassLowEndGuard=true karena caller (CheckAndApply) memanggil ini justru saat OptimizeForLowEnd masih FALSE
+        // (HDD + LowEnd/MidRange tier, !OptimizeForLowEnd, !UserHasManualPreset()).
+        // hddIoTweaks=true menyebabkan tambahan 3 flag HDD-specific di akhir apply base:
+        //   DFIntTextureCompositorActiveJobs=2 (vs UltraLow=1 vs LowEnd=unset)
+        //   FIntRenderLocalLightUpdatesMax=4, FIntRenderLocalLightUpdatesMin=2 (seperti UltraOrExtreme tapi tanpa side-effect FPS/Notifications)
         public static void ApplyHDDBalancedOptimizations()
         {
             try
             {
-                PurgeAllKnownFlags();
-
-                App.FastFlags.SetValue("DFFlagTextureQualityOverrideEnabled", "True");
-                App.FastFlags.SetValue("DFIntTextureQualityOverride", "0");
-                App.FastFlags.SetValue("FIntTextureCompositorLowResFactor", "1");
-
-                App.FastFlags.SetValue("DFIntDebugFRMQualityLevelOverride", "3");
-                App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
-
-                App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
-                App.FastFlags.SetValue("FIntSSAOMipLevels", "0");
-
-                App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
-                App.FastFlags.SetValue("FIntRenderGrainScale", "0");
-
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
-                App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
-
-                App.FastFlags.SetValue("FIntTerrainArraySliceSize", "0");
-                App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
-                App.FastFlags.SetValue("DFIntMaxFrameBufferSize", "4");
-
-                // ── HDD-SPECIFIC I/O ──────────────────────────────────────────────────
-                App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", "4");
-                App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
-                App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "2");
-                App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
-
-                App.FastFlags.SetValue("DFIntMaxActiveAnimationTracks", "32");
-                App.FastFlags.SetValue("FIntRenderLocalLightFadeInMs", "0");
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
-
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralCounter", "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralStat",    "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryEventIngest",      "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryPoint",            "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Counter",        "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Event",          "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Stat",           "True");
-
-                App.Logger.WriteLine(LOG_IDENT, "HDD Balanced optimizations applied (ExtremePerformance base + HDD I/O tweaks)");
+                App.Logger.WriteLine(LOG_IDENT, "HDD Balanced optimizations applied (LowEnd base + HDD I/O tweaks)");
+                ApplyAggressiveOptimizations(
+                    tier: SystemTier.LowEnd,
+                    hddIoTweaks: true,
+                    bypassLowEndGuard: true);
             }
             catch (Exception ex)
             {
