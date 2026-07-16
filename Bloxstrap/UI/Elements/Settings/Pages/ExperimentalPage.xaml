@@ -209,6 +209,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -228,10 +229,7 @@
                     <ui:Button Grid.Row="3" Grid.Column="1" Content="Pilih" Command="{Binding SelectWallpaperExtraCommand}" />
 
                     <TextBlock Grid.Row="4" Grid.Column="0" Text="Custom" VerticalAlignment="Center" Margin="0,8,0,4" />
-                    <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,8,0,4">
-                        <ui:Button Content="Pilih" Command="{Binding SelectWallpaperCustomCommand}" Margin="0,0,8,0" />
-                        <ui:Button Content="Browse..." Command="{Binding BrowseCustomBackgroundCommand}" />
-                    </StackPanel>
+                    <ui:Button Grid.Row="4" Grid.Column="1" Content="Browse..." Command="{Binding BrowseCustomBackgroundCommand}" Margin="0,8,0,4" />
                 </Grid>
             </StackPanel>
         </Border>
