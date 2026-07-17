@@ -29,7 +29,29 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
         public bool IsNotApplying => !IsApplying;
 
-        public event EventHandler? RequestPageReloadEvent;
+        public event EventHandler? RequestPageReloadEvent
+        {
+            add
+            {
+                _requestPageReloadEvent += value;
+            }
+            remove
+            {
+                _requestPageReloadEvent -= value;
+            }
+        }
+        private event EventHandler? _requestPageReloadEvent;
+
+        /// <summary>
+        /// Memicu RequestPageReloadEvent dan refresh SystemInfo.
+        /// </summary>
+        private void OnRequestPageReload()
+        {
+            RefreshSystemInfo();
+            _requestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+        }
+
+        // Ganti semua pemanggilan RequestPageReloadEvent?.Invoke dengan OnRequestPageReload()
         
         public event EventHandler? OpenFlagEditorEvent;
 
@@ -203,7 +225,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     _preResetFlags = null;
                 }
 
-                RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+                OnRequestPageReload();
             }
         }
 
@@ -242,6 +264,31 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", null);
                 }
                 OnPropertyChanged(nameof(EnableLowMemoryMode));
+            }
+        }
+
+        // ── System Info (Fitur C) ──────────────────────────────────────────────────
+        /// <summary>
+        /// Informasi sistem: CPU, RAM, storage type, tier — dari AutoOptimizeService.
+        /// Dipanggil ulang setiap kali RequestPageReloadEvent terpicu.
+        /// </summary>
+        public string SystemInfoText { get; private set; } = LoadSystemInfo();
+
+        public void RefreshSystemInfo()
+        {
+            SystemInfoText = LoadSystemInfo();
+            OnPropertyChanged(nameof(SystemInfoText));
+        }
+
+        private static string LoadSystemInfo()
+        {
+            try
+            {
+                return Integrations.AutoOptimizeService.GetSystemInfo();
+            }
+            catch
+            {
+                return "System info unavailable";
             }
         }
 
@@ -327,7 +374,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
             VerifyAndNotify("Auto-Optimize");
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            OnRequestPageReload();
         }
 
         private void ApplyRecommendedNetworkSettings()
@@ -345,7 +392,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
             Notify("Auto-optimize jaringan & No Delay telah diterapkan.");
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            OnRequestPageReload();
         }
 
         private void ApplyRecommendedStabilityPreset()
@@ -388,7 +435,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
             VerifyAndNotify("Stable");
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            OnRequestPageReload();
         }
 
         private void ApplyUltraLowSpecPreset()
@@ -452,7 +499,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.Settings.Save(); } catch { }
 
             VerifyAndNotify("Ultra Low");
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            OnRequestPageReload();
         }
 
         private void ApplyBalancedPreset()
@@ -492,7 +539,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
             VerifyAndNotify("Balanced");
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            OnRequestPageReload();
         }
 
         /// <summary>
@@ -636,7 +683,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.Settings.Save(); } catch { }
 
             VerifyAndNotify("Potato Mode");
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            OnRequestPageReload();
         }
 
         // ── Flag Verification ──────────────────────────────────────────────────────────────
@@ -817,7 +864,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             try { App.Settings.Save(); } catch { }
 
             Notify("✅ ClientAppSettings berhasil dibersihkan. Pilih preset untuk memulai ulang.");
-            RequestPageReloadEvent?.Invoke(this, EventArgs.Empty);
+            OnRequestPageReload();
         }
 
         // ── Night Vision ──────────────────────────────────────────────────────────────────

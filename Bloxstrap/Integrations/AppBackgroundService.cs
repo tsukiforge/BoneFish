@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Threading.Tasks;
 
@@ -14,6 +15,9 @@ namespace Bloxstrap.Integrations
     ///
     /// ★ FIX LOADING: Sekarang loading pakai MemoryStream + background thread
     ///   Jadi UI thread gak nge-block pas baca file dari disk! ★
+    ///
+    /// ★ Global Wallpaper: BackgroundImage sekarang bisa diakses secara global
+    ///   untuk ditampilkan di MainWindow (semua halaman + navigasi). ★
     /// </summary>
     public class AppBackgroundService
     {
@@ -24,6 +28,29 @@ namespace Bloxstrap.Integrations
 
         // Cache khusus custom background (pisah dari enum biar gak pake magic number)
         private static BitmapImage? _customCache;
+
+        // ── Global Background untuk MainWindow (semua halaman + navigasi) ───────
+        /// <summary>
+        /// Background image global — di-set oleh ExperimentalViewModel dan
+        /// di-consume oleh MainWindow untuk ditampilkan di belakang semua halaman.
+        /// </summary>
+        public static BitmapImage? CurrentBackgroundImage { get; private set; }
+
+        /// <summary>
+        /// Fired setiap kali CurrentBackgroundImage berubah.
+        /// MainWindow subscribe ke event ini untuk update background.
+        /// </summary>
+        public static event EventHandler? BackgroundChanged;
+
+        /// <summary>
+        /// Set background global dan fire event.
+        /// Dipanggil oleh ExperimentalViewModel setelah load wallpaper.
+        /// </summary>
+        public static void SetGlobalBackground(BitmapImage? image)
+        {
+            CurrentBackgroundImage = image;
+            BackgroundChanged?.Invoke(null, EventArgs.Empty);
+        }
 
         public enum BackgroundType
         {
@@ -108,7 +135,7 @@ namespace Bloxstrap.Integrations
 
         /// <summary>
         /// Get custom background ASYNC dari path yang disimpan di Settings.
-        /// Fallback ke Default kalo file gak ada / rusak.
+        /// Fallback ke folder images/img/ kalo path kosong, lalu ke Default kalo gak ada.
         /// </summary>
         public static async Task<BitmapImage?> GetCustomBackgroundAsync()
         {
@@ -116,10 +143,21 @@ namespace Bloxstrap.Integrations
             {
                 string? customPath = App.Settings.Prop.CustomBackgroundPath;
 
+                // ★ FALLBACK: jika CustomBackgroundPath kosong, scan folder images/img/
                 if (string.IsNullOrEmpty(customPath) || !File.Exists(customPath))
                 {
-                    App.Logger.WriteLine(LOG_IDENT, $"Custom background path invalid or not found: {customPath}. Falling back to Default.");
-                    return await GetBackgroundImageAsync(BackgroundType.Default);
+                    string[] userImages = Paths.GetCustomUserImages();
+                    if (userImages.Length > 0)
+                    {
+                        // Pilih gambar pertama dari folder images/img/
+                        customPath = userImages[0];
+                        App.Logger.WriteLine(LOG_IDENT, $"Custom path empty, using fallback: {customPath}");
+                    }
+                    else
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, $"Custom background path invalid/empty. No fallback images in images/img/. Falling to Default.");
+                        return await GetBackgroundImageAsync(BackgroundType.Default);
+                    }
                 }
 
                 // Cek cache custom dulu

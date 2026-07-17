@@ -141,6 +141,79 @@ namespace Bloxstrap
 
         }
 
+        /// <summary>
+        /// Perbaiki shortcut Desktop dan Start Menu agar menunjuk ke Paths.Application yang benar.
+        /// Berguna jika shortcut rusak/mengarah ke exe lama setelah update.
+        /// </summary>
+        /// <returns>Jumlah shortcut yang diperbaiki</returns>
+        public static int RepairShortcuts()
+        {
+            const string LOG_IDENT = "Installer::RepairShortcuts";
+            int repaired = 0;
+
+            var shortcutsToCheck = new[]
+            {
+                (Path: DesktopShortcut, Name: "Desktop"),
+                (Path: StartMenuShortcut, Name: "Start Menu")
+            };
+
+            foreach (var (shortcutPath, shortcutName) in shortcutsToCheck)
+            {
+                try
+                {
+                    bool needsRepair = false;
+
+                    if (!File.Exists(shortcutPath))
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, $"{shortcutName} shortcut not found — will create.");
+                        needsRepair = true;
+                    }
+                    else
+                    {
+                        // Baca target shortcut yang ada
+                        var existing = ShellLink.Shortcut.ReadFromFile(shortcutPath);
+                        string? currentTarget = existing?.ExtraData?.EnvironmentVariableDataBlock?.TargetUnicode;
+
+                        if (string.IsNullOrEmpty(currentTarget) ||
+                            !currentTarget.Equals(Paths.Application, StringComparison.OrdinalIgnoreCase))
+                        {
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"{shortcutName} shortcut points to '{currentTarget ?? "(empty)"}' instead of '{Paths.Application}' — repairing.");
+                            needsRepair = true;
+                        }
+                    }
+
+                    if (needsRepair)
+                    {
+                        // Hapus shortcut lama (kalo ada) lalu buat ulang
+                        if (File.Exists(shortcutPath))
+                        {
+                            try { File.Delete(shortcutPath); } catch { }
+                        }
+
+                        Shortcut.Create(Paths.Application, "", shortcutPath);
+                        repaired++;
+                        App.Logger.WriteLine(LOG_IDENT, $"{shortcutName} shortcut repaired → {Paths.Application}");
+                    }
+                    else
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, $"{shortcutName} shortcut is OK — points to {Paths.Application}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Failed to check/repair {shortcutName} shortcut: {ex.Message}");
+                }
+            }
+
+            if (repaired > 0)
+                App.Logger.WriteLine(LOG_IDENT, $"Total repaired shortcuts: {repaired}");
+            else
+                App.Logger.WriteLine(LOG_IDENT, "All shortcuts are OK — no repair needed.");
+
+            return repaired;
+        }
+
         private static void ExtractWallpapers()
         {
             const string LOG_IDENT = "Installer::ExtractWallpapers";
