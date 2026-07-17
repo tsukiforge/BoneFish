@@ -1,19 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-
 using Bloxstrap.UI.ViewModels.Settings;
+using Wpf.Ui.Common;
+using Wpf.Ui.Controls;
 
 namespace Bloxstrap.UI.Elements.Settings.Pages
 {
@@ -22,10 +11,28 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
     /// </summary>
     public partial class ShortcutsPage
     {
+        private ShortcutsViewModel _viewModel = null!;
+
         public ShortcutsPage()
         {
-            DataContext = new ShortcutsViewModel();
+            _viewModel = new ShortcutsViewModel();
+            DataContext = _viewModel;
             InitializeComponent();
+
+            _viewModel.RequestNotificationEvent += (_, message) => ShowNotification(message);
+        }
+
+        private void ShowNotification(string message)
+        {
+            try
+            {
+                RepairSnackbar.Title = "Perbaiki Shortcut";
+                RepairSnackbar.Message = message;
+                RepairSnackbar.Appearance = message.StartsWith("✅") ? ControlAppearance.Success : ControlAppearance.Danger;
+                RepairSnackbar.Visibility = Visibility.Visible;
+                RepairSnackbar.Show();
+            }
+            catch { }
         }
     }
 }

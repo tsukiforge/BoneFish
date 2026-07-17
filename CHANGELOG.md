@@ -1,5 +1,85 @@
 # BoneFish Changelog
 
+## v5.5.0 — Plan 1 Fixes + Plan 2: 4 Fitur Baru 🚀
+
+Release date: 2026-07-17
+
+### 🔧 Plan 1 — FastFlag New Bug Fixes
+
+#### 1. 🔑 Global Hotkey Tidak Berfungsi
+- **🐛 Isu:** `HotkeyService` cuma berjalan di Watcher process. Toggle ON/OFF di Settings cuma nyimpen setting, gak benar-benar start/stop service.
+- **🔧 Fix:** `ExperimentalViewModel.EnableHotkeys` sekarang start/stop `HotkeyService` langsung dari Settings UI — gak perlu nunggu Watcher process.
+
+#### 2. 🎯 Crosshair Tidak Muncul
+- **🐛 Isu:** `CrosshairService.Instance` null di Settings process karena Watcher belum jalan.
+- **🔧 Fix:** `ExperimentalViewModel.EnableCrosshair` sekarang create & start `CrosshairService` secara lokal jika Instance null.
+
+#### 3. 🖼️ Wallpaper Tidak Terlihat di UI
+- **🐛 Isu:** `BackgroundImage` property ada di ViewModel tapi **tidak di-bind ke XAML** — wallpaper gak pernah tampak.
+- **🔧 Fix:** Ditambahkan `ImageBrush` binding + `ProgressBar` loading indicator. Background sekarang tampil dengan opacity 0.15.
+- **🐛 Plus: Wallpaper Tidak Full Screen** — background cuma selebar konten karena di-daleman ScrollViewer.
+- **🔧 Fix:** Restructure page layout: manual `Grid` + `ScrollViewer` — background sekarang full viewport! ✅
+
+#### 4. 🧹 Wallpaper Tidak Hapus Saat Dinonaktifkan
+- **🔧 Fix:** `AppBackgroundService.ClearCache()` dipanggil saat disable. Random mode mati → restore saved background.
+
+#### 5. 📂 Custom Background Fallback `images/img/`
+- **🔧 Fix:** Folder `images/img/` otomatis discan sebagai fallback custom background. Browse default ke folder ini.
+
+---
+
+### 🚀 Plan 2 — 4 Fitur Baru
+
+#### Fitur A 🔧 — Repair Shortcut Otomatis
+- **Method baru** `Installer.RepairShortcuts()` — verifikasi target shortcut Desktop & Start Menu, recreate jika rusak/salah path
+- **UI:** Tombol "🔧 Perbaiki Sekarang" di halaman **Shortcuts** + snackbar notifikasi hasil
+- **Manual action** — tidak otomatis di background, user klik sendiri saat butuh
+
+#### Fitur B 🗑️ — Auto-Cleaner Cache Roblox
+- **Service baru** `CacheCleanerService.cs` — two-phase cleanup:
+  1. Hapus file lebih tua dari `maxAgeDays` (default 14 hari)
+  2. Jika total ukuran > 500MB, hapus file terlama sampai di bawah limit
+- **Safety:** Cek dulu apakah Roblox sedang berjalan — skip cleanup jika ada proses Roblox aktif
+- **Startup:** Non-blocking `Task.Run` di `App.xaml.cs.OnStartup()` — jalan sekali per sesi
+- **Settings baru:** `EnableAutoCacheCleanup` (bool, default true), `CacheCleanupMaxAgeDays` (int, default 14)
+- **UI:** Toggle "Bersihkan cache otomatis" di halaman **FastFlag New** (Cache & Storage section)
+
+#### Fitur C 💻 — Panel System Info di UI
+- **Card baru** di halaman **FastFlags** (sebelum InfoBar warning) menampilkan:
+  - CPU Cores, RAM terdeteksi, Storage type (HDD/SSD), System Tier
+- **Data** dari `AutoOptimizeService.GetSystemInfo()` (reuse method existing)
+- **Auto-refresh** setiap kali `RequestPageReloadEvent` terpicu melalui `OnRequestPageReload()`
+
+#### Fitur D 🔋 — Mode Hemat Baterai untuk Auto-Wallpaper
+- **Helper baru** `BatteryHelper.cs` — deteksi status baterai via `System.Windows.Forms.SystemInformation.PowerStatus`
+- **Logic:** Jika `EnableBatterySaverForWallpaper` ON + laptop tidak dicharge + ada baterai → skip auto-refresh wallpaper
+- **Fallback:** PC desktop (tanpa baterai) — toggle **otomatis tersembunyi** dari UI
+- **UI:** Toggle "Hemat Baterai (Auto-Wallpaper)" di halaman **FastFlag New** — hanya muncul jika `HasBattery() == true`
+
+---
+
+### Files Changed (15 files)
+
+| File | Perubahan |
+|------|-----------|
+| `Bloxstrap/Bloxstrap.csproj` | Version 5.3.0 → **5.5.0** |
+| `Bloxstrap/Models/Persistable/Settings.cs` | +3 settings: `EnableAutoCacheCleanup`, `CacheCleanupMaxAgeDays`, `EnableBatterySaverForWallpaper` |
+| `Bloxstrap/Integrations/CacheCleanerService.cs` | **NEW** — auto cache cleanup service |
+| `Bloxstrap/Utility/BatteryHelper.cs` | **NEW** — battery detection utility |
+| `Bloxstrap/Installer.cs` | +`RepairShortcuts()` method |
+| `Bloxstrap/App.xaml.cs` | +Auto cache cleanup di startup |
+| `Bloxstrap/Integrations/AppBackgroundService.cs` | +Fallback `images/img/` scanning |
+| `Bloxstrap/Paths.cs` | +`CustomImagesDir`, +`GetCustomUserImages()` |
+| `Bloxstrap/UI/ViewModels/Settings/ExperimentalViewModel.cs` | Fix hotkey/crosshair/wallpaper + battery saver + cache cleanup toggle |
+| `Bloxstrap/UI/Elements/Settings/Pages/ExperimentalPage.xaml` | Restructure full-screen background + battery/cache toggles |
+| `Bloxstrap/UI/ViewModels/Settings/FastFlagsViewModel.cs` | +`SystemInfoText`, +`OnRequestPageReload()` |
+| `Bloxstrap/UI/Elements/Settings/Pages/FastFlagsPage.xaml` | +System Info card |
+| `Bloxstrap/UI/ViewModels/Settings/ShortcutsViewModel.cs` | +`RepairShortcutsCommand`, +`RequestNotificationEvent` |
+| `Bloxstrap/UI/Elements/Settings/Pages/ShortcutsPage.xaml` | +Repair button + snackbar |
+| `Bloxstrap/UI/Elements/Settings/Pages/ShortcutsPage.xaml.cs` | +Notification handler |
+
+---
+
 ## v5.3.1 — HDD-Path Dedup + Hilangkan Tombol 'Pilih' Redundan 🧹
 
 Release date: 2026-07-16

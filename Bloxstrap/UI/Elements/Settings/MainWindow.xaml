@@ -21,6 +21,11 @@
              Closing="WpfUiWindow_Closing"
              Closed="WpfUiWindow_Closed">
     <Grid>
+        <!-- ★ GLOBAL BACKGROUND — muncul di belakang semua halaman + navigasi ★ -->
+        <Grid.Background>
+            <ImageBrush x:Name="GlobalWallpaperBrush" ImageSource="{x:Null}" Stretch="UniformToFill" Opacity="0.12" />
+        </Grid.Background>
+
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />

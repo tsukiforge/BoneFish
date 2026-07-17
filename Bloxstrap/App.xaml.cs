@@ -433,6 +433,26 @@ namespace Bloxstrap
                     });
                 }
 
+                // ★ AUTO CACHE CLEANUP (Fitur B) — non-blocking, jalan sekali per startup
+                if (App.Settings.Prop.EnableAutoCacheCleanup)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            Logger.WriteLine(LOG_IDENT, "Running auto cache cleanup...");
+                            int deleted = await CacheCleanerService.CleanupOldCache(
+                                maxAgeDays: App.Settings.Prop.CacheCleanupMaxAgeDays);
+                            if (deleted > 0)
+                                Logger.WriteLine(LOG_IDENT, $"Auto cache cleanup removed {deleted} file(s)");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.WriteLine(LOG_IDENT, $"Auto cache cleanup failed (non-fatal): {ex.Message}");
+                        }
+                    });
+                }
+
                 WindowsRegistry.RegisterApis(); // we want to register those early on
                                                 // so we wont have any issues with bloxshade
 

@@ -15,7 +15,15 @@
       Scrollable="True">
 
     <StackPanel Margin="0,0,14,14">
-        <TextBlock Margin="0,0,0,16" Text="{x:Static resources:Strings.Menu_Shortcuts_Description}" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        <ui:Snackbar x:Name="RepairSnackbar" Title="Pemberitahuan" Message="" Appearance="Success" Icon="CheckmarkCircle32" Timeout="5000" Margin="0,0,0,16" Visibility="Collapsed" />
+
+        <controls:OptionControl 
+            Header="Perbaiki Shortcut" 
+            Description="Perbaiki shortcut Desktop &amp; Start Menu yang rusak/tidak指向 ke BoneFish yang benar. Berguna setelah update manual.">
+            <ui:Button Content="🔧 Perbaiki Sekarang" Command="{Binding RepairShortcutsCommand}" Appearance="Primary" />
+        </controls:OptionControl>
+
+        <TextBlock Margin="0,16,0,16" Text="{x:Static resources:Strings.Menu_Shortcuts_Description}" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
         <controls:OptionControl 
             Header="{x:Static resources:Strings.Menu_Shortcuts_ExtractIcons_Title}" 

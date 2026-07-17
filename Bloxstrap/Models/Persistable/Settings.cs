@@ -104,5 +104,12 @@ namespace Bloxstrap.Models.Persistable
 
         // kalo true, background ganti random tiap buka app
         public bool BackgroundRandomMode { get; set; } = true;
+
+        // Auto cache cleanup settings
+        public bool EnableAutoCacheCleanup { get; set; } = true;
+        public int CacheCleanupMaxAgeDays { get; set; } = 14;
+
+        // Battery saver untuk auto-wallpaper
+        public bool EnableBatterySaverForWallpaper { get; set; } = true;
     }
 }

@@ -35,6 +35,36 @@
 
         public static string WallpapersDir => Path.Combine(Base, "Resources", "Wallpapers");
 
+        // Folder untuk custom background images milik user — fallback jika CustomBackgroundPath kosong
+        public static string CustomImagesDir => Path.Combine(Base, "images", "img");
+
+        /// <summary>
+        /// Scan folder CustomImagesDir (images/img/) dan return semua file gambar yang ditemukan
+        /// </summary>
+        public static string[] GetCustomUserImages()
+        {
+            try
+            {
+                if (!Directory.Exists(CustomImagesDir))
+                {
+                    Directory.CreateDirectory(CustomImagesDir);
+                    return Array.Empty<string>();
+                }
+
+                return Directory.GetFiles(CustomImagesDir, "*.*", SearchOption.TopDirectoryOnly)
+                    .Where(f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                             || f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)
+                             || f.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                             || f.EndsWith(".bmp", StringComparison.OrdinalIgnoreCase)
+                             || f.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
+
         public static string ResolveWallpapersDir()
         {
             // Coba beberapa lokasi yang mungkin
