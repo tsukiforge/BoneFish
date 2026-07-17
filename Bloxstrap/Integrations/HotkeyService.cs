@@ -134,9 +134,10 @@ namespace Bloxstrap.Integrations
                             // Auto-create CrosshairService jika belum ada (misal Watcher belum jalan)
                             try
                             {
+                                // Set EnableCrosshair SEBELUM Start() biar overlay langsung muncul
+                                App.Settings.Prop.EnableCrosshair = true;
                                 var ch = new CrosshairService();
                                 ch.Start();
-                                App.Settings.Prop.EnableCrosshair = true;
                                 App.Settings.Save();
                                 App.Logger.WriteLine(LOG_IDENT, "Auto-started CrosshairService via hotkey");
                             }
