@@ -1,28 +1,23 @@
 using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.Input;
 using Bloxstrap.Integrations;
+using Bloxstrap.Utility;
 
 namespace Bloxstrap.UI.ViewModels.Settings
 {
     public class ExperimentalViewModel : NotifyPropertyChangedViewModel
     {
-        // ── Wallpaper Properties ────────────────────────────────────────────────
-        private BitmapImage? _backgroundImage;
-        public BitmapImage? BackgroundImage
-        {
-            get => _backgroundImage;
-            set { _backgroundImage = value; OnPropertyChanged(nameof(BackgroundImage)); }
-        }
-
-        private bool _isBackgroundLoading;
+        // ── Wallpaper Properties (Global — untuk semua halaman + navigasi) ────
         public bool IsBackgroundLoading
         {
             get => _isBackgroundLoading;
             set { _isBackgroundLoading = value; OnPropertyChanged(nameof(IsBackgroundLoading)); }
         }
+        private bool _isBackgroundLoading;
 
         public bool BackgroundRandomMode
         {
@@ -36,6 +31,14 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 // Kalo random mode diaktifkan, langsung ganti random
                 if (value && EnableWallpaperLauncher)
                     _ = LoadRandomBackgroundAsync();
+                else if (!value && EnableWallpaperLauncher)
+                {
+                    // Random dimatikan: restore saved background (atau load random kalo belum milih)
+                    if (string.IsNullOrEmpty(App.Settings.Prop.SelectedBackgroundType) || App.Settings.Prop.SelectedBackgroundType == "Random")
+                        _ = LoadRandomBackgroundAsync();
+                    else
+                        _ = LoadSavedBackgroundAsync();
+                }
             }
         }
 
@@ -57,8 +60,20 @@ namespace Bloxstrap.UI.ViewModels.Settings
                         _ = LoadSavedBackgroundAsync();
                 }
                 else
-                    BackgroundImage = null;
+                {
+                    // Bersihkan global background + cache saat wallpaper dinonaktifkan
+                    AppBackgroundService.SetGlobalBackground(null);
+                    AppBackgroundService.ClearCache();
+                }
             }
+        }
+
+        /// <summary>
+        /// Cek apakah auto-wallpaper harus di-skip karena battery saver mode.
+        /// </summary>
+        private bool ShouldSkipLoadingDueToBattery()
+        {
+            return EnableBatterySaverForWallpaper && HasBattery && BatteryHelper.IsOnBatteryPower();
         }
 
         public async Task LoadRandomBackgroundAsync()
@@ -66,10 +81,18 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (!EnableWallpaperLauncher)
                 return;
 
+            // Battery Saver: skip auto-refresh jika laptop tidak dicharge
+            if (ShouldSkipLoadingDueToBattery())
+            {
+                App.Logger.WriteLine("ExperimentalViewModel", "Battery saver active — skipping random background load to save power.");
+                return;
+            }
+
             IsBackgroundLoading = true;
             try
             {
-                BackgroundImage = await AppBackgroundService.GetRandomBackgroundAsync();
+                var bg = await AppBackgroundService.GetRandomBackgroundAsync();
+                AppBackgroundService.SetGlobalBackground(bg);
                 
                 // Save ke Settings biar kalo random mode mati, background tetap
                 App.Settings.Prop.SelectedBackgroundType = "Random";
@@ -104,11 +127,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 }
                 else if (savedType == "Custom")
                 {
-                    BackgroundImage = await AppBackgroundService.GetCustomBackgroundAsync();
+                    var bg = await AppBackgroundService.GetCustomBackgroundAsync();
+                    AppBackgroundService.SetGlobalBackground(bg);
                 }
                 else if (Enum.TryParse<AppBackgroundService.BackgroundType>(savedType, out var parsedType))
                 {
-                    BackgroundImage = await AppBackgroundService.GetBackgroundAsync(parsedType);
+                    var bg = await AppBackgroundService.GetBackgroundAsync(parsedType);
+                    AppBackgroundService.SetGlobalBackground(bg);
                 }
                 else
                 {
@@ -126,7 +151,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
             IsBackgroundLoading = true;
             try
             {
-                BackgroundImage = await AppBackgroundService.GetBackgroundAsync(type);
+                var bg = await AppBackgroundService.GetBackgroundAsync(type);
+                AppBackgroundService.SetGlobalBackground(bg);
                 
                 // Persistence: simpan pilihan user
                 App.Settings.Prop.SelectedBackgroundType = type.ToString();
@@ -155,12 +181,20 @@ namespace Bloxstrap.UI.ViewModels.Settings
         {
             try
             {
+                // Default ke folder images/img/ jika ada
+                string initialDir = Paths.CustomImagesDir;
+                if (!Directory.Exists(initialDir))
+                {
+                    try { Directory.CreateDirectory(initialDir); } catch { }
+                }
+
                 var dialog = new Microsoft.Win32.OpenFileDialog
                 {
                     Title = "Pilih gambar background kustom",
                     Filter = "File gambar (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png|Semua file (*.*)|*.*",
                     CheckFileExists = true,
-                    Multiselect = false
+                    Multiselect = false,
+                    InitialDirectory = Directory.Exists(initialDir) ? initialDir : null
                 };
 
                 if (dialog.ShowDialog() == true)
@@ -255,6 +289,36 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        // ── Auto Cache Cleanup (Fitur B) ────────────────────────────────────────
+        public bool EnableAutoCacheCleanup
+        {
+            get => App.Settings.Prop.EnableAutoCacheCleanup;
+            set
+            {
+                App.Settings.Prop.EnableAutoCacheCleanup = value;
+                OnPropertyChanged(nameof(EnableAutoCacheCleanup));
+                try { App.Settings.Save(); } catch { }
+            }
+        }
+
+        // ── Battery Saver for Wallpaper (Fitur D) ──────────────────────────────
+        /// <summary>
+        /// Apakah device ini punya baterai? (false = PC desktop).
+        /// Toggle Battery Saver HANYA muncul kalo true.
+        /// </summary>
+        public bool HasBattery => BatteryHelper.HasBattery();
+
+        public bool EnableBatterySaverForWallpaper
+        {
+            get => App.Settings.Prop.EnableBatterySaverForWallpaper;
+            set
+            {
+                App.Settings.Prop.EnableBatterySaverForWallpaper = value;
+                OnPropertyChanged(nameof(EnableBatterySaverForWallpaper));
+                try { App.Settings.Save(); } catch { }
+            }
+        }
+
         public bool EnableHotkeys
         {
             get => App.Settings.Prop.EnableHotkeys;
@@ -263,6 +327,25 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.Settings.Prop.EnableHotkeys = value;
                 OnPropertyChanged(nameof(EnableHotkeys));
                 try { App.Settings.Save(); } catch { }
+
+                // Start/stop HotkeyService secara langsung dari Settings UI
+                // (Watcher process mungkin tidak berjalan, jadi kita perlu handle di sini)
+                if (value)
+                {
+                    if (HotkeyService.Instance == null)
+                    {
+                        var hk = new HotkeyService();
+                        hk.Start();
+                    }
+                    else
+                    {
+                        HotkeyService.Instance.Start();
+                    }
+                }
+                else
+                {
+                    HotkeyService.Instance?.Stop();
+                }
             }
         }
 
@@ -274,9 +357,18 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.Settings.Prop.EnableCrosshair = value;
                 OnPropertyChanged(nameof(EnableCrosshair));
                 try { App.Settings.Save(); } catch { }
-                
-                // Notify CrosshairService to apply/remove overlay
-                CrosshairService.Instance?.ApplySettings();
+
+                // Pastikan CrosshairService aktif bahkan dari Settings UI
+                // (Watcher process mungkin tidak berjalan)
+                if (CrosshairService.Instance == null && value)
+                {
+                    var ch = new CrosshairService();
+                    ch.Start();
+                }
+                else
+                {
+                    CrosshairService.Instance?.ApplySettings();
+                }
             }
         }
 

@@ -10,8 +10,6 @@ using Bloxstrap.UI.ViewModels.Settings;
 using Wpf.Ui.Common;
 using Wpf.Ui.Controls;
 using Bloxstrap.UI.Elements.Settings.Pages;
-using SharpVectors.Scripting;
-using System.Drawing;
 using Bloxstrap.Integrations;
 
 namespace Bloxstrap.UI.Elements.Settings
@@ -56,8 +54,15 @@ namespace Bloxstrap.UI.Elements.Settings
                     fastflags.PageType = typeof(FastFlagsDisabled);
             });
 
-            // Wallpaper otomatis di-load oleh ExperimentalViewModel (FastFlag New page)
-            // saat halaman tersebut dibuka — gak perlu preload dari MainWindow.
+            // ★ GLOBAL WALLPAPER: Subscribe ke event perubahan background
+            // Agar wallpaper muncul di semua halaman + navigasi
+            AppBackgroundService.BackgroundChanged += OnGlobalBackgroundChanged;
+
+            // Load saved background jika wallpaper aktif
+            if (App.Settings.Prop.EnableWallpaperLauncher)
+            {
+                LoadSavedGlobalBackground();
+            }
 
             if (lastPage != null)
                 SafeNavigate(lastPage);
@@ -92,6 +97,51 @@ namespace Bloxstrap.UI.Elements.Settings
                 this.Left = _state.Left;
                 this.Top = _state.Top;
             }
+        }
+
+        // ── Global Wallpaper Event Handler ─────────────────────────────────────
+        private void OnGlobalBackgroundChanged(object? sender, EventArgs e)
+        {
+            try
+            {
+                var bg = AppBackgroundService.CurrentBackgroundImage;
+                if (bg != null)
+                {
+                    GlobalWallpaperBrush.ImageSource = bg;
+                }
+                else
+                {
+                    GlobalWallpaperBrush.ImageSource = null;
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Load saved global background saat startup (tanpa menunggu ViewModel).
+        /// </summary>
+        private async void LoadSavedGlobalBackground()
+        {
+            try
+            {
+                string savedType = App.Settings.Prop.SelectedBackgroundType;
+                if (string.IsNullOrEmpty(savedType) || savedType == "Random" || App.Settings.Prop.BackgroundRandomMode)
+                {
+                    var bg = await AppBackgroundService.GetRandomBackgroundAsync();
+                    AppBackgroundService.SetGlobalBackground(bg);
+                }
+                else if (savedType == "Custom")
+                {
+                    var bg = await AppBackgroundService.GetCustomBackgroundAsync();
+                    AppBackgroundService.SetGlobalBackground(bg);
+                }
+                else if (Enum.TryParse<AppBackgroundService.BackgroundType>(savedType, out var parsedType))
+                {
+                    var bg = await AppBackgroundService.GetBackgroundAsync(parsedType);
+                    AppBackgroundService.SetGlobalBackground(bg);
+                }
+            }
+            catch { }
         }
 
         private async void SafeNavigate(Type page)
