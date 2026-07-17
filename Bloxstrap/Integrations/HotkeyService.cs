@@ -128,22 +128,28 @@ namespace Bloxstrap.Integrations
                 {
                     case HOTKEY_CROSSHAIR:
                         App.Logger.WriteLine(LOG_IDENT, "Hotkey: Ctrl+Shift+C — Toggle Crosshair");
-                        // Auto-create CrosshairService kalo belum ada (misal Watcher belum jalan)
+
                         if (CrosshairService.Instance == null)
                         {
+                            // Auto-create CrosshairService jika belum ada (misal Watcher belum jalan)
                             try
                             {
                                 var ch = new CrosshairService();
                                 ch.Start();
                                 App.Settings.Prop.EnableCrosshair = true;
-                                try { App.Settings.Save(); } catch { }
+                                App.Settings.Save();
+                                App.Logger.WriteLine(LOG_IDENT, "Auto-started CrosshairService via hotkey");
                             }
                             catch (Exception ex)
                             {
                                 App.Logger.WriteLine(LOG_IDENT, $"Failed to auto-start CrosshairService: {ex.Message}");
                             }
                         }
-                        CrosshairService.Instance?.Toggle();
+                        else
+                        {
+                            // Sudah jalan — toggle visibility biasa
+                            CrosshairService.Instance.Toggle();
+                        }
                         break;
 
                     case HOTKEY_FPS:
