@@ -1,5 +1,47 @@
 # BoneFish Changelog
 
+## v5.5.3 — Fix: FastFlags ComboBox Reset + ProductVersion Build Config
+
+Release date: 2026-07-18
+
+### 🐛 FastFlags Enum ComboBox — Nilai Tidak Bertahan
+
+**Bug:** Saat FastFlags MSAA / RenderingMode / TextureQuality telah diaktifkan, membuka halaman FastFlags kembali membuat kontrol terlihat nonaktif/ter-reset ke posisi default.
+
+**Root Cause:** Binding `Text` pada `ComboBox` untuk tipe enum dapat menyebabkan nilai ter-parse ulang dan mengubah state yang sudah disimpan saat halaman dibuka ulang.
+
+**Fix:** Ganti `Text="{Binding ...}"` → `SelectedItem="{Binding ...}"` pada 3 ComboBox:
+
+| ComboBox | Properti Binding |
+|----------|-----------------|
+| MSAA Level | `SelectedMSAALevel` |
+| Rendering Mode | `SelectedRenderingMode` |
+| Texture Quality | `SelectedTextureQuality` |
+
+Ketiganya kini konsisten menggunakan `SelectedItem`, menjaga nilai enum tetap stabil saat halaman dibuka ulang.
+
+### 🔧 ProductVersion — Selalu Terisi di Semua Build Config
+
+**Bug:** `ProductVersion` pada binary kadang kosong di Debug build, menyebabkan logic `HandleUpgrade()` di `Installer.cs` salah mendeteksi versi dan memunculkan dialog version mismatch.
+
+**Fix:** Tambahkan `AssemblyVersion` dan `AssemblyInformationalVersion` eksplisit di csproj:
+
+```xml
+<AssemblyVersion>$(Version)</AssemblyVersion>
+<AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>
+```
+
+Dengan `$(Version)`, cukup update `<Version>` di satu tempat — `AssemblyVersion` dan `AssemblyInformationalVersion` ikut otomatis. Ini memastikan `FileVersionInfo.GetVersionInfo().ProductVersion` selalu mengembalikan nilai yang benar di semua build config (Debug, Release, CI/CD).
+
+### Files Changed
+
+| File | Perubahan |
+|------|-----------|
+| `Bloxstrap/UI/Elements/Settings/Pages/FastFlagsPage.xaml` | 3 ComboBox: `Text` → `SelectedItem` |
+| `Bloxstrap/Bloxstrap.csproj` | +`<AssemblyVersion>`, +`<AssemblyInformationalVersion>` |
+
+---
+
 ## v5.5.0 — Plan 1 Fixes + Plan 2: 4 Fitur Baru 🚀
 
 Release date: 2026-07-17
