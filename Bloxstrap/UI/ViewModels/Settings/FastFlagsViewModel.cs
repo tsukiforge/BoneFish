@@ -77,7 +77,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand ApplyExtremePerformancePresetCommand => new RelayCommand(ApplyExtremePerformancePreset);
 
-        public ICommand ToggleNightVisionCommand => new RelayCommand(ToggleNightVision);
+        // ToggleNightVisionCommand dihapus (GAP 4 — Night Vision deprecated)
 
         public ICommand ClearClientAppSettingsCommand => new RelayCommand(ClearClientAppSettings);
 
@@ -343,6 +343,28 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        /// <summary>
+        /// Fast Loading — toggle independen untuk percepat loading aset.
+        /// Bisa aktif BERSAMAAN dengan preset visual apa pun.
+        /// Saat diaktifkan: apply flag optimal; saat dimatikan: remove flag.
+        /// Flag yang dipakai conditional pada cpuCores (>=4 / >=8).
+        /// </summary>
+        public bool EnableFastLoadingFlags
+        {
+            get => App.Settings.Prop.EnableFastLoadingFlags;
+            set
+            {
+                App.Settings.Prop.EnableFastLoadingFlags = value;
+                if (value)
+                    Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
+                else
+                    Integrations.AutoOptimizeService.RemoveFastLoadingFlags();
+                OnPropertyChanged(nameof(EnableFastLoadingFlags));
+                try { App.FastFlags.Save(); } catch { }
+                try { App.Settings.Save(); } catch { }
+            }
+        }
+
         private void ApplyRecommendedFastFlags()
         {
             // Bersihkan semua flag lama sebelum apply preset baru.
@@ -351,7 +373,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
-            NightVisionEnabled = false;
+            // NightVisionEnabled = false — dihapus (GAP 4)
             // ForceExtremeMode harus di-reset saat pindah ke preset lain,
             // agar AutoOptimizeService.DetectSystemTier() tidak memaksa ExtremePerformance
             // di launch berikutnya walau user sudah pilih preset lain.
@@ -379,15 +401,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         private void ApplyRecommendedNetworkSettings()
         {
-            App.Settings.Prop.EnableBetterMatchmaking = true;
-            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
-
-            // DNS/No Delay Network Flags
-            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
-            App.FastFlags.SetValue("DFIntMaxReceivePPS", "50000");
-            App.FastFlags.SetValue("DFIntMaxSendPPS", "50000");
-            App.FastFlags.SetValue("DFIntConnectionMTUSize", "1500");
-            App.FastFlags.SetValue("DFIntOptimizeSendQueue", "1");
+            // ★ REFACTOR: Panggil method reusable dari AutoOptimizeService
+            Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
 
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
@@ -400,7 +415,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // ── Cleanup (sekali vs sebelumnya ter-delegate 3x save/notify/reload) ─────
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
-            NightVisionEnabled = false;
+            // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
 
@@ -418,13 +433,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             EnableLowMemoryMode = true;
 
             // ── Network ────────────────────────────────────────────────────────────────
-            App.Settings.Prop.EnableBetterMatchmaking = true;
-            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
-            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
-            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
-            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
-            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
-            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
+            Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
+
+            // ── Fast Loading: re-apply jika toggle aktif (stack dengan preset) ─────────
+            if (App.Settings.Prop.EnableFastLoadingFlags)
+                Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
             // ── Stability-specific ──────────────────────────────────────────────────
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
@@ -441,10 +454,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private void ApplyUltraLowSpecPreset()
         {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
-            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
-            NightVisionEnabled = false;
+            // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
 
@@ -475,14 +487,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             DisableRobloxAnimations = true;
             EnableLowMemoryMode = true;
 
-            // Network flags langsung
-            App.Settings.Prop.EnableBetterMatchmaking = true;
-            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
-            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
-            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
-            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
-            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
-            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
+            // Network flags langsung — panggil method reusable
+            Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
+
+            // Fast Loading: re-apply jika toggle aktif
+            if (App.Settings.Prop.EnableFastLoadingFlags)
+                Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
@@ -505,10 +515,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private void ApplyBalancedPreset()
         {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
-            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
-            NightVisionEnabled = false;
+            // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
 
@@ -526,14 +535,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetPreset("Rendering.LightingMode", "Default");
             App.FastFlags.SetPreset("Terrain.GridV2", "False");
 
-            // Network flags langsung (jangan panggil ApplyRecommendedNetworkSettings untuk avoid reload interrupt)
-            App.Settings.Prop.EnableBetterMatchmaking = true;
-            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
-            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
-            App.FastFlags.SetValue("DFIntMaxReceivePPS", "50000");
-            App.FastFlags.SetValue("DFIntMaxSendPPS", "50000");
-            App.FastFlags.SetValue("DFIntConnectionMTUSize", "1500");
-            App.FastFlags.SetValue("DFIntOptimizeSendQueue", "1");
+            // Network flags — panggil method reusable (ApplyNetworkOptimizations tidak trigger reload)
+            Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
+
+            // Fast Loading: re-apply jika toggle aktif
+            if (App.Settings.Prop.EnableFastLoadingFlags)
+                Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
             SelectedPreset = "Balanced";
             try { App.FastFlags.Save(); } catch { }
@@ -556,14 +563,49 @@ namespace Bloxstrap.UI.ViewModels.Settings
         ///  - TIDAK disable PostFx → visual game rusak
         ///  - TIDAK SkyGray → atmosphere game berubah
         ///  - TIDAK ubah LightAttenuation → model lighting game berubah
+        ///
+        /// ═══════════════════════════════════════════════════════════════════
+        /// ★ AUDIT: Anti Not-Responding (Long Session) — Laporan Lengkap
+        /// ═══════════════════════════════════════════════════════════════════
+        ///
+        /// 1. STATUS ACTIVE:
+        ///    - Hanya aktif melalui klik manual user (button "Anti Not-Responding").
+        ///    - TIDAK auto-activated oleh CheckAndApply()/DetectSystemTier().
+        ///    - Dapat juga aktif via ForceExtremeMode toggle + launch restart.
+        ///
+        /// 2. FLAG VISUAL (sengaja disertakan, tidak dipisah jadi toggle):
+        ///    - FFlagDebugSSAOForce=False   — SSAO dimatikan
+        ///    - FIntSSAOMipLevels=0         — SSAO kualitas 0
+        ///    - FIntRobloxGuiBlurIntensity=0 — Blur UI mati
+        ///    - FIntRenderGrainScale=0      — Grain mati
+        ///    Alasan: Preset ini didesain untuk device dual-core, RAM <4GB,
+        ///    di mana SEMUA post-processing ringan pun membebani CPU/GPU.
+        ///    Label "PALING AGRESIF" sudah memperingatkan user.
+        ///    Visual yang dimatikan hanya efek kosmetik (blur, grain, SSAO)
+        ///    — TIDAK memengaruhi gameplay, lighting, atau shadow.
+        ///
+        /// 3. FLAG ANTI-FREEZE/STABILITY:
+        ///    - DFIntMaxActiveAnimationTracks=32 — batasi animasi
+        ///    - FIntRenderLocalLightFadeInMs=0  — fade light instan
+        ///    - 7 flag telemetry off              — kurangi I/O disk
+        ///    Flag ini TIDAK dipisah jadi toggle terpisah karena:
+        ///    a) Preset ini adalah SATU KESATUAN agresif untuk device lemah.
+        ///    b) Anti-freeze tanpa pengorbanan visual tidak cukup efektif.
+        ///    c) User masih bisa stack toggle lain (Fast Loading, dsb).
+        ///
+        /// 4. KEPUTUSAN FINAL:
+        ///    - Tidak dibuat toggle EnableAntiFreezeMode terpisah.
+        ///    - Preset tetap sebagai SATU PAKET untuk target pengguna
+        ///      spesifik (low-end extreme).
+        ///    - Dokumentasi ini untuk transparansi — bukan dead code.
+        /// ═══════════════════════════════════════════════════════════════════
         /// </summary>
         private void ApplyExtremePerformancePreset()
         {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
-            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
             Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             Integrations.AutoOptimizeService.PurgeAllKnownFlags();
-            NightVisionEnabled = false;
+            // NightVisionEnabled = false — dihapus (GAP 4)
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
@@ -664,15 +706,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
 
-            // Network flags langsung — tidak panggil ApplyRecommendedNetworkSettings()
-            // karena method itu punya RequestPageReloadEvent sendiri yang interrupt flow save.
-            App.Settings.Prop.EnableBetterMatchmaking = true;
-            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
-            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
-            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
-            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
-            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
-            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
+            // Network flags — panggil method reusable (ApplyNetworkOptimizations tidak trigger reload)
+            Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
+
+            // Fast Loading: re-apply jika toggle aktif
+            if (App.Settings.Prop.EnableFastLoadingFlags)
+                Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
             // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
             // Agar value "ExtremePerformance" tertulis ke disk. Lihat komentar di ApplyUltraLowSpecPreset.
@@ -867,101 +906,14 @@ namespace Bloxstrap.UI.ViewModels.Settings
             OnRequestPageReload();
         }
 
-        // ── Night Vision ──────────────────────────────────────────────────────────────────
-        /// <summary>
-        /// Status Night Vision saat ini — true = aktif, false = nonaktif.
-        /// Membaca dari Settings agar persisten antar session.
-        /// </summary>
-        public bool NightVisionEnabled
-        {
-            get => App.Settings.Prop.EnableNightVision;
-            set
-            {
-                App.Settings.Prop.EnableNightVision = value;
-                OnPropertyChanged(nameof(NightVisionEnabled));
-            }
-        }
+        // ── Night Vision — DIHAPUS (GAP 4) ────────────────────────────────────────────
+        // ★ GAP 4: Night Vision dihapus total karena flag-nya sudah deprecated.
+        //   FFlagFastGPULightCulling3 dan FFlagNewLightAttenuation tidak ada di Roblox
+        //   Allowlist sejak September 2025 — client Roblox abaikan flag ini.
+        //   Referensi: https://devforum.roblox.com/t/allowlist-for-local-client-configuration-via-fast-flags/3966569
 
-        /// <summary>
-        /// Toggle Night Vision dengan dialog konfirmasi.
-        /// Menampilkan peringatan "Are you sure?" sebelum mengaktifkan,
-        /// karena flag ini mengubah cara lighting Roblox bekerja secara global.
-        ///
-        /// Cara kerja Night Vision (client-side only, tidak mempengaruhi server/pemain lain):
-        ///   FFlagFastGPULightCulling3=True  — aktifkan GPU light culling yang lebih efisien,
-        ///       sebagai efek samping membuat area yang seharusnya gelap menjadi lebih terang
-        ///       karena lebih banyak sumber cahaya ambient yang diproses.
-        ///   FFlagNewLightAttenuation=True   — model attenuation baru yang lebih "lembut",
-        ///       cahaya menyebar lebih jauh dari sumbernya, area transisi gelap-terang
-        ///       jadi lebih gradual dan tidak se-hitam mode normal.
-        ///   FIntRenderLocalLightUpdatesMax=8 — naikkan update dynamic light ke 8/frame
-        ///       agar senter/torch game update lebih sering = radius cahayanya terasa lebih luas.
-        ///
-        /// Catatan: TIDAK menggunakan flag ambient override karena tidak ada di allowlist Roblox.
-        /// Efek "night vision" adalah kombinasi light culling + attenuation, bukan cheat.
-        /// Sumber: Dantezz025/Roblox-Fast-Flags (FFlagFastGPULightCulling3 + FFlagNewLightAttenuation,
-        ///   confirmed 2026); flag ini juga tidak ada di daftar banned/exploit flagnya Roblox.
-        /// </summary>
-        private void ToggleNightVision()
-        {
-            if (!NightVisionEnabled)
-            {
-                // Belum aktif — tampilkan konfirmasi dulu
-                var result = System.Windows.MessageBox.Show(
-                    "🌙 Are you sure — aktifkan Night Vision?\n\n" +
-                    "Mode ini menerangkan area gelap di game secara client-side.\n" +
-                    "Pemain lain dan server TIDAK melihat perubahan apapun.\n\n" +
-                    "• Area gelap / senter game akan terasa lebih terang\n" +
-                    "• Tidak ada keuntungan kompetitif langsung\n" +
-                    "• Bisa di-nonaktifkan kapan saja\n\n" +
-                    "Lanjutkan?",
-                    "Night Vision — Konfirmasi",
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Question
-                );
-
-                if (result != System.Windows.MessageBoxResult.Yes)
-                    return;
-
-                // Aktifkan Night Vision flags
-                // FFlagFastGPULightCulling3: GPU light culling efisien — sebagai efek samping
-                // lebih banyak ambient light yang sampai ke permukaan, area gelap jadi lebih terang.
-                App.FastFlags.SetValue("FFlagFastGPULightCulling3", "True");
-
-                // FFlagNewLightAttenuation=True: model attenuation "lembut" — cahaya menyebar
-                // lebih jauh dari sumbernya, transisi terang-gelap lebih gradual.
-                // Catatan: di AutoOptimizeService kita set ini ke False (untuk hemat CPU),
-                // Night Vision OVERRIDE nilai itu ke True saat aktif.
-                App.FastFlags.SetValue("FFlagNewLightAttenuation", "True");
-
-                // FIntRenderLocalLightUpdatesMax=8: naikkan dari 4 (potato mode) ke 8 agar
-                // senter/torch update lebih sering → radius cahaya terasa lebih luas & responsif.
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "8");
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
-
-                NightVisionEnabled = true;
-                try { App.FastFlags.Save(); } catch { }
-                try { App.Settings.Save(); } catch { }
-                Notify("🌙 Mode aktif: Night Vision (menerangkan area gelap secara client-side, tanpa mengubah server/pemain lain).");
-            }
-            else
-            {
-                // Nonaktifkan — hapus semua flag Night Vision (kembalikan ke null = default game)
-                // JANGAN set FFlagNewLightAttenuation ke "False" — itu merusak lighting game.
-                // Cukup hapus flag ini sehingga Roblox pakai model lighting default-nya sendiri.
-                App.FastFlags.SetValue("FFlagFastGPULightCulling3", null);
-                App.FastFlags.SetValue("FFlagNewLightAttenuation", null);
-                // Kembalikan light updates ke nilai Potato Mode
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-                App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
-
-                NightVisionEnabled = false;
-                try { App.FastFlags.Save(); } catch { }
-                try { App.Settings.Save(); } catch { }
-                Notify("🌙 Mode aktif: Night Vision nonaktif — kembali ke mode normal.");
-            }
-
-            OnPropertyChanged(nameof(NightVisionEnabled));
-        }
+        // NightVisionEnabled property, ToggleNightVision(), dan ToggleNightVisionCommand
+        // telah dihapus. Semua referensi NightVisionEnabled = false di method preset juga
+        // sudah dibersihkan.
     }
 }

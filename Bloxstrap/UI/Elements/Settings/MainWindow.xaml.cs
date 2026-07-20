@@ -56,13 +56,9 @@ namespace Bloxstrap.UI.Elements.Settings
 
             // ★ GLOBAL WALLPAPER: Subscribe ke event perubahan background
             // Agar wallpaper muncul di semua halaman + navigasi
+            // ★ FIX 3: Background selalu aktif — langsung load tanpa cek EnableWallpaperLauncher
             AppBackgroundService.BackgroundChanged += OnGlobalBackgroundChanged;
-
-            // Load saved background jika wallpaper aktif
-            if (App.Settings.Prop.EnableWallpaperLauncher)
-            {
-                LoadSavedGlobalBackground();
-            }
+            LoadSavedGlobalBackground();
 
             if (lastPage != null)
                 SafeNavigate(lastPage);

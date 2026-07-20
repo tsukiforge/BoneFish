@@ -67,7 +67,7 @@ namespace Bloxstrap.Integrations
                     }
                 })
                 {
-                    IsBackground = false,
+                    IsBackground = true,
                     Name = "CrosshairThread"
                 };
 
