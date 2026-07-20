@@ -12,82 +12,105 @@
       d:DesignHeight="1080" d:DesignWidth="800"
       Title="IntegrationsPage"
       Scrollable="True">
-    <StackPanel Margin="0,0,14,14">
-        <TextBlock Text="{x:Static resources:Strings.Menu_Integrations_Description}" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+    <!-- ★ GAP 3: Layout 2 kolom -->
+    <Grid Margin="0,0,14,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <TextBlock Text="{x:Static resources:Strings.Menu_Integrations_ActivityTracking}" FontSize="20" FontWeight="Medium" Margin="0,16,0,0" />
+        <TextBlock Grid.Row="0" Text="{x:Static resources:Strings.Menu_Integrations_Description}" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_Integrations_EnableActivityTracking_Title}" 
-            Description="{x:Static resources:Strings.Menu_Integrations_EnableActivityTracking_Description}" 
-            HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F"
-            x:Name="ActivityTrackingOption">
-            <ui:ToggleSwitch IsChecked="{Binding ActivityTrackingEnabled, Mode=TwoWay}" />
-        </controls:OptionControl>
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_Integrations_QueryServerLocation_Title}" 
-            Description="{Binding Source={x:Static resources:Strings.Menu_Integrations_QueryServerLocation_Description}, Converter={StaticResource StringFormatConverter}, ConverterParameter='https://www.rovalra.com'}"
-            HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F#server-location-querying"
-            IsEnabled="{Binding InnerContent.IsChecked, ElementName=ActivityTrackingOption, Mode=OneWay}">
-            <ui:ToggleSwitch IsChecked="{Binding ShowServerDetailsEnabled, Mode=TwoWay}" />
-        </controls:OptionControl>
+            <!-- KOLOM KIRI: Activity Tracking -->
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="{x:Static resources:Strings.Menu_Integrations_ActivityTracking}" FontSize="20" FontWeight="Medium" Margin="0,0,0,0" />
 
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_Integrations_DesktopApp_Title}" 
-            Description="{Binding Source={x:Static resources:Strings.Menu_Integrations_DesktopApp_Description}, Converter={StaticResource StringFormatConverter}, ConverterParameter='https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F#dont-exit-to-desktop-app'}"
-            HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F#dont-exit-to-desktop-app"
-            IsEnabled="{Binding InnerContent.IsChecked, ElementName=ActivityTrackingOption, Mode=OneWay}">
-            <ui:ToggleSwitch IsChecked="{Binding DisableAppPatchEnabled, Mode=TwoWay}" />
-        </controls:OptionControl>
+                <controls:OptionControl 
+                    Header="{x:Static resources:Strings.Menu_Integrations_EnableActivityTracking_Title}" 
+                    Description="{x:Static resources:Strings.Menu_Integrations_EnableActivityTracking_Description}" 
+                    HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F"
+                    x:Name="ActivityTrackingOption">
+                    <ui:ToggleSwitch IsChecked="{Binding ActivityTrackingEnabled, Mode=TwoWay}" />
+                </controls:OptionControl>
 
-        <TextBlock Text="{x:Static resources:Strings.Common_DiscordRichPresence}" FontSize="20" FontWeight="Medium" Margin="0,16,0,0" />
-        <controls:MarkdownTextBlock MarkdownText="{Binding Source={x:Static resources:Strings.Menu_Integrations_RequiresActivityTracking}, Converter={StaticResource StringFormatConverter}, ConverterParameter='https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F#discord-rich-presence'}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <controls:OptionControl 
+                    Header="{x:Static resources:Strings.Menu_Integrations_QueryServerLocation_Title}" 
+                    Description="{Binding Source={x:Static resources:Strings.Menu_Integrations_QueryServerLocation_Description}, Converter={StaticResource StringFormatConverter}, ConverterParameter='https://www.rovalra.com'}"
+                    HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F#server-location-querying"
+                    IsEnabled="{Binding InnerContent.IsChecked, ElementName=ActivityTrackingOption, Mode=OneWay}">
+                    <ui:ToggleSwitch IsChecked="{Binding ShowServerDetailsEnabled, Mode=TwoWay}" />
+                </controls:OptionControl>
 
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_Integrations_ShowGameActivity_Title}" 
-            Description="{Binding Source={x:Static resources:Strings.Menu_Integrations_ShowGameActivity_Description}, Converter={StaticResource StringFormatConverter}, ConverterParameter='https://github.com/bloxstraplabs/bloxstrap/wiki/Discord-Rich-Presence-does-not-work'}"
-            IsEnabled="{Binding InnerContent.IsChecked, ElementName=ActivityTrackingOption, Mode=OneWay}"
-            x:Name="DiscordActivityOption">
-            <ui:ToggleSwitch IsChecked="{Binding DiscordActivityEnabled, Mode=TwoWay}" />
-        </controls:OptionControl>
+                <controls:OptionControl 
+                    Header="{x:Static resources:Strings.Menu_Integrations_DesktopApp_Title}" 
+                    Description="{Binding Source={x:Static resources:Strings.Menu_Integrations_DesktopApp_Description}, Converter={StaticResource StringFormatConverter}, ConverterParameter='https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F#dont-exit-to-desktop-app'}"
+                    HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F#dont-exit-to-desktop-app"
+                    IsEnabled="{Binding InnerContent.IsChecked, ElementName=ActivityTrackingOption, Mode=OneWay}">
+                    <ui:ToggleSwitch IsChecked="{Binding DisableAppPatchEnabled, Mode=TwoWay}" />
+                </controls:OptionControl>
+            </StackPanel>
 
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_Integrations_AllowActivityJoining_Title}" 
-            Description="{x:Static resources:Strings.Menu_Integrations_AllowActivityJoining_Description}"
-            IsEnabled="{Binding InnerContent.IsChecked, ElementName=DiscordActivityOption, Mode=OneWay}">
-            <ui:ToggleSwitch IsChecked="{Binding DiscordActivityJoinEnabled, Mode=TwoWay}" />
-        </controls:OptionControl>
+            <!-- KOLOM KANAN: Discord RPC -->
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="{x:Static resources:Strings.Common_DiscordRichPresence}" FontSize="20" FontWeight="Medium" Margin="0,0,0,0" />
+                <controls:MarkdownTextBlock MarkdownText="{Binding Source={x:Static resources:Strings.Menu_Integrations_RequiresActivityTracking}, Converter={StaticResource StringFormatConverter}, ConverterParameter='https://github.com/bloxstraplabs/bloxstrap/wiki/What-is-activity-tracking%3F#discord-rich-presence'}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_Integrations_ShowAccountOnProfile_Title}" 
-            Description="{x:Static resources:Strings.Menu_Integrations_ShowAccountOnProfile_Description}"
-            IsEnabled="{Binding InnerContent.IsChecked, ElementName=DiscordActivityOption, Mode=OneWay}">
-            <ui:ToggleSwitch IsChecked="{Binding DiscordAccountOnProfile, Mode=TwoWay}" />
-        </controls:OptionControl>
+                <controls:OptionControl 
+                    Header="{x:Static resources:Strings.Menu_Integrations_ShowGameActivity_Title}" 
+                    Description="{Binding Source={x:Static resources:Strings.Menu_Integrations_ShowGameActivity_Description}, Converter={StaticResource StringFormatConverter}, ConverterParameter='https://github.com/bloxstraplabs/bloxstrap/wiki/Discord-Rich-Presence-does-not-work'}"
+                    IsEnabled="{Binding InnerContent.IsChecked, ElementName=ActivityTrackingOption, Mode=OneWay}"
+                    x:Name="DiscordActivityOption">
+                    <ui:ToggleSwitch IsChecked="{Binding DiscordActivityEnabled, Mode=TwoWay}" />
+                </controls:OptionControl>
 
-        <TextBlock Text="{x:Static resources:Strings.Common_Miscellaneous}" FontSize="20" FontWeight="Medium" Margin="0,16,0,0" />
+                <controls:OptionControl 
+                    Header="{x:Static resources:Strings.Menu_Integrations_AllowActivityJoining_Title}" 
+                    Description="{x:Static resources:Strings.Menu_Integrations_AllowActivityJoining_Description}"
+                    IsEnabled="{Binding InnerContent.IsChecked, ElementName=DiscordActivityOption, Mode=OneWay}">
+                    <ui:ToggleSwitch IsChecked="{Binding DiscordActivityJoinEnabled, Mode=TwoWay}" />
+                </controls:OptionControl>
 
-        <Border Margin="0,4,0,0" Padding="8" CornerRadius="4" BorderThickness="1" BorderBrush="#41F2290A" Background="#F2290A">
-            <Grid Height="64">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Border BorderThickness="0,0,2,0" BorderBrush="#41000000">
-                    <ui:SymbolIcon Grid.Column="0" Symbol="Warning28" Foreground="White" FontSize="28" HorizontalAlignment="Left" Margin="14,0" />
-                </Border>
-                <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="1" Text="{x:Static resources:Strings.Menu_Integrations_MultiInstanceLaunching_Warning}" TextWrapping="Wrap" Foreground="White" FontSize="14" />
-            </Grid>
-        </Border>
-        
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_Integrations_MultiInstanceLaunching_Title}" 
-            Description="{x:Static resources:Strings.Menu_Integrations_MultiInstanceLaunching_Description}">
-            <ui:ToggleSwitch IsChecked="{Binding MultiInstanceLaunchingEnabled, Mode=TwoWay}" />
-        </controls:OptionControl>
+                <controls:OptionControl 
+                    Header="{x:Static resources:Strings.Menu_Integrations_ShowAccountOnProfile_Title}" 
+                    Description="{x:Static resources:Strings.Menu_Integrations_ShowAccountOnProfile_Description}"
+                    IsEnabled="{Binding InnerContent.IsChecked, ElementName=DiscordActivityOption, Mode=OneWay}">
+                    <ui:ToggleSwitch IsChecked="{Binding DiscordAccountOnProfile, Mode=TwoWay}" />
+                </controls:OptionControl>
+            </StackPanel>
+        </Grid>
 
-        <TextBlock Text="{x:Static resources:Strings.Menu_Integrations_Custom_Title}" FontSize="20" FontWeight="Medium" Margin="0,16,0,0" />
+        <!-- BAWAH (FULL WIDTH): Miscellaneous + Custom Integrations -->
+        <StackPanel Grid.Row="2">
+            <TextBlock Text="{x:Static resources:Strings.Common_Miscellaneous}" FontSize="20" FontWeight="Medium" Margin="0,8,0,0" />
+
+            <Border Margin="0,4,0,0" Padding="8" CornerRadius="4" BorderThickness="1" BorderBrush="#41F2290A" Background="#F2290A">
+                <Grid Height="64">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border BorderThickness="0,0,2,0" BorderBrush="#41000000">
+                        <ui:SymbolIcon Grid.Column="0" Symbol="Warning28" Foreground="White" FontSize="28" HorizontalAlignment="Left" Margin="14,0" />
+                    </Border>
+                    <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="1" Text="{x:Static resources:Strings.Menu_Integrations_MultiInstanceLaunching_Warning}" TextWrapping="Wrap" Foreground="White" FontSize="14" />
+                </Grid>
+            </Border>
+
+            <controls:OptionControl 
+                Header="{x:Static resources:Strings.Menu_Integrations_MultiInstanceLaunching_Title}" 
+                Description="{x:Static resources:Strings.Menu_Integrations_MultiInstanceLaunching_Description}">
+                <ui:ToggleSwitch IsChecked="{Binding MultiInstanceLaunchingEnabled, Mode=TwoWay}" />
+            </controls:OptionControl>
+
+            <TextBlock Text="{x:Static resources:Strings.Menu_Integrations_Custom_Title}" FontSize="20" FontWeight="Medium" Margin="0,8,0,0" />
         <TextBlock Text="{x:Static resources:Strings.Menu_Integrations_Custom_Description}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
         <Grid Margin="0,8,0,0">
             <Grid.RowDefinitions>
@@ -159,4 +182,5 @@
             </TextBlock>
         </Grid>
     </StackPanel>
+    </Grid>
 </ui:UiPage>

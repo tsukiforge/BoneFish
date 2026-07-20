@@ -28,42 +28,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 OnPropertyChanged(nameof(BackgroundRandomMode));
                 try { App.Settings.Save(); } catch { }
 
-                // Kalo random mode diaktifkan, langsung ganti random
-                if (value && EnableWallpaperLauncher)
+                // ★ FIX 3: Background selalu aktif — langsung ganti sesuai mode
+                if (value)
                     _ = LoadRandomBackgroundAsync();
-                else if (!value && EnableWallpaperLauncher)
+                else
                 {
                     // Random dimatikan: restore saved background (atau load random kalo belum milih)
                     if (string.IsNullOrEmpty(App.Settings.Prop.SelectedBackgroundType) || App.Settings.Prop.SelectedBackgroundType == "Random")
                         _ = LoadRandomBackgroundAsync();
                     else
                         _ = LoadSavedBackgroundAsync();
-                }
-            }
-        }
-
-        public bool EnableWallpaperLauncher
-        {
-            get => App.Settings.Prop.EnableWallpaperLauncher;
-            set
-            {
-                App.Settings.Prop.EnableWallpaperLauncher = value;
-                OnPropertyChanged(nameof(EnableWallpaperLauncher));
-                try { App.Settings.Save(); } catch { }
-
-                if (value)
-                {
-                    // Load sesuai mode: random atau saved
-                    if (App.Settings.Prop.BackgroundRandomMode || string.IsNullOrEmpty(App.Settings.Prop.SelectedBackgroundType))
-                        _ = LoadRandomBackgroundAsync();
-                    else
-                        _ = LoadSavedBackgroundAsync();
-                }
-                else
-                {
-                    // Bersihkan global background + cache saat wallpaper dinonaktifkan
-                    AppBackgroundService.SetGlobalBackground(null);
-                    AppBackgroundService.ClearCache();
                 }
             }
         }
@@ -78,9 +52,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public async Task LoadRandomBackgroundAsync()
         {
-            if (!EnableWallpaperLauncher)
-                return;
-
+            // ★ FIX 3: Background selalu aktif — hapus EnableWallpaperLauncher check
+            
             // Battery Saver: skip auto-refresh jika laptop tidak dicharge
             if (ShouldSkipLoadingDueToBattery())
             {
@@ -106,8 +79,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public async Task LoadSavedBackgroundAsync()
         {
-            if (!EnableWallpaperLauncher)
-                return;
+            // ★ FIX 3: Background selalu aktif — hapus EnableWallpaperLauncher check
 
             string savedType = App.Settings.Prop.SelectedBackgroundType;
             if (string.IsNullOrEmpty(savedType) || savedType == "Random")
@@ -319,6 +291,32 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        /// <summary>
+        /// ★ FIX 1.3: Deteksi apakah Watcher process sedang berjalan.
+        /// Watcher bikin EventWaitHandle "BoneFish-WatcherExitEvent" pas startup.
+        /// EventWaitHandle bisa diakses lintas-proses — sempurna buat deteksi ini.
+        /// Jangan pakai DoesMutexExist karena ini EventWaitHandle, bukan Mutex.
+        /// Kalau Watcher aktif, jangan buat instance CrosshairService/HotkeyService baru
+        /// dari Settings process — Watcher sudah punya instance-nya sendiri.
+        /// </summary>
+        private static bool IsWatcherRunning()
+        {
+            try
+            {
+                using var evt = System.Threading.EventWaitHandle.OpenExisting("BoneFish-WatcherExitEvent");
+                return evt != null;
+            }
+            catch (System.Threading.WaitHandleCannotBeOpenedException)
+            {
+                // Watcher process tidak ada — boleh buat instance lokal
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public bool EnableHotkeys
         {
             get => App.Settings.Prop.EnableHotkeys;
@@ -327,6 +325,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.Settings.Prop.EnableHotkeys = value;
                 OnPropertyChanged(nameof(EnableHotkeys));
                 try { App.Settings.Save(); } catch { }
+
+                // ★ FIX 1.3: Cegah duplikasi — kalau Watcher sedang jalan, jangan buat instance baru
+                if (IsWatcherRunning())
+                {
+                    App.Logger.WriteLine("ExperimentalViewModel", "Watcher is running — skipping local HotkeyService creation");
+                    return;
+                }
 
                 // Start/stop HotkeyService secara langsung dari Settings UI
                 // (Watcher process mungkin tidak berjalan, jadi kita perlu handle di sini)
@@ -357,6 +362,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.Settings.Prop.EnableCrosshair = value;
                 OnPropertyChanged(nameof(EnableCrosshair));
                 try { App.Settings.Save(); } catch { }
+
+                // ★ FIX 1.3: Cegah duplikasi — kalau Watcher sedang jalan, jangan buat instance baru
+                if (IsWatcherRunning())
+                {
+                    App.Logger.WriteLine("ExperimentalViewModel", "Watcher is running — skipping local CrosshairService creation");
+                    return;
+                }
 
                 // Pastikan CrosshairService aktif bahkan dari Settings UI
                 // (Watcher process mungkin tidak berjalan)
@@ -414,15 +426,28 @@ namespace Bloxstrap.UI.ViewModels.Settings
         // Available crosshair styles for the ComboBox
         public string[] CrosshairStyles { get; } = new[] { "Cross", "Dot", "Circle", "CrossDot" };
 
+        /// <summary>
+        /// CrosshairColor property — dengan OnPropertyChanged supaya preview binding update real-time.
+        /// </summary>
+        public string CrosshairColor
+        {
+            get => App.Settings.Prop.CrosshairColor;
+            set
+            {
+                App.Settings.Prop.CrosshairColor = value;
+                OnPropertyChanged(nameof(CrosshairColor));
+                try { App.Settings.Save(); } catch { }
+                CrosshairService.Instance?.ApplySettings();
+            }
+        }
+
         public ICommand SelectCrosshairColorCommand { get; }
 
         private void SelectCrosshairColor(object? param)
         {
             if (param is string color && !string.IsNullOrEmpty(color))
             {
-                App.Settings.Prop.CrosshairColor = color;
-                try { App.Settings.Save(); } catch { }
-                CrosshairService.Instance?.ApplySettings();
+                CrosshairColor = color; // Pakai property setter biar OnPropertyChanged kepanggil
             }
         }
 
@@ -469,16 +494,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             SelectWallpaperExtraCommand = new RelayCommand(OnSelectWallpaperExtra);
             BrowseCustomBackgroundCommand = new RelayCommand(OnBrowseCustomBackground);
 
-            // Auto-load wallpaper pas halaman ini di-load
-            // Pake persistence: kalo random mode ON atau belom pernah milih → random
-            // Kalo ada saved type → load sesuai saved type
-            if (App.Settings.Prop.EnableWallpaperLauncher)
-            {
-                if (App.Settings.Prop.BackgroundRandomMode || string.IsNullOrEmpty(App.Settings.Prop.SelectedBackgroundType))
-                    _ = LoadRandomBackgroundAsync();
-                else
-                    _ = LoadSavedBackgroundAsync();
-            }
+            // ★ FIX 3: Background selalu aktif — auto-load sesuai mode persistence
+            if (App.Settings.Prop.BackgroundRandomMode || string.IsNullOrEmpty(App.Settings.Prop.SelectedBackgroundType))
+                _ = LoadRandomBackgroundAsync();
+            else
+                _ = LoadSavedBackgroundAsync();
         }
     }
 }

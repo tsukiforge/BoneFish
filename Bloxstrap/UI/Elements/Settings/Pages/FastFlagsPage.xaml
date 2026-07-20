@@ -8,20 +8,34 @@
       xmlns:resources="clr-namespace:Bloxstrap.Resources"
       xmlns:controls="clr-namespace:Bloxstrap.UI.Elements.Controls"
       mc:Ignorable="d"
-      d:DesignHeight="1500" d:DesignWidth="800"
+      d:DesignHeight="1200" d:DesignWidth="800"
       Title="FastFlagsPage"
       Scrollable="True"
       Loaded="Page_Loaded">
     <ui:UiPage.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </ui:UiPage.Resources>
-    <StackPanel Margin="0,0,14,14">
-        <TextBlock Margin="0,0,0,16" Text="{x:Static resources:Strings.Menu_FastFlags_Description}" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
-        <ui:Snackbar x:Name="FastFlagsSnackbar" Title="Pemberitahuan" Message="" Appearance="Success" Icon="CheckmarkCircle32" Timeout="5000" Margin="0,0,0,16" Visibility="Collapsed" />
+    <!-- ★ FIX 4: Layout 2 kolom untuk mengurangi scroll -->
+    <Grid Margin="0,0,14,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ── INFO & LOADING ─────────────────────────────────────── -->
+        <TextBlock Grid.Row="0" Margin="0,0,0,12" 
+                   Text="{x:Static resources:Strings.Menu_FastFlags_Description}" 
+                   FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+        <ui:Snackbar Grid.Row="0" x:Name="FastFlagsSnackbar" Title="Pemberitahuan" Message="" 
+                     Appearance="Success" Icon="CheckmarkCircle32" Timeout="5000" 
+                     Margin="0,0,0,8" Visibility="Collapsed" />
 
         <!-- Loading indicator saat apply preset -->
-        <Border x:Name="ApplyingIndicator" Margin="0,0,0,16" Padding="12,8" CornerRadius="6"
+        <Border Grid.Row="0" x:Name="ApplyingIndicator" Margin="0,0,0,8" Padding="12,8" CornerRadius="6"
                 Background="#1A2196F3"
                 Visibility="{Binding IsApplying, Converter={StaticResource BoolToVis}}">
             <StackPanel Orientation="Horizontal">
@@ -31,233 +45,254 @@
             </StackPanel>
         </Border>
 
-        <!-- ═══ SYSTEM INFO (Fitur C) ════════════════════════════════════════════ -->
-        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="14" Margin="0,0,0,8">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="💻 System Info" VerticalAlignment="Center" />
-                    <Border Margin="8,0,0,0" Padding="6,2" Background="#004D40" CornerRadius="4">
-                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="#64FFDA" Text="READ-ONLY" />
-                    </Border>
-                </StackPanel>
-                <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="{Binding SystemInfoText}" TextWrapping="Wrap" />
-            </StackPanel>
-        </Border>
+        <!-- ═══ 2 KOLOM UTAMA ════════════════════════════════════════ -->
+        <!-- ★ FIX 4: Responsive — 2 kolom, fallback 1 kolom (stacking) kalo < 700px -->
+        <Grid Grid.Row="2" Margin="0,0,0,12" SizeChanged="MainGrid_SizeChanged">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-        <ui:InfoBar MouseDoubleClick="InfoBar_MouseDoubleClick" Margin="0,-8,0,0" Padding="8" Title="{x:Static resources:Strings.Common_Warning}" Message="{x:Static resources:Strings.Menu_FastFlags_EditorInfo}" Severity="Warning" IsOpen="True" IsClosable="False"></ui:InfoBar>
-        
-        <ui:CardAction Margin="0,8,0,0" Icon="EditSettings24" Command="{Binding OpenFastFlagEditorCommand}">
-            <StackPanel>
-                <TextBlock FontSize="14" Text="{x:Static resources:Strings.Menu_FastFlagEditor_Title}" />
-                <TextBlock Margin="0,2,0,0" FontSize="12" Text="{x:Static resources:Strings.Menu_FastFlags_Editor_Description}" Padding="0,0,16,0"  Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-            </StackPanel>
-        </ui:CardAction>
-
-        <!-- ═══ APPLY & RESTART ════════════════════════════════════════════════════════ -->
-        <ui:CardAction Margin="0,8,0,0" Icon="ArrowSync24" Command="{Binding ApplyAndRestartRobloxCommand}"
-                       Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="🚀 Apply &amp; Restart Roblox" />
-                    <Border Margin="8,0,0,0" Padding="6,2" Background="#004D40" CornerRadius="4">
-                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="#64FFDA" Text="SAVE + RESTART" />
-                    </Border>
-                </StackPanel>
-                <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="Simpan semua FastFlag &amp; perubahan settings ke disk, tutup paksa Roblox (termasuk system tray), lalu restart BoneFish loader — jadi setting langsung kebaca tanpa perlu manual close &amp; buka ulang." />
-            </StackPanel>
-        </ui:CardAction>
-
-        <TextBlock Text="Performance &amp; Network Presets (Pilih Salah Satu)" FontSize="20" FontWeight="Medium" Margin="0,16,0,8" />
-
-        <ui:CardAction Margin="0,8,0,0" Icon="Settings28" Command="{Binding ApplyRecommendedFastFlagsCommand}">
-            <StackPanel>
-                <TextBlock FontSize="14" Text="Auto-optimize FastFlags" />
-                <TextBlock Margin="0,2,0,0" FontSize="12" Text="Set recommended performance flags for lower-end systems." Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" Text="[ ACTIVE ]" Visibility="{Binding IsAutoOptimizeActive, Converter={StaticResource BoolToVis}}" />
-            </StackPanel>
-        </ui:CardAction>
-
-        <ui:CardAction Margin="0,8,0,0" Icon="Wrench24" Command="{Binding ApplyRecommendedStabilityPresetCommand}">
-            <StackPanel>
-                <TextBlock FontSize="14" Text="Apply stable low-spec preset" />
-                <TextBlock Margin="0,2,0,0" FontSize="12" Text="Combine low-spec rendering and stable network settings in one click." Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" Text="[ ACTIVE ]" Visibility="{Binding IsStableActive, Converter={StaticResource BoolToVis}}" />
-            </StackPanel>
-        </ui:CardAction>
-
-        <!-- Tombol "Ultra low-spec + Anti Crash" DIHAPUS di v4.5.0.
-             Flag-nya digabung ke tombol "Anti Not-Responding (Extreme Performance)"
-             di bawah (lihat ApplyExtremePerformancePreset).             Untuk migrasi preset lama "UltraLow" → "ExtremePerformance", lihat
-             App.OnStartup() blok MIGASI PRESET v4.5.0. -->
-
-        <ui:CardAction Margin="0,8,0,0" Icon="AppsAddIn28" Command="{Binding ApplyBalancedPresetCommand}">
-            <StackPanel>
-                <TextBlock FontSize="14" Text="Balanced (optimal)" />
-                <TextBlock Margin="0,2,0,0" FontSize="12" Text="Keseimbangan visual dan performa. Termasuk No Delay Network." Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" Text="[ ACTIVE ]" Visibility="{Binding IsBalancedActive, Converter={StaticResource BoolToVis}}" />
-            </StackPanel>
-        </ui:CardAction>
-
-        <!-- ═══ ANTI NOT-RESPONDING (POTATO MODE / LONG SESSION) ════════════════════════ -->
-        <ui:CardAction Margin="0,8,0,0" Icon="Flash24" Command="{Binding ApplyExtremePerformancePresetCommand}"
-                       Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="🥔 Anti Not-Responding (Long Session)" />
-                    <Border Margin="8,0,0,0" Padding="6,2" Background="#CC3300" CornerRadius="4">
-                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="White" Text="PALING AGRESIF" />
-                    </Border>
-                </StackPanel>
-                <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="Untuk laptop kentang: dual-core, RAM &lt;4GB, tanpa GPU dedicated. Tujuan utama: mencegah Roblox freeze/not-responding setelah main lama. Matikan shadow, post-FX, SSAO, telemetry, anim track, dynamic faces. Gabungan flag Potato + Ultra Low." />
-                <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="Orange"
-                           Text="[ ACTIVE — ANTI NOT-RESPONDING 🥔 ]"
-                           Visibility="{Binding IsExtremePerformanceActive, Converter={StaticResource BoolToVis}}" />
-            </StackPanel>
-        </ui:CardAction>
-
-        <!-- Toggle dan slider khusus Potato Mode -->
-        <controls:OptionControl
-            Header="Force Extreme Mode (Potato Mode Override)"
-            Description="Paksa preset ExtremePerformance walau hardware terdeteksi MidRange/HighEnd. AutoOptimizeService akan ikut apply tier ini saat Roblox launch.">
-            <ui:ToggleSwitch IsChecked="{Binding ForceExtremeMode, Mode=TwoWay}" />
-        </controls:OptionControl>
-
-        <ui:CardExpander Margin="0,4,0,0" IsExpanded="False">
-            <ui:CardExpander.Header>
-                <StackPanel>
-                    <TextBlock FontSize="14" Text="Target FPS — Extreme / Potato Mode" />
-                    <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Batasi FPS internal Roblox untuk kurangi CPU load. Default 30fps; turunkan ke 24 untuk device paling lemah." />
-                </StackPanel>
-            </ui:CardExpander.Header>
-            <Grid Margin="0,8,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="24 fps" Grid.Column="0" VerticalAlignment="Center" />
-                <Slider Grid.Column="1" Margin="8,0,8,0" Minimum="24" Maximum="60"
-                        TickFrequency="1" IsSnapToTickEnabled="True"
-                        Value="{Binding ExtremeModeFpsTarget, Mode=TwoWay}" />
-                <TextBlock Text="60 fps" Grid.Column="2" VerticalAlignment="Center" />
-                <Border Margin="8,-4,0,0" Grid.Column="3" Width="36"
-                        BorderBrush="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}"
-                        Background="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}"
-                        BorderThickness="1" CornerRadius="4">
-                    <TextBlock HorizontalAlignment="Center" Padding="4" VerticalAlignment="Center"
-                               TextAlignment="Center"
-                               Text="{Binding ExtremeModeFpsTarget, Mode=TwoWay}" />
-                </Border>
-            </Grid>
-        </ui:CardExpander>
-
-        <!-- ═══ NIGHT VISION (Potato Mode) ══════════════════════════════════════════ -->
-        <ui:CardAction Margin="0,8,0,0" Icon="WeatherMoon24" Command="{Binding ToggleNightVisionCommand}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="🌙 Night Vision" />
-                    <Border Margin="8,0,0,0" Padding="6,2" Background="#1A4A8A" CornerRadius="4">
-                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="#7EC8FF" Text="CLIENT-SIDE ONLY" />
-                    </Border>
-                </StackPanel>
-                <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="Terangkan area gelap di game. Tidak mempengaruhi server atau pemain lain. Klik untuk toggle — akan muncul konfirmasi sebelum aktif." />
-                <!-- Status aktif: warna biru terang -->
-                <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="#7EC8FF"
-                           Text="[ 🌙 NIGHT VISION AKTIF ]"
-                           Visibility="{Binding NightVisionEnabled, Converter={StaticResource BoolToVis}}" />
-            </StackPanel>
-        </ui:CardAction>
-
-        <TextBlock Text="Manual FastFlag Overrides" FontSize="20" FontWeight="Medium" Margin="0,16,0,8" />
-
-        <!-- ═══ CLEAR CLIENTAPPSETTINGS ══════════════════════════════════════════════ -->
-        <ui:CardAction Margin="0,0,0,0" Icon="Delete24" Command="{Binding ClearClientAppSettingsCommand}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="🗑️ Clear ClientAppSettings" />
-                    <Border Margin="8,0,0,0" Padding="6,2" Background="#5A3000" CornerRadius="4">
-                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="#FFA040" Text="TROUBLESHOOT" />
-                    </Border>
-                </StackPanel>
-                <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="Hapus semua FastFlag dari BoneFish dan Roblox path. Gunakan jika game gelap atau visual aneh setelah ganti preset. Pilih ulang preset setelahnya." />
-            </StackPanel>
-        </ui:CardAction>
-
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_FastFlags_ManagerEnabled_Title}"
-            Description="{x:Static resources:Strings.Menu_FastFlags_ManagerEnabled_Description}">
-            <ui:ToggleSwitch IsChecked="{Binding UseFastFlagManager, Mode=TwoWay}" />
-        </controls:OptionControl>
-
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_FastFlags_Reset_Title}">
-            <ui:ToggleSwitch IsChecked="{Binding ResetConfiguration, Mode=TwoWay}" />
-        </controls:OptionControl>
-
-        <controls:OptionControl 
-            Header="Nonaktifkan Animasi UI Roblox"
-            Description="Menonaktifkan animasi menu ESC dan transisi UI lainnya untuk memperingan game.">
-            <ui:ToggleSwitch IsChecked="{Binding DisableRobloxAnimations, Mode=TwoWay}" />
-        </controls:OptionControl>
-
-        <controls:OptionControl 
-            Header="Mode Memori Rendah Roblox"
-            Description="Mengoptimalkan penggunaan RAM Roblox agar lebih ringan pada PC spek rendah.">
-            <ui:ToggleSwitch IsChecked="{Binding EnableLowMemoryMode, Mode=TwoWay}" />
-        </controls:OptionControl>
-
-        <TextBlock Text="{x:Static resources:Strings.Common_Presets}" FontSize="20" FontWeight="Medium" Margin="0,16,0,0" />
-
-        <TextBlock Text="{x:Static resources:Strings.Common_Geometry}" FontSize="16" FontWeight="Medium" Margin="0,16,0,0" />
-        <ui:CardExpander Margin="0,8,0,0" IsExpanded="{Binding Path=MeshQualityEnabled, Mode=OneWay}" Style="{StaticResource NoUserExpansionCardExpanderStyle}">
-            <ui:CardExpander.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0">
-                        <TextBlock FontSize="14" Text="{x:Static resources:Strings.Menu_FastFlags_MeshDetail_Header}" />
-                        <TextBlock FontSize="12" Text="{x:Static resources:Strings.Menu_FastFlags_MeshDetail_Description}" 
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            <!-- ══ KOLOM KIRI ════════════════════════════════════════ -->
+            <StackPanel x:Name="LeftPanel" Grid.Column="0" Grid.Row="0">
+                <!-- SYSTEM INFO -->
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="14" Margin="0,0,0,8">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontSize="14" FontWeight="SemiBold" Text="💻 System Info" VerticalAlignment="Center" />
+                            <Border Margin="8,0,0,0" Padding="6,2" Background="#004D40" CornerRadius="4">
+                                <TextBlock FontSize="10" FontWeight="Bold" Foreground="#64FFDA" Text="READ-ONLY" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="{Binding SystemInfoText}" TextWrapping="Wrap" />
                     </StackPanel>
+                </Border>
 
-                    <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding MeshQualityEnabled, Mode=TwoWay}" />
-                </Grid>
-            </ui:CardExpander.Header>
+                <ui:InfoBar MouseDoubleClick="InfoBar_MouseDoubleClick" Margin="0,0,0,0" Padding="8" 
+                            Title="{x:Static resources:Strings.Common_Warning}" 
+                            Message="{x:Static resources:Strings.Menu_FastFlags_EditorInfo}" 
+                            Severity="Warning" IsOpen="True" IsClosable="False" />
 
-            <StackPanel Margin="0,8,0,0">
-                <TextBlock Padding="8" Text="{x:Static resources:Strings.Menu_FastFlags_MeshDetail_LowQualityWarning}" TextAlignment="Center" />
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                <ui:CardAction Margin="0,8,0,0" Icon="EditSettings24" Command="{Binding OpenFastFlagEditorCommand}">
+                    <StackPanel>
+                        <TextBlock FontSize="14" Text="{x:Static resources:Strings.Menu_FastFlagEditor_Title}" />
+                        <TextBlock Margin="0,2,0,0" FontSize="12" 
+                                   Text="{x:Static resources:Strings.Menu_FastFlags_Editor_Description}" 
+                                   Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                    </StackPanel>
+                </ui:CardAction>
 
-                    <TextBlock Text="{x:Static resources:Strings.Common_LowestQuality}" Grid.Column="0" />
-                    <Slider Grid.Column="1" Margin="8,0,8,0" Minimum="0" Maximum="3" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding MeshQuality, Mode=TwoWay}" />
-                    <TextBlock Text="{x:Static resources:Strings.Common_HighestQuality}" Grid.Column="2" />
-                </Grid>
+                <!-- APPLY & RESTART -->
+                <ui:CardAction Margin="0,8,0,0" Icon="ArrowSync24" Command="{Binding ApplyAndRestartRobloxCommand}"
+                               Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontSize="14" FontWeight="SemiBold" Text="🚀 Apply &amp; Restart Roblox" />
+                            <Border Margin="8,0,0,0" Padding="6,2" Background="#004D40" CornerRadius="4">
+                                <TextBlock FontSize="10" FontWeight="Bold" Foreground="#64FFDA" Text="SAVE + RESTART" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Simpan semua FastFlag &amp; perubahan settings ke disk, tutup paksa Roblox, lalu restart BoneFish loader." />
+                    </StackPanel>
+                </ui:CardAction>
+
+                <!-- PERFORMANCE PRESETS -->
+                <TextBlock Text="Performance &amp; Network Presets (Pilih Satu)" FontSize="20" FontWeight="Medium" Margin="0,16,0,4" />
+
+                <ui:CardAction Margin="0,4,0,0" Icon="Settings28" Command="{Binding ApplyRecommendedFastFlagsCommand}">
+                    <StackPanel>
+                        <TextBlock FontSize="14" Text="Auto-optimize FastFlags" />
+                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Set recommended performance flags for lower-end systems." 
+                                   Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
+                                   Text="[ ACTIVE ]" Visibility="{Binding IsAutoOptimizeActive, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </ui:CardAction>
+
+                <ui:CardAction Margin="0,4,0,0" Icon="Wrench24" Command="{Binding ApplyRecommendedStabilityPresetCommand}">
+                    <StackPanel>
+                        <TextBlock FontSize="14" Text="Apply stable low-spec preset" />
+                        <TextBlock Margin="0,2,0,0" FontSize="12" 
+                                   Text="Combine low-spec rendering and stable network settings in one click." 
+                                   Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
+                                   Text="[ ACTIVE ]" Visibility="{Binding IsStableActive, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </ui:CardAction>
+
+                <ui:CardAction Margin="0,4,0,0" Icon="AppsAddIn28" Command="{Binding ApplyBalancedPresetCommand}">
+                    <StackPanel>
+                        <TextBlock FontSize="14" Text="Balanced (optimal)" />
+                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Keseimbangan visual dan performa. Termasuk No Delay Network." 
+                                   Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
+                                   Text="[ ACTIVE ]" Visibility="{Binding IsBalancedActive, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </ui:CardAction>
+
+                <ui:CardAction Margin="0,4,0,0" Icon="Flash24" Command="{Binding ApplyExtremePerformancePresetCommand}"
+                               Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontSize="14" FontWeight="SemiBold" Text="🥔 Anti Not-Responding (Long Session)" />
+                            <Border Margin="8,0,0,0" Padding="6,2" Background="#CC3300" CornerRadius="4">
+                                <TextBlock FontSize="10" FontWeight="Bold" Foreground="White" Text="PALING AGRESIF" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Untuk laptop kentang: dual-core, RAM &lt;4GB. Mencegah Roblox freeze/not-responding setelah main lama." />
+                        <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="Orange"
+                                   Text="[ ACTIVE — ANTI NOT-RESPONDING 🥔 ]"
+                                   Visibility="{Binding IsExtremePerformanceActive, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </ui:CardAction>
+
+                <!-- CLEAR CLIENTAPPSETTINGS -->
+                <ui:CardAction Margin="0,12,0,0" Icon="Delete24" Command="{Binding ClearClientAppSettingsCommand}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontSize="14" FontWeight="SemiBold" Text="🗑️ Clear ClientAppSettings" />
+                            <Border Margin="8,0,0,0" Padding="6,2" Background="#5A3000" CornerRadius="4">
+                                <TextBlock FontSize="10" FontWeight="Bold" Foreground="#FFA040" Text="TROUBLESHOOT" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Hapus semua FastFlag dari BoneFish dan Roblox path. Pilih ulang preset setelahnya." />
+                    </StackPanel>
+                </ui:CardAction>
             </StackPanel>
-        </ui:CardExpander>
 
-        <TextBlock Text="{x:Static resources:Strings.Menu_FastFlags_Presets_Categories_Rendering}" FontSize="16" FontWeight="Medium" Margin="0,16,0,0" />
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_FastFlags_Presets_MSAA_Title}">
-                    <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" ItemsSource="{Binding MSAALevels.Keys, Mode=OneTime}" SelectedItem="{Binding SelectedMSAALevel, Mode=TwoWay}">
+            <!-- ══ KOLOM KANAN ═══════════════════════════════════════ -->
+            <StackPanel x:Name="RightPanel" Grid.Column="2" Grid.Row="0">
+                <!-- NIGHT VISION — DIHAPUS (GAP 4: deprecated flags) -->
+
+                <!-- FORCE EXTREME MODE -->
+                <controls:OptionControl
+                    Header="Force Extreme Mode (Potato Mode Override)"
+                    Description="Paksa preset ExtremePerformance walau hardware terdeteksi MidRange/HighEnd.">
+                    <ui:ToggleSwitch IsChecked="{Binding ForceExtremeMode, Mode=TwoWay}" />
+                </controls:OptionControl>
+
+                <!-- FAST LOADING TOGGLE -->
+                <controls:OptionControl
+                    Header="Fast Loading (Percepat Muncul Aset)"
+                    Description="Optimasi loading: texture &amp; mesh muncul lebih cepat. Stack dengan preset apa pun. Aktif otomatis berdasarkan jumlah core CPU.">
+                    <ui:ToggleSwitch IsChecked="{Binding EnableFastLoadingFlags, Mode=TwoWay}" />
+                </controls:OptionControl>
+
+                <!-- FPS TARGET -->
+                <ui:CardExpander Margin="0,4,0,0" IsExpanded="False">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontSize="14" Text="Target FPS — Extreme / Potato Mode" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Batasi FPS internal Roblox untuk kurangi CPU load. Default 30fps." />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="24 fps" Grid.Column="0" VerticalAlignment="Center" />
+                        <Slider Grid.Column="1" Margin="8,0,8,0" Minimum="24" Maximum="60"
+                                TickFrequency="1" IsSnapToTickEnabled="True"
+                                Value="{Binding ExtremeModeFpsTarget, Mode=TwoWay}" />
+                        <TextBlock Text="60 fps" Grid.Column="2" VerticalAlignment="Center" />
+                        <Border Margin="8,-4,0,0" Grid.Column="3" Width="36"
+                                BorderBrush="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}"
+                                Background="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}"
+                                BorderThickness="1" CornerRadius="4">
+                            <TextBlock HorizontalAlignment="Center" Padding="4" VerticalAlignment="Center"
+                                       TextAlignment="Center"
+                                       Text="{Binding ExtremeModeFpsTarget, Mode=TwoWay}" />
+                        </Border>
+                    </Grid>
+                </ui:CardExpander>
+
+                <!-- MANUAL OVERRIDES -->
+                <TextBlock Text="Manual FastFlag Overrides" FontSize="20" FontWeight="Medium" Margin="0,16,0,4" />
+
+                <controls:OptionControl 
+                    Header="{x:Static resources:Strings.Menu_FastFlags_ManagerEnabled_Title}"
+                    Description="{x:Static resources:Strings.Menu_FastFlags_ManagerEnabled_Description}">
+                    <ui:ToggleSwitch IsChecked="{Binding UseFastFlagManager, Mode=TwoWay}" />
+                </controls:OptionControl>
+
+                <controls:OptionControl 
+                    Header="{x:Static resources:Strings.Menu_FastFlags_Reset_Title}">
+                    <ui:ToggleSwitch IsChecked="{Binding ResetConfiguration, Mode=TwoWay}" />
+                </controls:OptionControl>
+
+                <controls:OptionControl 
+                    Header="Nonaktifkan Animasi UI Roblox"
+                    Description="Menonaktifkan animasi menu ESC dan transisi UI untuk memperingan game.">
+                    <ui:ToggleSwitch IsChecked="{Binding DisableRobloxAnimations, Mode=TwoWay}" />
+                </controls:OptionControl>
+
+                <controls:OptionControl 
+                    Header="Mode Memori Rendah Roblox"
+                    Description="Mengoptimalkan penggunaan RAM Roblox agar lebih ringan di PC spek rendah.">
+                    <ui:ToggleSwitch IsChecked="{Binding EnableLowMemoryMode, Mode=TwoWay}" />
+                </controls:OptionControl>
+
+                <!-- GEOMETRY -->
+                <TextBlock Text="{x:Static resources:Strings.Common_Presets}" FontSize="20" FontWeight="Medium" Margin="0,16,0,4" />
+                <TextBlock Text="{x:Static resources:Strings.Common_Geometry}" FontSize="16" FontWeight="Medium" Margin="0,4,0,0" />
+
+                <ui:CardExpander Margin="0,4,0,0" IsExpanded="{Binding Path=MeshQualityEnabled, Mode=OneWay}" 
+                                 Style="{StaticResource NoUserExpansionCardExpanderStyle}">
+                    <ui:CardExpander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock FontSize="14" Text="{x:Static resources:Strings.Menu_FastFlags_MeshDetail_Header}" />
+                                <TextBlock FontSize="12" Text="{x:Static resources:Strings.Menu_FastFlags_MeshDetail_Description}" 
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                            </StackPanel>
+                            <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding MeshQualityEnabled, Mode=TwoWay}" />
+                        </Grid>
+                    </ui:CardExpander.Header>
+                    <StackPanel Margin="0,8,0,0">
+                        <TextBlock Padding="8" Text="{x:Static resources:Strings.Menu_FastFlags_MeshDetail_LowQualityWarning}" 
+                                   TextAlignment="Center" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static resources:Strings.Common_LowestQuality}" Grid.Column="0" />
+                            <Slider Grid.Column="1" Margin="8,0,8,0" Minimum="0" Maximum="3" 
+                                    TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding MeshQuality, Mode=TwoWay}" />
+                            <TextBlock Text="{x:Static resources:Strings.Common_HighestQuality}" Grid.Column="2" />
+                        </Grid>
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- RENDERING -->
+                <TextBlock Text="{x:Static resources:Strings.Menu_FastFlags_Presets_Categories_Rendering}" 
+                           FontSize="16" FontWeight="Medium" Margin="0,16,0,0" />
+
+                <controls:OptionControl Header="{x:Static resources:Strings.Menu_FastFlags_Presets_MSAA_Title}">
+                    <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" 
+                              ItemsSource="{Binding MSAALevels.Keys, Mode=OneTime}" 
+                              SelectedItem="{Binding SelectedMSAALevel, Mode=TwoWay}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Path=., Converter={StaticResource EnumNameConverter}}" />
@@ -267,50 +302,53 @@
                 </controls:OptionControl>
 
                 <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_FastFlags_Presets_FixDisplayScaling_Title}" 
-            Description="{x:Static resources:Strings.Menu_FastFlags_Presets_FixDisplayScaling_Description}" 
-            HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/A-guide-to-FastFlags#dpi-scaling-fixes">
+                    Header="{x:Static resources:Strings.Menu_FastFlags_Presets_FixDisplayScaling_Title}" 
+                    Description="{x:Static resources:Strings.Menu_FastFlags_Presets_FixDisplayScaling_Description}" 
+                    HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/A-guide-to-FastFlags#dpi-scaling-fixes">
                     <ui:ToggleSwitch IsChecked="{Binding FixDisplayScaling, Mode=TwoWay}" />
                 </controls:OptionControl>
 
-        <ui:CardExpander Margin="0,8,0,0" IsExpanded="{Binding FRMQualityOverrideEnabled, Mode=OneWay}" Style="{StaticResource NoUserExpansionCardExpanderStyle}">
-            <ui:CardExpander.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <ui:CardExpander Margin="0,4,0,0" IsExpanded="{Binding FRMQualityOverrideEnabled, Mode=OneWay}" 
+                                 Style="{StaticResource NoUserExpansionCardExpanderStyle}">
+                    <ui:CardExpander.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock FontSize="14" Text="{x:Static resources:Strings.Menu_FastFlags_FRMQualityOverride_Title}" />
+                                <TextBlock FontSize="12" Text="{x:Static resources:Strings.Menu_FastFlags_FRMQualityOverride_Description}" 
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                            </StackPanel>
+                            <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding FRMQualityOverrideEnabled, Mode=TwoWay}" />
+                        </Grid>
+                    </ui:CardExpander.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Static resources:Strings.Common_LowestQuality}" Grid.Column="0" />
+                        <Slider Grid.Column="1" Margin="8,0,8,0" Minimum="1" Maximum="21" 
+                                TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FRMQualityOverride, Mode=TwoWay}" />
+                        <TextBlock Text="{x:Static resources:Strings.Common_HighestQuality}" Grid.Column="2" />
+                        <Border Margin="8,-4,0,0" Grid.Column="3" Width="30" 
+                                BorderBrush="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}" 
+                                Background="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}" 
+                                BorderThickness="1" CornerRadius="4">
+                            <TextBlock HorizontalAlignment="Center" Padding="4" VerticalAlignment="Center" 
+                                       TextAlignment="Center" Text="{Binding FRMQualityOverride, Mode=TwoWay}" />
+                        </Border>
+                    </Grid>
+                </ui:CardExpander>
 
-                    <StackPanel Grid.Column="0">
-                        <TextBlock FontSize="14" Text="{x:Static resources:Strings.Menu_FastFlags_FRMQualityOverride_Title}" />
-                        <TextBlock FontSize="12" Text="{x:Static resources:Strings.Menu_FastFlags_FRMQualityOverride_Description}" 
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                    </StackPanel>
-
-                    <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding FRMQualityOverrideEnabled, Mode=TwoWay}" />
-                </Grid>
-            </ui:CardExpander.Header>
-
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Text="{x:Static resources:Strings.Common_LowestQuality}" Grid.Column="0" />
-                <Slider Grid.Column="1" Margin="8,0,8,0" Minimum="1" Maximum="21" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FRMQualityOverride, Mode=TwoWay}" />
-                <TextBlock Text="{x:Static resources:Strings.Common_HighestQuality}" Grid.Column="2" />
-                <Border Margin="8,-4,0,0" Grid.Column="3" Width="30" BorderBrush="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}" Background="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}" BorderThickness="1" CornerRadius="4">
-                    <TextBlock HorizontalAlignment="Center" Padding="4" VerticalAlignment="Center" TextAlignment="Center" Text="{Binding FRMQualityOverride, Mode=TwoWay}" />
-                </Border>
-            </Grid>
-        </ui:CardExpander>
-
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_FastFlags_Presets_RenderingMode_Title}">
-                    <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" ItemsSource="{Binding RenderingModes.Keys, Mode=OneTime}" SelectedItem="{Binding SelectedRenderingMode, Mode=TwoWay}">
+                <controls:OptionControl Header="{x:Static resources:Strings.Menu_FastFlags_Presets_RenderingMode_Title}">
+                    <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" 
+                              ItemsSource="{Binding RenderingModes.Keys, Mode=OneTime}" 
+                              SelectedItem="{Binding SelectedRenderingMode, Mode=TwoWay}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Path=., Converter={StaticResource EnumNameConverter}}" />
@@ -319,15 +357,18 @@
                     </ComboBox>
                 </controls:OptionControl>
 
-        <controls:OptionControl 
-            Header="{x:Static resources:Strings.Menu_FastFlags_Presets_TextureQuality_Title}">
-            <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" ItemsSource="{Binding TextureQualities.Keys, Mode=OneTime}" SelectedItem="{Binding SelectedTextureQuality, Mode=TwoWay}">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Path=., Converter={StaticResource EnumNameConverter}}" />
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-        </controls:OptionControl>
-    </StackPanel>
+                <controls:OptionControl Header="{x:Static resources:Strings.Menu_FastFlags_Presets_TextureQuality_Title}">
+                    <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" 
+                              ItemsSource="{Binding TextureQualities.Keys, Mode=OneTime}" 
+                              SelectedItem="{Binding SelectedTextureQuality, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Path=., Converter={StaticResource EnumNameConverter}}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </controls:OptionControl>
+            </StackPanel>
+        </Grid>
+    </Grid>
 </ui:UiPage>
