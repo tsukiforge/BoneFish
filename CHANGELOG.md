@@ -1,5 +1,92 @@
 # BoneFish Changelog
 
+## v6.0.0 — Network Refactor, Fast Loading Toggle, Anti Not-Responding Audit + Night Vision Removal 🧹
+
+Release date: 2026-07-20
+
+### ♻️ Refactor — Network Flags Ekstrak ke Method Reusable
+
+5 lokasi duplikasi `App.FastFlags.SetValue("...")` untuk flag network (FIntRakNetPacketRateLimit, DFIntMaxReceivePPS, DFIntMaxSendPPS, DFIntConnectionMTUSize, DFIntOptimizeSendQueue) diekstrak ke `AutoOptimizeService.ApplyNetworkOptimizations()`. Semua 5 preset (AutoOptimize, Stable, UltraLow, Balanced, ExtremePerformance) panggil method ini — **100% identik, zero drift.**
+
+| Sebelum | Sesudah |
+|---------|--------|
+| 5× copy-paste 7 baris | 1× method reusable |
+| Risiko: update nilai di 1 tempat lupa 4 lainnya | Update di 1 tempat, semua preset ikut |
+
+### 🚀 Fitur Baru — Fast Loading Toggle
+
+Toggle independen baru **"Fast Loading (Percepat Muncul Aset)"** di halaman FastFlags (kolom kanan, setelah Force Extreme Mode):
+
+- **DFIntTextureCompositorActiveJobs=2** — jika cpuCores >= 4
+- **FIntRuntimeMaxNumOfThreads=6** — jika cpuCores >= 8
+- **Stack dengan preset apa pun** — bukan preset berdiri sendiri, tapi toggle tambahan
+- **Persisten** — state disimpan di `Settings.EnableFastLoadingFlags`
+- **Re-apply otomatis** — setiap kali preset diterapkan, Fast Loading flags di-set ulang jika toggle ON
+
+**Flag yang TIDAK dipakai (ditemukan melalui riset Allowlist):**
+- `FFlagEnableAsyncResourceLoading` ❌ Tidak di Allowlist
+- `FIntRenderChunkLODThreshold` ❌ Tidak di Allowlist
+- `FFlagEnableTextureStreamingFix` ❌ Tidak di Allowlist
+- `FIntPartSizeBoostThreshold` ❌ Tidak di Allowlist
+
+### 📋 Audit — Anti Not-Responding (Long Session) — Laporan Lengkap
+
+Dokumentasi lengkap di XML comment `ApplyExtremePerformancePreset()`:
+
+| Aspek | Temuan |
+|-------|--------|
+| **Status ACTIVE** | Manual only (button click). Tidak auto-activate. |
+| **Visual flags** | `FFlagDebugSSAOForce=False`, `FIntSSAOMipLevels=0`, `FIntRobloxGuiBlurIntensity=0`, `FIntRenderGrainScale=0` — efek kosmetik, tidak gameplay-breaking |
+| **Anti-freeze flags** | `DFIntMaxActiveAnimationTracks=32`, 7 telemetry flags, `FIntRenderLocalLightFadeInMs=0` |
+| **Keputusan** | Tidak dibuat toggle terpisah. Preset ini SATU PAKET agresif untuk target low-end extreme (dual-core, <4GB RAM). |
+
+### 🧹 Pembersihan — Night Vision Dihapus Total
+
+`FFlagFastGPULightCulling3` dan `FFlagNewLightAttenuation` sudah **deprecated** sejak September 2025 (Roblox Allowlist). Client Roblox abaikan flag ini. Semua kode dihapus:
+- `Settings.EnableNightVision` → dihapus
+- `NightVisionEnabled` property → dihapus
+- `ToggleNightVision()` + `ToggleNightVisionCommand` → dihapus
+- `Ctrl+Shift+N` dari HotkeyService → dihapus
+- `NightVisionEnabled = false` dari semua preset method → dihapus
+
+### 🎯 Crosshair — Preview Panel Real-Time
+
+Panel preview crosshair di halaman FastFlag New menampilkan perubahan style/size/opacity/color secara real-time via binding ke `CrosshairColor` property baru.
+
+### 📐 Layout — Redesign 2 Kolom (Responsive)
+
+3 halaman Settings di-redesign dari 1 kolom panjang jadi 2 kolom kiri-kanan:
+- **AppearancePage** (232→2 kolom): Theme+Language kiri, Bootstrapper+Custom kanan
+- **ChannelPage** (191→2 kolom): Fishstrap kiri, Channel info kanan
+- **IntegrationsPage** (162→2 kolom): Activity Tracking kiri, Discord RPC kanan
+
+**Tidak diubah** (konten pendek/cukup 1 kolom): Mods(114), Bootstrapper(131), FastFlagEditor(100), Shortcuts(89), GlobalSettings(90). Responsive fallback otomatis ke 1 kolom jika lebar window < 700px.
+
+### 🔧 GAP Fixes Lainnya
+
+| GAP | Fix |
+|-----|-----|
+| **GAP 1** — HotkeyService leak | Dikonfirmasi pakai HwndSource (bukan Thread). `IsWatcherRunning()` + `CleanupServices()` sudah terpasang. |
+| **GAP 2** — Custom Loading Screen | Flow diverifikasi: Pilih gambar → `NewState` → `Execute()` → copy file ✅. Tidak ada bug. |
+| **GAP 5** — Crosshair drag-to-move | Kode `Window_MouseDown/Move/Up` + `SavePosition()` diverifikasi ✅. Hanya 1 instance setelah FIX 1. |
+
+### Files Changed
+
+| File | Perubahan |
+|------|-----------|
+| `Bloxstrap/Bloxstrap.csproj` | Version 5.5.3 → **6.0.0** |
+| `Bloxstrap/Integrations/AutoOptimizeService.cs` | +3 methods: `ApplyNetworkOptimizations()`, `ApplyFastLoadingFlags()`, `RemoveFastLoadingFlags()` |
+| `Bloxstrap/UI/ViewModels/Settings/FastFlagsViewModel.cs` | Refactor 5→1 network call. +`EnableFastLoadingFlags`. +Audit doc di `ApplyExtremePerformancePreset()`. Night Vision dihapus. |
+| `Bloxstrap/Models/Persistable/Settings.cs` | +`EnableFastLoadingFlags` (bool, default false) |
+| `Bloxstrap/UI/Elements/Settings/Pages/FastFlagsPage.xaml` | +Toggle Fast Loading |
+| `Bloxstrap/UI/Elements/Settings/Pages/AppearancePage.xaml` | Redesign 2 kolom |
+| `Bloxstrap/UI/Elements/Settings/Pages/ChannelPage.xaml` | Redesign 2 kolom |
+| `Bloxstrap/UI/Elements/Settings/Pages/IntegrationsPage.xaml` | Redesign 2 kolom |
+| `Bloxstrap/Resources/Strings.resx` | +2 entries Fast Loading |
+| `Bloxstrap/Resources/Strings.id.resx` | +2 entries Fast Loading |
+
+---
+
 ## v5.5.3 — Fix: FastFlags ComboBox Reset + ProductVersion Build Config
 
 Release date: 2026-07-18

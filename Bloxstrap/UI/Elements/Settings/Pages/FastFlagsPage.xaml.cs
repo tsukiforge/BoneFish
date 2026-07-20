@@ -65,6 +65,33 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
             SetupViewModel();
         }
 
+        /// <summary>
+        /// ★ FIX 4: Responsive layout — stacking vertikal kalo lebar < 700px.
+        /// RightPanel pindah dari Grid.Column=2 ke Grid.Row=1 (di bawah LeftPanel).
+        /// </summary>
+        private void MainGrid_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Panel panel)
+            {
+                bool narrow = e.NewSize.Width < 700;
+                System.Windows.Controls.Grid.SetColumn(LeftPanel, 0);
+                System.Windows.Controls.Grid.SetRow(LeftPanel, 0);
+
+                if (narrow)
+                {
+                    // Stack vertikal: kanan di bawah kiri
+                    System.Windows.Controls.Grid.SetColumn(RightPanel, 0);
+                    System.Windows.Controls.Grid.SetRow(RightPanel, 1);
+                }
+                else
+                {
+                    // Side by side: kanan di kolom 2
+                    System.Windows.Controls.Grid.SetColumn(RightPanel, 2);
+                    System.Windows.Controls.Grid.SetRow(RightPanel, 0);
+                }
+            }
+        }
+
         private void InfoBar_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             Utilities.ShellExecute("https://devforum.roblox.com/t/allowlist-for-local-client-configuration-via-fast-flags/3966569");

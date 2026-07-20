@@ -82,6 +82,9 @@ namespace Bloxstrap
 
             Logger.WriteLine("App::Terminate", $"Terminating with exit code {exitCodeNum} ({exitCode})");
 
+            // ★ FIX 1: Bersihkan service sebelum exit — cegah proses zombie
+            CleanupServices();
+
             Environment.Exit(exitCodeNum);
         }
 
@@ -91,8 +94,11 @@ namespace Bloxstrap
 
             Logger.WriteLine("App::SoftTerminate", $"Terminating with exit code {exitCodeNum} ({exitCode})");
 
+            // ★ FIX 1: Bersihkan service sebelum exit — cegah proses zombie
+            CleanupServices();
+
             // Pre-select background untuk sesi berikutnya kalo random mode aktif
-            if (App.Settings?.Prop is not null && App.Settings.Prop.EnableWallpaperLauncher && App.Settings.Prop.BackgroundRandomMode)
+            if (App.Settings?.Prop is not null && App.Settings.Prop.BackgroundRandomMode)
             {
                 try
                 {
@@ -399,39 +405,37 @@ namespace Bloxstrap
 
                 Task.Run(App.RemoteData.LoadData); // ok
 
-                // Initialize app background on startup (async — gak block UI thread)
-                if (App.Settings.Prop.EnableWallpaperLauncher)
+                // ★ FIX 3: Background SELALU aktif — validasi background files saat startup
+                // (EnableWallpaperLauncher dihapus)
+                _ = Task.Run(async () =>
                 {
-                    _ = Task.Run(async () =>
+                    try
                     {
-                        try
-                        {
-                            Logger.WriteLine(LOG_IDENT, "Validating app background files...");
-                            bool isValid = await AppBackgroundService.ValidateBackgroundFilesAsync();
-                            if (isValid)
-                                Logger.WriteLine(LOG_IDENT, "App background files validated");
+                        Logger.WriteLine(LOG_IDENT, "Validating app background files...");
+                        bool isValid = await AppBackgroundService.ValidateBackgroundFilesAsync();
+                        if (isValid)
+                            Logger.WriteLine(LOG_IDENT, "App background files validated");
 
-                            // Pre-load background untuk startup berikutnya
-                            // Kalo random mode ON, pilih random untuk sesi berikutnya
-                            if (App.Settings.Prop.BackgroundRandomMode)
+                        // Pre-load background untuk startup berikutnya
+                        // Kalo random mode ON, pilih random untuk sesi berikutnya
+                        if (App.Settings.Prop.BackgroundRandomMode)
+                        {
+                            var types = (AppBackgroundService.BackgroundType[])Enum.GetValues(typeof(AppBackgroundService.BackgroundType));
+                            var nonCustomTypes = types.Where(t => t != AppBackgroundService.BackgroundType.Custom).ToList();
+                            if (nonCustomTypes.Count > 0)
                             {
-                                var types = (AppBackgroundService.BackgroundType[])Enum.GetValues(typeof(AppBackgroundService.BackgroundType));
-                                var nonCustomTypes = types.Where(t => t != AppBackgroundService.BackgroundType.Custom).ToList();
-                                if (nonCustomTypes.Count > 0)
-                                {
-                                    var randomType = nonCustomTypes[Random.Shared.Next(nonCustomTypes.Count)];
-                                    App.Settings.Prop.SelectedBackgroundType = randomType.ToString();
-                                    try { App.Settings.Save(); } catch { }
-                                    Logger.WriteLine(LOG_IDENT, $"Pre-selected next background: {randomType} (random mode)");
-                                }
+                                var randomType = nonCustomTypes[Random.Shared.Next(nonCustomTypes.Count)];
+                                App.Settings.Prop.SelectedBackgroundType = randomType.ToString();
+                                try { App.Settings.Save(); } catch { }
+                                Logger.WriteLine(LOG_IDENT, $"Pre-selected next background: {randomType} (random mode)");
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            Logger.WriteLine(LOG_IDENT, $"App background initialization failed: {ex.Message}");
-                        }
-                    });
-                }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.WriteLine(LOG_IDENT, $"App background initialization failed: {ex.Message}");
+                    }
+                });
 
                 // ★ AUTO CACHE CLEANUP (Fitur B) — non-blocking, jalan sekali per startup
                 if (App.Settings.Prop.EnableAutoCacheCleanup)
@@ -460,6 +464,41 @@ namespace Bloxstrap
             }
 
             // you must *explicitly* call terminate when everything is done, it won't be called implicitly
+        }
+
+        /// <summary>
+        /// ★ FIX 1: Bersihkan CrosshairService &amp; HotkeyService sebelum process exit.
+        /// Dipanggil dari Terminate() dan SoftTerminate() — mencakup semua jalur shutdown.
+        /// Mencegah proses zombie yang tetap hidup karena thread IsBackground=false (sekarang true)
+        /// tapi tetap baik untuk cleanup yang rapi.
+        /// </summary>
+        private static void CleanupServices()
+        {
+            try
+            {
+                if (CrosshairService.Instance != null)
+                {
+                    Logger.WriteLine("App::CleanupServices", "Disposing CrosshairService");
+                    CrosshairService.Instance.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteLine("App::CleanupServices", $"CrosshairService cleanup: {ex.Message}");
+            }
+
+            try
+            {
+                if (HotkeyService.Instance != null)
+                {
+                    Logger.WriteLine("App::CleanupServices", "Stopping HotkeyService");
+                    HotkeyService.Instance.Stop();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteLine("App::CleanupServices", $"HotkeyService cleanup: {ex.Message}");
+            }
         }
     }
 }

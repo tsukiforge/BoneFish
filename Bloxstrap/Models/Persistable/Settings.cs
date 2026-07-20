@@ -77,9 +77,9 @@ namespace Bloxstrap.Models.Persistable
         // Default 30fps; bisa diturunkan ke 24 untuk perangkat paling lemah.
         public int ExtremeModeFpsTarget { get; set; } = 30;
 
-        // Night Vision mode untuk Potato Mode — terangkan area gelap client-side.
-        // Client-side only, tidak mempengaruhi gameplay atau pemain lain.
-        public bool EnableNightVision { get; set; } = false;
+        // ★ GAP 4: Night Vision DIHAPUS (FFlagFastGPULightCulling3 + FFlagNewLightAttenuation
+        // sudah deprecated sejak September 2025 karena Roblox Allowlist system — keduanya
+        // tidak ada di allowlist, jadi client Roblox abaikan flag ini. Tidak berefek apa-apa.)
 
         // Global hotkey settings
         public bool EnableHotkeys { get; set; } = true;
@@ -93,8 +93,7 @@ namespace Bloxstrap.Models.Persistable
         public double CrosshairX { get; set; } = 0;                 // screen position
         public double CrosshairY { get; set; } = 0;
 
-        // wallpaper background
-        public bool EnableWallpaperLauncher { get; set; } = false;
+        // wallpaper background (EnableWallpaperLauncher dihapus — FIX 3: background selalu aktif)
 
         // custom background
         public string CustomBackgroundPath { get; set; } = "";
@@ -111,5 +110,8 @@ namespace Bloxstrap.Models.Persistable
 
         // Battery saver untuk auto-wallpaper
         public bool EnableBatterySaverForWallpaper { get; set; } = true;
+
+        // Fast Loading — toggle independen untuk percepat loading aset
+        public bool EnableFastLoadingFlags { get; set; } = false;
     }
 }

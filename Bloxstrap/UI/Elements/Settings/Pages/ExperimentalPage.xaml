@@ -16,17 +16,41 @@
     <ui:UiPage.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </ui:UiPage.Resources>
-    <!-- Wallpaper sekarang GLOBAL — dipasang di MainWindow (semua halaman + navigasi) -->
-    <StackPanel Margin="0,0,14,14">
+
+    <!-- ★ FIX 3+4: Background selalu aktif, layout 2 kolom -->
+    <Grid Margin="0,0,14,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
         <!-- Loading Indicator untuk wallpaper -->
         <ProgressBar IsIndeterminate="True" Height="3" Margin="0,0,0,0"
-                     Visibility="{Binding IsBackgroundLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                     Visibility="{Binding IsBackgroundLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Grid.Row="0" />
 
+        <TextBlock Grid.Row="0" Margin="0,0,0,12" Text="Fitur experimental yang sedang dikembangkan."
+                   FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
-                <TextBlock Margin="0,0,0,16" Text="Fitur experimental yang sedang dikembangkan." FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        <!-- ═══ 2 KOLOM UTAMA ════════════════════════════════════════ -->
+        <!-- ★ FIX 4: Responsive — 2 kolom, fallback 1 kolom (stacking) kalo < 700px -->
+        <Grid Grid.Row="1" Margin="0,0,0,8" SizeChanged="MainGrid_SizeChanged">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
+            <!-- ── KOLOM KIRI ───────────────────────────────────────── -->
+            <StackPanel x:Name="LeftPanel" Grid.Column="0" Grid.Row="0">
+                <!-- ❖ GLOBAL HOTKEYS ❖ -->
                 <TextBlock Text="Global Hotkeys" FontSize="20" FontWeight="Medium" Margin="0,0,0,0" />
-                <TextBlock Text="Gunakan keyboard shortcut untuk toggle fitur dengan cepat saat bermain. Hotkeys bekerja meski BoneFish di-minimize." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
+                <TextBlock Text="Gunakan keyboard shortcut untuk toggle fitur dengan cepat saat bermain."
+                           FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
 
                 <controls:OptionControl 
                     Header="Aktifkan Global Hotkeys" 
@@ -44,7 +68,7 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
@@ -54,27 +78,27 @@
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl + Shift + F" FontWeight="Bold" FontFamily="Courier New" FontSize="13" />
                             <TextBlock Grid.Row="1" Grid.Column="1" Text="Toggle FPS Monitor" Margin="10,0,0,4" />
 
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl + Shift + N" FontWeight="Bold" FontFamily="Courier New" FontSize="13" />
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Toggle Night Vision" Margin="10,0,0,0" />
+                            <!-- Ctrl+Shift+N = Night Vision — DIHAPUS (GAP 4) -->
                         </Grid>
                     </StackPanel>
                 </Border>
 
+                <!-- ❖ SYSTEM TRAY & NOTIF ❖ -->
                 <controls:OptionControl 
                     Header="System Tray saat Roblox ditutup" 
-                    Description="Saat kamu keluar dari Roblox (klik tombol X), BoneFish tidak akan keluar tapi minimize ke System Tray Windows.">
+                    Description="Saat kamu keluar dari Roblox, BoneFish minimize ke System Tray.">
                     <ui:ToggleSwitch IsChecked="{Binding EnableSystemTrayOnClose, Mode=TwoWay}" />
                 </controls:OptionControl>
 
                 <controls:OptionControl 
                     Header="Notifikasi Roblox Native Windows" 
-                    Description="Aktifkan notifikasi Windows native untuk menampilkan notifikasi dari Roblox di pojok bawah kanan.">
+                    Description="Tampilkan notifikasi Windows dari Roblox di pojok bawah kanan.">
                     <ui:ToggleSwitch IsChecked="{Binding EnableRobloxNotifications, Mode=TwoWay}" />
                 </controls:OptionControl>
 
                 <controls:OptionControl 
                     Header="Notifikasi Teman Online" 
-                    Description="Tampilkan notifikasi ketika teman mu ada yang online. Notifikasi akan muncul di pojok bawah kanan layar.">
+                    Description="Tampilkan notifikasi ketika teman online.">
                     <ui:ToggleSwitch IsChecked="{Binding EnableFriendOnlineNotifications, Mode=TwoWay}" />
                 </controls:OptionControl>
 
@@ -84,39 +108,40 @@
                     <ui:ToggleSwitch IsChecked="{Binding EnableNotificationSound, Mode=TwoWay}" />
                 </controls:OptionControl>
 
+                <!-- ❖ FPS MONITOR ❖ -->
                 <controls:OptionControl 
                     Header="FPS Monitor Overlay" 
-                    Description="Tampilkan monitor FPS real-time di pojok layar saat bermain Roblox. Klik dan drag untuk memindahkan posisi. FPS Monitor akan tetap aktif bahkan setelah Anda keluar dari game.">
+                    Description="Tampilkan monitor FPS real-time saat bermain Roblox.">
                     <ui:ToggleSwitch IsChecked="{Binding EnableFpsMonitor, Mode=TwoWay}" />
                 </controls:OptionControl>
 
                 <Border Visibility="{Binding FpsAdminInfoVisibility}" 
                         Background="{DynamicResource ControlFillColorDefaultBrush}" 
-                        CornerRadius="8" 
-                        Padding="12" 
-                        Margin="0,0,0,8"
+                        CornerRadius="8" Padding="12" Margin="0,0,0,8"
                         BorderBrush="{DynamicResource SystemControlForegroundAccentBrush}"
                         BorderThickness="1">
-                    <StackPanel>
-                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
-                            <Run Text="💡 "/>
-                            <Run Text="Overlay FPS kustom hanya muncul jika BoneFish dijalankan sebagai "/>
-                            <Bold Foreground="{DynamicResource TextFillColorPrimaryBrush}"><Run Text="Administrator"/></Bold>
-                            <Run Text=". Jika tidak ingin pakai admin, aktifkan FPS Monitor ini lalu tekan "/>
-                            <Bold Foreground="{DynamicResource TextFillColorPrimaryBrush}"><Run Text="Shift+F5"/></Bold>
-                            <Run Text=" di dalam game untuk melihat FPS bawaan Roblox."/>
-                        </TextBlock>
-                    </StackPanel>
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                        <Run Text="💡 Overlay FPS kustom hanya muncul jika BoneFish dijalankan sebagai "/>
+                        <Bold Foreground="{DynamicResource TextFillColorPrimaryBrush}"><Run Text="Administrator"/></Bold>
+                        <Run Text=". Jika tidak ingin pakai admin, tekan "/>
+                        <Bold Foreground="{DynamicResource TextFillColorPrimaryBrush}"><Run Text="Shift+F5"/></Bold>
+                        <Run Text=" di dalam game untuk FPS bawaan Roblox."/>
+                    </TextBlock>
                 </Border>
 
                 <controls:OptionControl 
-                    Header="Optimalkan untuk perangkat low-end (Rendah)" 
-                    Description="Kurangi frekuensi update dan beban CPU agar fitur lebih ringan di laptop jadul. Recommended untuk perangkat kentang.">
+                    Header="Optimalkan untuk perangkat low-end" 
+                    Description="Kurangi frekuensi update dan beban CPU agar fitur lebih ringan di laptop jadul.">
                     <ui:ToggleSwitch IsChecked="{Binding OptimizeForLowEnd, Mode=TwoWay}" />
                 </controls:OptionControl>
+            </StackPanel>
 
-                <TextBlock Text="Crosshair Overlay" FontSize="20" FontWeight="Medium" Margin="0,24,0,0" />
-                <TextBlock Text="Tampilkan crosshair di tengah layar — berguna untuk game FPS tanpa crosshair bawaan. Crosshair tetap aktif selama BoneFish berjalan (tidak harus sedang main Roblox)." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
+            <!-- ── KOLOM KANAN ──────────────────────────────────────── -->
+            <StackPanel x:Name="RightPanel" Grid.Column="2" Grid.Row="0">
+                <!-- ❖ CROSSHAIR ❖ -->
+                <TextBlock Text="Crosshair Overlay" FontSize="20" FontWeight="Medium" Margin="0,0,0,0" />
+                <TextBlock Text="Tampilkan crosshair di tengah layar — berguna untuk game FPS tanpa crosshair bawaan."
+                           FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
 
                 <controls:OptionControl 
                     Header="Aktifkan Crosshair" 
@@ -133,25 +158,62 @@
                 <controls:OptionControl 
                     Header="Ukuran Crosshair" 
                     Description="Atur besar kecil crosshair (20 - 200px).">
-                    <Slider Minimum="20" Maximum="200" Value="{Binding CrosshairSize, Mode=TwoWay}" Width="200" TickFrequency="10" IsSnapToTickEnabled="True" />
+                    <Slider Minimum="20" Maximum="200" Value="{Binding CrosshairSize, Mode=TwoWay}" Width="180" TickFrequency="10" IsSnapToTickEnabled="True" />
                 </controls:OptionControl>
 
                 <controls:OptionControl 
                     Header="Opacity Crosshair" 
                     Description="Atur transparansi crosshair (0.1 = hampir transparan, 1.0 = solid).">
-                    <Slider Minimum="0.1" Maximum="1.0" Value="{Binding CrosshairOpacity, Mode=TwoWay}" Width="200" TickFrequency="0.1" IsSnapToTickEnabled="True" />
+                    <Slider Minimum="0.1" Maximum="1.0" Value="{Binding CrosshairOpacity, Mode=TwoWay}" Width="180" TickFrequency="0.1" IsSnapToTickEnabled="True" />
                 </controls:OptionControl>
+
+                <!-- ═══ CROSSHAIR PREVIEW (FIX 1.4) ═══ -->
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" 
+                        CornerRadius="8" Padding="12" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6">🎯 Preview Crosshair</TextBlock>
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Preview lingkaran kecil dengan warna crosshair saat ini -->
+                            <Border Width="48" Height="48" CornerRadius="24"
+                                    Background="{Binding CrosshairColor}"
+                                    Opacity="{Binding CrosshairOpacity}"
+                                    BorderBrush="{DynamicResource TextFillColorPrimaryBrush}"
+                                    BorderThickness="2"
+                                    Margin="0,0,12,0"
+                                    HorizontalAlignment="Left">
+                                <Viewbox Width="28" Height="28">
+                                    <TextBlock Text="{Binding CrosshairStyle}" 
+                                               FontSize="10" 
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="White"
+                                               TextWrapping="Wrap"
+                                               TextAlignment="Center" />
+                                </Viewbox>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                    <Run Text="Style: " /><Run FontWeight="Bold" Text="{Binding CrosshairStyle}" />
+                                </TextBlock>
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                    <Run Text="Size: " /><Run FontWeight="Bold" Text="{Binding CrosshairSize, StringFormat='{}{0:0}px'}" />
+                                </TextBlock>
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                    <Run Text="Opacity: " /><Run FontWeight="Bold" Text="{Binding CrosshairOpacity, StringFormat='{}{0:0%}'}" />
+                                </TextBlock>
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                    <Run Text="Color: " /><Run FontWeight="Bold" Text="{Binding CrosshairColor}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
                 <controls:OptionControl 
                     Header="Warna Crosshair" 
-                    Description="Pilih warna crosshair. Pilih warna yang kontras dengan background game.">
+                    Description="Pilih warna crosshair yang kontras dengan background game.">
                     <StackPanel Orientation="Horizontal">
-                        <Border Width="28" Height="28" CornerRadius="14" Background="#00FF00" Margin="0,0,6,0">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Cursor" Value="Hand" />
-                                </Style>
-                            </Border.Style>
+                        <Border Width="28" Height="28" CornerRadius="14" Background="#00FF00" Margin="0,0,6,0" Cursor="Hand">
                             <Border.InputBindings>
                                 <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCrosshairColorCommand}" CommandParameter="#00FF00" />
                             </Border.InputBindings>
@@ -194,20 +256,19 @@
                     </StackPanel>
                 </controls:OptionControl>
 
+                <!-- ❖ TURBO MODE ❖ -->
                 <controls:OptionControl 
                     Header="🚀 Turbo Mode" 
-                    Description="Override semua setting ke performa maksimal — cocok untuk FPS darurat. Turbo Mode RESET ke normal saat Roblox di-restart (tidak permanen).">
+                    Description="Override semua setting ke performa maksimal — cocok untuk FPS darurat. Persisten (tidak auto-reset).">
                     <ui:ToggleSwitch IsChecked="{Binding EnableTurboMode, Mode=TwoWay}" />
                 </controls:OptionControl>
 
+                <!-- ❖ WALLPAPER ❖ -->
                 <TextBlock Text="Wallpaper Background" FontSize="20" FontWeight="Medium" Margin="0,24,0,0" />
-                <TextBlock Text="Tampilkan wallpaper keren di background settings biar makin aesthetic. Loading pakai teknologi ASYNC jadi gak bikin lemot! 🫨" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
+                <TextBlock Text="Wallpaper aesthetic di background semua halaman Settings."
+                           FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
 
-                <controls:OptionControl 
-                    Header="Aktifkan Wallpaper" 
-                    Description="Pajang wallpaper aesthetic di background settings. Async loading, gak bikin loading lama.">
-                    <ui:ToggleSwitch IsChecked="{Binding EnableWallpaperLauncher, Mode=TwoWay}" />
-                </controls:OptionControl>
+                <!-- ★ FIX 3: Toggle "Aktifkan Wallpaper" DIHAPUS — background selalu aktif -->
 
                 <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" Padding="16" Margin="0,0,0,8">
                     <StackPanel>
@@ -249,22 +310,26 @@
                     <ui:ToggleSwitch IsChecked="{Binding BackgroundRandomMode, Mode=TwoWay}" />
                 </controls:OptionControl>
 
-                <!-- Battery Saver for Auto-Wallpaper (Fitur D) — HANYA muncul di laptop/device dengan baterai -->
+                <!-- Battery Saver — HANYA muncul di laptop -->
                 <controls:OptionControl 
                     Header="Hemat Baterai (Auto-Wallpaper)"
-                    Description="Jika laptop tidak dicharge, jangan ganti wallpaper otomatis — biarkan background terakhir tetap tampil untuk hemat daya."
+                    Description="Jika laptop tidak dicharge, jangan ganti wallpaper otomatis untuk hemat daya."
                     Visibility="{Binding HasBattery, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <ui:ToggleSwitch IsChecked="{Binding EnableBatterySaverForWallpaper, Mode=TwoWay}" />
                 </controls:OptionControl>
+            </StackPanel>
+        </Grid>
 
-                <TextBlock Text="Cache &amp; Storage" FontSize="20" FontWeight="Medium" Margin="0,24,0,0" />
-                <TextBlock Text="Pengaturan penyimpanan cache Roblox." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
+        <!-- ═══ SECTION BAWAH (FULL WIDTH) ════════════════════════════ -->
+        <StackPanel Grid.Row="2">
+            <TextBlock Text="Cache &amp; Storage" FontSize="20" FontWeight="Medium" Margin="0,8,0,0" />
+            <TextBlock Text="Pengaturan penyimpanan cache Roblox." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap" />
 
-                <controls:OptionControl 
-                    Header="Bersihkan cache otomatis"
-                    Description="Bersihkan file cache Roblox yang sudah tua (&gt;14 hari) setiap kali aplikasi dibuka. Aman untuk HDD dan SSD — cek dulu apakah Roblox sedang berjalan.">
-                    <ui:ToggleSwitch IsChecked="{Binding EnableAutoCacheCleanup, Mode=TwoWay}" />
-                </controls:OptionControl>
-
-    </StackPanel>
+            <controls:OptionControl 
+                Header="Bersihkan cache otomatis"
+                Description="Bersihkan file cache Roblox yang sudah tua (&gt;14 hari) setiap kali aplikasi dibuka. Aman untuk HDD dan SSD.">
+                <ui:ToggleSwitch IsChecked="{Binding EnableAutoCacheCleanup, Mode=TwoWay}" />
+            </controls:OptionControl>
+        </StackPanel>
+    </Grid>
 </ui:UiPage>

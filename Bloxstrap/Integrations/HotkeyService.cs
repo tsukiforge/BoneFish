@@ -15,7 +15,7 @@ namespace Bloxstrap.Integrations
     /// Hotkeys yang didaftarkan:
     ///   Ctrl+Shift+C → Toggle Crosshair overlay
     ///   Ctrl+Shift+F → Toggle FPS Monitor
-    ///   Ctrl+Shift+N → Toggle Night Vision
+    ///   (Ctrl+Shift+N — Night Vision dihapus GAP 4)
     /// </summary>
     public class HotkeyService : IDisposable
     {
@@ -24,7 +24,7 @@ namespace Bloxstrap.Integrations
         // Unique IDs untuk setiap hotkey (harus unik per proses)
         private const int HOTKEY_CROSSHAIR = 9001;
         private const int HOTKEY_FPS = 9002;
-        private const int HOTKEY_NIGHTVISION = 9003;
+        // HOTKEY_NIGHTVISION (9003) — dihapus (GAP 4: Night Vision deprecated)
 
         private HwndSource? _hwndSource;
         private bool _registered = false;
@@ -70,13 +70,12 @@ namespace Bloxstrap.Integrations
                 _hwndSource!.AddHook(WndProc);
                 _hotkeyHwnd = (HWND)_hwndSource.Handle;
 
-                // Daftarkan semua hotkey
+                // Daftarkan semua hotkey (Night Vision dihapus GAP 4)
                 RegisterHotkey(HOTKEY_CROSSHAIR, "Ctrl+Shift+C");
                 RegisterHotkey(HOTKEY_FPS, "Ctrl+Shift+F");
-                RegisterHotkey(HOTKEY_NIGHTVISION, "Ctrl+Shift+N");
 
                 _registered = true;
-                App.Logger.WriteLine(LOG_IDENT_FULL, "HotkeyService initialized (Ctrl+Shift+C/F/N)");
+                App.Logger.WriteLine(LOG_IDENT_FULL, "HotkeyService initialized (Ctrl+Shift+C/F)");
             }
             catch (Exception ex)
             {
@@ -99,9 +98,6 @@ namespace Bloxstrap.Integrations
                     break;
                 case HOTKEY_FPS:
                     virtualKey = (uint)'F'; // VK_F
-                    break;
-                case HOTKEY_NIGHTVISION:
-                    virtualKey = (uint)'N'; // VK_N
                     break;
                 default:
                     return;
@@ -158,10 +154,7 @@ namespace Bloxstrap.Integrations
                         ToggleFpsMonitor();
                         break;
 
-                    case HOTKEY_NIGHTVISION:
-                        App.Logger.WriteLine(LOG_IDENT, "Hotkey: Ctrl+Shift+N — Toggle Night Vision");
-                        ToggleNightVision();
-                        break;
+                    // HOTKEY_NIGHTVISION — dihapus (GAP 4)
                 }
             }
 
@@ -176,13 +169,7 @@ namespace Bloxstrap.Integrations
             try { App.Settings.Save(); } catch { }
         }
 
-        private static void ToggleNightVision()
-        {
-            var settings = App.Settings.Prop;
-            settings.EnableNightVision = !settings.EnableNightVision;
-
-            try { App.Settings.Save(); } catch { }
-        }
+        // ToggleNightVision() — dihapus (GAP 4: Night Vision deprecated)
 
         public void Stop()
         {
@@ -196,7 +183,7 @@ namespace Bloxstrap.Integrations
                 // Unregister all hotkeys
                 PInvoke.UnregisterHotKey(_hotkeyHwnd, HOTKEY_CROSSHAIR);
                 PInvoke.UnregisterHotKey(_hotkeyHwnd, HOTKEY_FPS);
-                PInvoke.UnregisterHotKey(_hotkeyHwnd, HOTKEY_NIGHTVISION);
+                // PInvoke.UnregisterHotKey(_hotkeyHwnd, HOTKEY_NIGHTVISION) — dihapus (GAP 4)
 
                 _hwndSource!.RemoveHook(WndProc);
                 _hwndSource!.Dispose();

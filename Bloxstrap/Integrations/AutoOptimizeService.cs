@@ -701,5 +701,94 @@ namespace Bloxstrap.Integrations
                 return false;
             }
         }
+
+        // ── Network Optimizations (Reusable) ─────────────────────────────────────────
+        // ★ REFACTOR: Ekstrak dari FastFlagsViewModel untuk menghilangkan duplikasi
+        // di 5 preset method. Method ini SETARA dengan blok yang sebelumnya inline:
+        //   App.Settings.Prop.EnableBetterMatchmaking = true;
+        //   App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
+        //   App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
+        //   App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
+        //   App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
+        //   App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
+        //   App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
+        //
+        // TIDAK memanggil Save()/Notify()/Reload() — itu tanggung jawab caller.
+        // Caller: ApplyRecommendedNetworkSettings(), ApplyRecommendedStabilityPreset(),
+        //         ApplyUltraLowSpecPreset(), ApplyBalancedPreset(),
+        //         ApplyExtremePerformancePreset().
+        //
+        // Verifikasi: Kelima preset sebelumnya menulis flag yang SAMA PERSIS —
+        // method ini adalah 1-to-1 replacement, tidak ada perubahan nilai.
+        public static void ApplyNetworkOptimizations()
+        {
+            App.Settings.Prop.EnableBetterMatchmaking = true;
+            App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
+            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
+            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
+            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
+            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
+            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
+        }
+
+        // ── Fast Loading Flags (Toggle Terpisah) ─────────────────────────────────────
+        // ★ Fast Loading toggle: EnableFastLoadingFlags — mempercepat loading aset
+        // (texture, mesh) dengan meningkatkan paralelisme komposisi texture dan
+        // thread scheduler. Stack dengan preset visual apa pun.
+        //
+        // Flag yang dipakai (semua SUDAH ADA di AllKnownManagedFlags):
+        //   DFIntTextureCompositorActiveJobs=2  (jika cpuCores >= 4)
+        //     Naikkan dari 1 (UltraLow/Extreme) ke 2 agar texture compositor
+        //     lebih paralel — aset texture muncul lebih cepat.
+        //   FIntRuntimeMaxNumOfThreads=6        (jika cpuCores >= 8)
+        //     Naikkan dari 4 (default semua preset) ke 6 agar task scheduler
+        //     punya lebih banyak thread untuk loading aset.
+        //
+        // Flag yang TIDAK dipakai (riset menemukan kemungkinan diblokir Allowlist):
+        //   FFlagEnableAsyncResourceLoading     — ❌ Tidak di Allowlist
+        //   FIntRenderChunkLODThreshold         — ❌ Tidak di Allowlist
+        //   FFlagEnableTextureStreamingFix      — ❌ Tidak di Allowlist
+        //   FIntPartSizeBoostThreshold          — ❌ Tidak di Allowlist
+        //
+        // Flag yang JANGAN dipakai (visual, bukan loading):
+        //   FIntRenderShadowIntensity           — Flag visual
+        //   DFFlagDisablePostProcessing         — Flag visual
+        //
+        // DFIntTaskSchedulerTargetFps: SUDAH ADA di ApplyAggressiveOptimizations()
+        // sebagai base flag kondisional — tidak ditambahkan di sini untuk
+        // menghindari duplikasi/konflik nilai.
+        public static void ApplyFastLoadingFlags()
+        {
+            int cpuCores = Environment.ProcessorCount;
+            
+            // DFIntTextureCompositorActiveJobs: naikkan ke 2 KHUSUS cpuCores >= 4
+            if (cpuCores >= 4)
+            {
+                App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "2");
+                App.Logger.WriteLine(LOG_IDENT, $"FastLoading: DFIntTextureCompositorActiveJobs=2 (cpuCores={cpuCores} >= 4)");
+            }
+            else
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"FastLoading: DFIntTextureCompositorActiveJobs SKIPPED (cpuCores={cpuCores} < 4)");
+            }
+
+            // FIntRuntimeMaxNumOfThreads: naikkan ke 6 KHUSUS cpuCores >= 8
+            if (cpuCores >= 8)
+            {
+                App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", "6");
+                App.Logger.WriteLine(LOG_IDENT, $"FastLoading: FIntRuntimeMaxNumOfThreads=6 (cpuCores={cpuCores} >= 8)");
+            }
+            else
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"FastLoading: FIntRuntimeMaxNumOfThreads SKIPPED (cpuCores={cpuCores} < 8)");
+            }
+        }
+
+        public static void RemoveFastLoadingFlags()
+        {
+            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", null);
+            App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", null);
+            App.Logger.WriteLine(LOG_IDENT, "FastLoading flags removed");
+        }
     }
 }
