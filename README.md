@@ -48,7 +48,7 @@
 - **Crosshair Overlay** — In-game custom crosshair with 4 styles (Cross, Dot, Circle, CrossDot), adjustable size (20-200px), opacity (10-100%), 8 color presets, and drag-to-move positioning
 - **Global Hotkeys** — Keyboard shortcuts for instant feature toggles: `Ctrl+Shift+C` (Crosshair), `Ctrl+Shift+F` (FPS Monitor)
 - **FPS Monitor Overlay** — Real-time FPS display via ETW with color coding (green/yellow/red), draggable positioning, and persistent mode (stays active after game exit)
-- **Modern UI** — Clean, fluent design with Inter font, 2-column responsive layout, and dark/light theme support
+- **Modern UI** — Clean, minimal design with JetBrains Mono (monospace) font, Lucide-style outline icons, 2-column responsive layout, and dark/light theme support
 - **Custom Font, Cursor & Emoji** — Upload custom fonts, choose between classic 2006/2013 cursors, and pick emoji styles (Twemoji, Windows 10/11, Catmoji)
 - **Bootstrapper Customization** — Multiple bootstrapper styles (Legacy 2008/2011, Vista, Classic, Glass, Fake Byfron), custom icons, and custom title
 
@@ -231,14 +231,15 @@ When reporting bugs, please include:
 - **[pizzaboxer](https://github.com/pizzaboxer)** — Original creator of Bloxstrap
 - **[Valra](https://github.com/NotValra)** — RoValra API for server information
 - **[Fishstrap Team](https://github.com/fishstrap)** — Foundation for many features
-- **[rsms](https://github.com/rsms)** — Inter font family
+- **[JetBrains](https://www.jetbrains.com/lp/mono/)** — JetBrains Mono font (SIL OFL)
+- **[Lucide Icons](https://lucide.dev)** — Open-source icon set (ISC License)
 
 ### Technology Stack
 - **[WPF UI](https://github.com/lepoco/wpfui)** — Modern UI controls
 - **[CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet)** — MVVM framework
 - **[AvalonEdit](https://github.com/icsharpcode/AvalonEdit)** — Code editor component
 - **[DiscordRichPresence](https://github.com/Lachee/discord-rpc-csharp)** — Discord integration
-- **[SharpVectors](https://github.com/ElinamLLC/SharpVectors)** — SVG rendering
+- **[SharpVectors](https://github.com/ElinamLLC/SharpVectors)** — SVG rendering (for Lucide Icons)
 
 ### Community
 - All contributors who submitted issues, PRs, and feedback

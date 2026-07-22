@@ -11,7 +11,8 @@
       Scrollable="True"
       Loaded="Page_Loaded"
       Unloaded="Page_Unloaded"
-      Title="FastFlagEditorWarningPage">
+      Title="FastFlagEditorWarningPage"
+      TextElement.FontFamily="{StaticResource JetBrainsMonoRegular}">
 
     <StackPanel VerticalAlignment="Center">
         <Image HorizontalAlignment="Center" Source="pack://application:,,,/Resources/MessageBox/Warning.png" RenderOptions.BitmapScalingMode="HighQuality" Width="96" />

@@ -12,7 +12,8 @@
       d:DataContext="{d:DesignInstance dmodels:ExperimentalViewModel, IsDesignTimeCreatable=True}"
       d:DesignHeight="800" d:DesignWidth="800"
       Title="ExperimentalPage"
-      Scrollable="True">
+      Scrollable="True"
+      TextElement.FontFamily="{StaticResource JetBrainsMonoRegular}">
     <ui:UiPage.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </ui:UiPage.Resources>
@@ -72,10 +73,10 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + Shift + C" FontWeight="Bold" FontFamily="Courier New" FontSize="13" />
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + Shift + C" FontWeight="Bold" FontFamily="{StaticResource JetBrainsMonoMedium}" FontSize="13" />
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="Toggle Crosshair Overlay" Margin="10,0,0,4" />
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl + Shift + F" FontWeight="Bold" FontFamily="Courier New" FontSize="13" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Ctrl + Shift + F" FontWeight="Bold" FontFamily="{StaticResource JetBrainsMonoMedium}" FontSize="13" />
                             <TextBlock Grid.Row="1" Grid.Column="1" Text="Toggle FPS Monitor" Margin="10,0,0,4" />
 
                             <!-- Ctrl+Shift+N = Night Vision — DIHAPUS (GAP 4) -->
