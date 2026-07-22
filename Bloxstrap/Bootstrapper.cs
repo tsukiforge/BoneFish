@@ -1025,7 +1025,9 @@ namespace Bloxstrap
                     ProcessId = _appPid,
                     LogFile = logFileName,
                     AutoclosePids = autoclosePids,
-                    Handle = _appWindowHandle.ToInt64()
+                    Handle = _appWindowHandle.ToInt64(),
+                    PlaceId = _joinData?.PlaceId,
+                    JobId = _joinData?.JobId
                 };
 
                 string watcherDataArg = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(watcherData)));

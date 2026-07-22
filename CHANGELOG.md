@@ -1,5 +1,82 @@
 # BoneFish Changelog
 
+## v6.1.0 — Auto-Reconnect + Documentation Polish 📝
+
+Release date: 2026-07-22
+
+### 🚀 Fitur Baru — Auto-Reconnect Setelah Crash
+
+Saat Roblox crash (exit code != 0 dan negatif / NTSTATUS error), BoneFish sekarang mendeteksi dan menawarkan tombol "Sambung Ulang":
+
+- **Deteksi crash via exit code** — Exit code 0 = normal (user klik Leave/X). Negatif (e.g. -1073741819 / 0xC0000005) = crash.
+- **Session duration guard** — Hanya trigger jika sesi > 2 menit (hindari false trigger pas Roblox gagal buka).
+- **Notifikasi system tray** — Balloon notification + klik untuk sambung ulang ke server yang sama (PlaceId + JobId).
+- **Fallback server baru** — Jika JobId sudah tidak valid, join server baru di PlaceId yang sama.
+- **Manual only** — User harus klik notifikasi / tombol Yes. Tidak auto-rejoin.
+- **Setting toggle** — `EnableAutoReconnectPrompt` (bool, default true) di Settings.
+
+### 📖 Documentation — v7.0.0 Preparation
+
+#### 📜 License Fix
+
+**Kontradiksi diperbaiki:**
+- `LICENSE`: Copyright "returnrqt" → **BoneFishStudio** (+ atribusi Bloxstrap)
+- `LICENSE.Bloxstrap`: **NEW** — file lisensi terpisah untuk original Bloxstrap (MIT, pizzaboxer)
+- `README.md` TL;DR: ❌ "Commercial use not allowed" → ✅ "Free for any use (personal & commercial)" — **MIT-compliant**
+
+#### 🔗 Badge & Link Updates
+
+Semua link `faizinuha/BoneFish` → **BoneFishStudio/BoneFish** di README.md dan YOUTUBE-CONTENT-SCRIPT.md.
+
+**Badge statis → dinamis (shields.io):**
+| Badge | Sebelum | Sesudah |
+|-------|---------|--------|
+| Version | `v3.5.0` hardcoded | `github/v/release` — auto dari tag |
+| Downloads | `10k+` hardcoded | `github/downloads/total` — auto dari API |
+| Build | `build-passing` statis | `github/actions/workflow/ci-release.yml` — real-time |
+| License | `BoneFish` custom | `MIT` standar |
+| Stars | `faizinuha` | `BoneFishStudio` ✅ |
+
+#### 🌐 Website Link
+
+Tombol "Visit Website" → [https://bonefishstudioo.vercel.app](https://bonefishstudioo.vercel.app) di header README.
+
+#### ✨ Key Features — Sinkron dengan Kode Terkini
+
+Rewrite total bagian fitur untuk mencakup semua fitur yang sudah ditambahkan:
+- 🎯 Crosshair Overlay (4 style, drag-to-move, color/size/opacity)
+- ⌨️ Global Hotkeys (Ctrl+Shift+C/F)
+- 🚀 Turbo Mode
+- 💾 HDD/SSD Auto-Detection + HDD Balanced preset
+- 🛡️ Anti Not-Responding System (3-layer)
+- 🔄 Auto-Reconnect After Crash
+- 🗑️ Auto-Cache Cleaner
+- 🔧 Quick Repair Shortcuts
+- 🔋 Battery Saver Mode
+- 🚀 Fast Loading Toggle
+- 💻 System Info Panel
+- 🎨 Custom Wallpaper (upload sendiri)
+- 📐 2-column responsive layout
+
+### Files Changed
+
+| File | Perubahan |
+|------|-----------|
+| `Bloxstrap/Bloxstrap.csproj` | Version 6.0.0 → **6.1.0** |
+| `Bloxstrap/Models/WatcherData.cs` | +`PlaceId`, +`JobId` fields |
+| `Bloxstrap/Bootstrapper.cs` | Pass `_joinData.PlaceId/JobId` ke Watcher |
+| `Bloxstrap/Models/Persistable/Settings.cs` | +`EnableAutoReconnectPrompt` |
+| `Bloxstrap/Watcher.cs` | +`IsCrashExit()`, crash detection, `RejoinRoblox()` |
+| `Bloxstrap/Resources/Strings.resx` | +4 entries (balloon, message, title, desc) |
+| `Bloxstrap/Resources/Strings.id.resx` | +4 entries |
+| `Bloxstrap/Resources/Strings.Designer.cs` | +4 properties |
+| `LICENSE` | Copyright returnrqt → BoneFishStudio |
+| `LICENSE.Bloxstrap` | **NEW** — original Bloxstrap MIT license |
+| `README.md` | Badges dinamis, link BoneFishStudio, +website, License fix, Key Features rewrite |
+| `YOUTUBE-CONTENT-SCRIPT.md` | `faizinuha` → `BoneFishStudio` |
+
+---
+
 ## v6.0.0 — Network Refactor, Fast Loading Toggle, Anti Not-Responding Audit + Night Vision Removal 🧹
 
 Release date: 2026-07-20
