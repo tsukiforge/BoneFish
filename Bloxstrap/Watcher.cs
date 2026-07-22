@@ -1,5 +1,7 @@
 using Bloxstrap.AppData;
 using Bloxstrap.Integrations;
+using System.Web;
+using System.Windows;
 
 namespace Bloxstrap
 {
@@ -12,6 +14,10 @@ namespace Bloxstrap
         private readonly WatcherData? _watcherData;
         
         private readonly NotifyIconWrapper? _notifyIcon;
+
+        // Game join data untuk auto-reconnect setelah crash
+        private readonly long? _joinPlaceId;
+        private readonly string? _joinJobId;
 
         public readonly ActivityWatcher? ActivityWatcher;
 
@@ -114,6 +120,12 @@ namespace Bloxstrap
 
             if (_watcherData is null)
                 throw new Exception("Watcher data is invalid");
+
+            // Simpan game join data dari Bootstrapper untuk auto-reconnect
+            _joinPlaceId = _watcherData.PlaceId;
+            _joinJobId = _watcherData.JobId;
+            if (_joinPlaceId.HasValue)
+                App.Logger.WriteLine(LOG_IDENT, $"Game join data tersimpan: PlaceId={_joinPlaceId}, JobId={_joinJobId ?? "(none)"}");
 
             WindowManipulation = new(_watcherData.Handle, _watcherData.ProcessId);
 
@@ -308,6 +320,47 @@ namespace Bloxstrap
 
         public void KillRobloxProcess() => CloseProcess(_watcherData!.ProcessId, true);
 
+        /// <summary>
+        /// Sambung ulang ke game Roblox terakhir menggunakan PlaceId + JobId yang tersimpan.
+        /// Kalau JobId sudah tidak valid (server penuh/tutup), fallback ke PlaceId saja
+        /// (server mana pun yang tersedia) — Bootstrapper akan menangani ini secara otomatis.
+        /// </summary>
+        public void RejoinRoblox()
+        {
+            const string LOG_IDENT = "Watcher::RejoinRoblox";
+
+            if (_joinPlaceId == null)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Tidak ada PlaceId — tidak bisa sambung ulang");
+                return;
+            }
+
+            App.Logger.WriteLine(LOG_IDENT, $"Menyambung ulang ke PlaceId={_joinPlaceId}, JobId={_joinJobId ?? "(new server)"}");
+
+            try
+            {
+                // Bangun PlaceLauncher URL dengan atau tanpa JobId
+                string placeLauncherUrl = Utility.UrlBuilder.BuildPlacelauncherUrl(
+                    _joinPlaceId.Value,
+                    _joinJobId  // null → RequestGameJob tanpa gameId → fallback ke server baru
+                );
+
+                // Bungkus dalam format roblox-player:1+placelauncherurl:{encoded_url}+
+                string launchUrl = $"roblox-player:1+placelauncherurl:{HttpUtility.UrlEncode(placeLauncherUrl)}+";
+
+                App.Logger.WriteLine(LOG_IDENT, $"Launch args: {launchUrl}");
+
+                Process.Start(Paths.Process, $"-player \"{launchUrl}\"");
+
+                App.Logger.WriteLine(LOG_IDENT, "BoneFish Bootstrapper diluncurkan untuk sambung ulang");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Gagal meluncurkan sambung ulang: {ex.Message}");
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+        }
+
         public void CloseProcess(int pid, bool force = false)
         {
             const string LOG_IDENT = "Watcher::CloseProcess";
@@ -338,8 +391,20 @@ namespace Bloxstrap
 
         public readonly TaskCompletionSource<bool> SystemTrayExitSignal = new();
 
+        /// <summary>
+        /// Roblox crash exit codes (Windows NTSTATUS). Exit code 0 = normal/graceful shutdown
+        /// (user klik Leave/X). Nilai negatif menandakan exception/kill paksa oleh OS.
+        /// Sumber: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e1262b83fc
+        /// </summary>
+        private static bool IsCrashExit(int exitCode)
+        {
+            return exitCode != 0 && exitCode < 0;
+        }
+
         public async Task Run()
         {
+            const string LOG_IDENT = "Watcher::Run";
+
             if (!_lock.IsAcquired || _watcherData is null)
                 return;
 
@@ -349,28 +414,100 @@ namespace Bloxstrap
             if (App.Settings.Prop.FakeBorderlessFullscreen)
                 WindowManipulation?.FakeBorderless();
 
-            while (Utilities.GetProcessesSafe().Any(x => x.Id == _watcherData.ProcessId))
-                await Task.Delay(1000);
+            // Capture process reference + session start time SEBELUM Roblox exit,
+            // supaya kita bisa baca ExitCode setelah process mati.
+            int exitCode = 0;
+            bool couldReadExitCode = false;
+            DateTime sessionStart = DateTime.UtcNow;
 
-            // Jika system tray mode aktif, jangan langsung exit
-            if (App.Settings.Prop.EnableSystemTrayOnClose)
+            try
             {
-                _notifyIcon?.ShowAlert("BoneFish", "Roblox telah ditutup. BoneFish masih berjalan di system tray.", 5, null);
-                // Menunggu sampai user klik Exit dari context menu ATAU ada watcher baru yang menyuruh kita exit
-                var exitSignalTask = SystemTrayExitSignal.Task;
-                var externalExitTask = Task.Run(() => {
-                    try
-                    {
-                        _exitEvent.WaitOne();
-                        return true;
-                    }
-                    catch
-                    {
-                        return false;
-                    }
-                });
+                using var robloxProcess = Process.GetProcessById(_watcherData.ProcessId);
+                try { sessionStart = robloxProcess.StartTime.ToUniversalTime(); } catch { }
 
-                await Task.WhenAny(exitSignalTask, externalExitTask);
+                while (Utilities.GetProcessesSafe().Any(x => x.Id == _watcherData.ProcessId))
+                    await Task.Delay(1000);
+
+                // Process sudah exit — baca exit code dari Process object yang masih valid
+                robloxProcess.WaitForExit(500);
+                if (robloxProcess.HasExited)
+                {
+                    exitCode = robloxProcess.ExitCode;
+                    couldReadExitCode = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Fallback: Process.GetProcessById gagal (mis. process sudah mati sebelum kita dapat handle)
+                // Gunakan polling loop tanpa tracking exit code
+                App.Logger.WriteLine(LOG_IDENT, $"Could not attach to process for exit code tracking: {ex.Message}");
+
+                while (Utilities.GetProcessesSafe().Any(x => x.Id == _watcherData.ProcessId))
+                    await Task.Delay(1000);
+            }
+
+            // ── Auto-Reconnect: Deteksi Crash ────────────────────────────────────
+            bool isCrash = couldReadExitCode && IsCrashExit(exitCode);
+            bool longEnoughSession = (DateTime.UtcNow - sessionStart).TotalMinutes > 2;
+
+            if (isCrash && longEnoughSession && _joinPlaceId != null && App.Settings.Prop.EnableAutoReconnectPrompt)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Roblox crash terdeteksi! ExitCode={exitCode}, session={(DateTime.UtcNow - sessionStart).TotalMinutes:F1} menit");
+
+                if (App.Settings.Prop.EnableSystemTrayOnClose)
+                {
+                    // System tray mode: tampilkan balloon notification dengan click handler
+                    _notifyIcon?.ShowAlert(
+                        "BoneFish",
+                        Strings.Watcher_CrashDetected_Balloon,
+                        15,
+                        (_, _) => RejoinRoblox()
+                    );
+
+                    // Tetap jalan di system tray — user bisa klik notif untuk sambung ulang,
+                    // atau klik Exit dari context menu untuk tutup
+                    var exitSignalTask = SystemTrayExitSignal.Task;
+                    var externalExitTask = Task.Run(() => {
+                        try { return _exitEvent.WaitOne(); } catch { return false; }
+                    });
+                    await Task.WhenAny(exitSignalTask, externalExitTask);
+                }
+                else
+                {
+                    // Non-system-tray mode: tampilkan MessageBox
+                    var result = Frontend.ShowMessageBox(
+                        Strings.Watcher_CrashDetected_Message,
+                        MessageBoxImage.Question,
+                        MessageBoxButton.YesNo
+                    );
+
+                    if (result == MessageBoxResult.Yes)
+                        RejoinRoblox();
+                }
+            }
+            else
+            {
+                // Tidak crash — lanjut ke flow normal
+                // Jika system tray mode aktif, jangan langsung exit
+                if (App.Settings.Prop.EnableSystemTrayOnClose)
+                {
+                    _notifyIcon?.ShowAlert("BoneFish", "Roblox telah ditutup. BoneFish masih berjalan di system tray.", 5, null);
+                    // Menunggu sampai user klik Exit dari context menu ATAU ada watcher baru yang menyuruh kita exit
+                    var exitSignalTask = SystemTrayExitSignal.Task;
+                    var externalExitTask = Task.Run(() => {
+                        try
+                        {
+                            _exitEvent.WaitOne();
+                            return true;
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    });
+
+                    await Task.WhenAny(exitSignalTask, externalExitTask);
+                }
             }
 
             if (_watcherData.AutoclosePids is not null)
