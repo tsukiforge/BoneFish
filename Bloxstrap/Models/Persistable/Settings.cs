@@ -113,5 +113,8 @@ namespace Bloxstrap.Models.Persistable
 
         // Fast Loading — toggle independen untuk percepat loading aset
         public bool EnableFastLoadingFlags { get; set; } = false;
+
+        // Auto-Reconnect — tawarkan sambung ulang setelah Roblox crash
+        public bool EnableAutoReconnectPrompt { get; set; } = true;
     }
 }

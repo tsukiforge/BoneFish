@@ -13,7 +13,7 @@
 [![Discord][badge-discord]][discord-invite]
 [![Stars][badge-stars]](#)
 
-[Download Latest Release][repo-latest] · [Report Bug][repo-new-issue] · [Join Discord][discord-invite]
+[Download Latest Release][repo-latest] · [Visit Website][website] · [Report Bug][repo-new-issue] · [Join Discord][discord-invite]
 
 </div>
 
@@ -42,33 +42,51 @@
 ## ✨ Key Features
 
 ### 🎨 **Visual Customization**
-- **Dynamic Background System** — Choose from 4 built-in wallpapers (Default, Cool, Quality, Extra) or enable random backgrounds on launch
-- **Custom Loading Screens** — Upload your own images for a personalized loading experience
-- **Modern UI** — Clean, fluent design with Inter font for better readability
-- **Organized Sidebar** — Categorized navigation with visual separators
+- **Wallpaper Background System** — Choose from 5 background types (Default, Cool, Quality, Extra, Custom) or enable random mode for a fresh look every launch
+- **Custom Wallpaper** — Upload your own images from your PC, with auto-fallback to `images/img/` folder scanning
+- **Custom Loading Screens** — Upload your own images for a personalized loading experience.png / .jpg / .jpeg / .bmp supported
+- **Crosshair Overlay** — In-game custom crosshair with 4 styles (Cross, Dot, Circle, CrossDot), adjustable size (20-200px), opacity (10-100%), 8 color presets, and drag-to-move positioning
+- **Global Hotkeys** — Keyboard shortcuts for instant feature toggles: `Ctrl+Shift+C` (Crosshair), `Ctrl+Shift+F` (FPS Monitor)
+- **FPS Monitor Overlay** — Real-time FPS display via ETW with color coding (green/yellow/red), draggable positioning, and persistent mode (stays active after game exit)
+- **Modern UI** — Clean, fluent design with Inter font, 2-column responsive layout, and dark/light theme support
+- **Custom Font, Cursor & Emoji** — Upload custom fonts, choose between classic 2006/2013 cursors, and pick emoji styles (Twemoji, Windows 10/11, Catmoji)
+- **Bootstrapper Customization** — Multiple bootstrapper styles (Legacy 2008/2011, Vista, Classic, Glass, Fake Byfron), custom icons, and custom title
 
-### ⚡ **Performance & Configuration**
-- **FastFlags Editor** — Unhidden editor with direct preset controls:
-  - Low-Spec mode for older devices
-  - Balanced configuration
-  - Performance mode for maximum FPS
-  - Stability tweaks
-- **Global Basic Settings** — Fine-tune frame rate caps, quality levels, and rendering options
-- **FPS Monitor Overlay** — Real-time FPS display with draggable positioning (stays active even after game exit)
+### ⚡ **Performance & Optimization**
+- **FastFlags Manager** — 5 preset performance profiles:
+  - 🤖 **Auto-Optimize** — Detects your hardware and applies the best settings automatically
+  - 🛡️ **Stable** — Prioritizes stability with network optimizations
+  - 🐌 **Ultra Low-Spec** — For old devices (2-core, 2-4GB RAM, Intel HD)
+  - 🥔 **Extreme Performance (Potato Mode)** — Maximum FPS with configurable FPS cap (24-60)
+  - ⚖️ **Balanced** — Middle ground between performance and visuals
+- **Fast Loading Toggle** — Accelerate asset loading by increasing texture compositor parallelism and thread limits (conditional: activates based on CPU core count)
+- **Turbo Mode** — One-click performance burst: forces Extreme Performance preset, applies aggressive FastFlags, resets on restart (non-permanent)
+- **HDD/SSD Auto-Detection** — 100% accurate detection via `DeviceIoControl` + `IOCTL_STORAGE_QUERY_PROPERTY`, with automatic HDD Balanced preset for low-end HDD systems
+- **Anti Not-Responding System** — 3-layer protection: FastFlags (animation limits, telemetry disable), process priority boost, and RAM trimming for low-end devices
+- **FPS Monitor** — ETW-based overlay with color-coded FPS, frame time, and Vulkan detection
 
 ### 🔧 **Advanced Tools**
-- **Detailed Server Information** — Powered by [RoValra][rovalra]'s API
-- **Server History Tracking** — Keep track of servers you've joined
-- **Roblox Studio Support** — Full bootstrapper support for Studio
-- **Auto-Update System** — Automatic update checks with release notifications
-- **Cache Cleaner** — One-click cleanup for Roblox cache
-- **Channel Switcher** — Switch between Roblox deployment channels
+- **Detailed Server Information** — Powered by [RoValra][rovalra]'s API: server region, player list, ping, uptime, and location
+- **Server History Tracking** — Keep track of servers you've joined during the session, with one-click rejoin
+- **Auto-Reconnect After Crash** — Detects Roblox crashes via exit code (NTSTATUS: negative = crash, 0 = normal exit), and offers a "Sambung Ulang" button to rejoin the exact same server (PlaceId + JobId), with automatic fallback to a new server if the old one is full
+- **Auto-Cache Cleaner** — Automatic Roblox cache cleanup at startup (configurable max age, max size, with safety check for active Roblox processes)
+- **Quick Repair Shortcuts** — One-click verification and repair of Desktop & Start Menu shortcuts
+- **Battery Saver Mode** — Skips auto-wallpaper refresh when laptop is on battery (PC desktops without battery auto-hide the toggle)
+- **Roblox Studio Support** — Full bootstrapper support for Studio with channel management
+- **Auto-Update System** — Automatic update checks with release notifications and background updater
+- **Channel Switcher** — Switch between Roblox deployment channels (production, beta, etc.)
+- **System Info Panel** — Real-time display of CPU cores, RAM, storage type (HDD/SSD), and system tier right in the UI
+- **Custom Bootstrapper Themes** — Advanced XML-based theme system for fully custom bootstrapper dialogs
 
 ### 🧪 **Experimental Features**
-- **System Tray Integration** — Minimize to tray on close
+- **System Tray Integration** — Minimize to tray on close with persistent tray icon
 - **Friend Online Notifications** — Get notified when friends come online (Windows native notifications)
 - **Notification Sounds** — Audio alerts for notifications
 - **Low-End Optimization** — Reduced update frequency for older hardware
+- **Network Optimizations** — Better Matchmaking with server region prioritization, MTU tuning, and telemetry reduction
+- **Multiple Instance Support** — Launch multiple Roblox instances simultaneously
+- **DNS Resilience** — Automatic DNS connectivity testing with backoff on failure
+- **Advanced Memory Management** — Low-memory mode, working set trimming, and CPU affinity control for dual-core systems
 
 ---
 
@@ -231,13 +249,17 @@ When reporting bugs, please include:
 
 ## 📜 License
 
-This project is licensed under a custom BoneFish License.  
+This project is licensed under the **MIT License**.  
 See the [LICENSE](LICENSE) file for details.
 
+BoneFish is a fork of [Bloxstrap][bloxstrap] by pizzaboxer (MIT).  
+See [LICENSE.Bloxstrap](LICENSE.Bloxstrap) for the original Bloxstrap license.
+
 **TL;DR:**
-- ✅ Free for personal use
+- ✅ Free for any use (personal & commercial)
 - ✅ Modify and redistribute (with attribution)
-- ❌ Commercial use without permission
+- ✅ Private use / fork freely
+- ❌ Hold us liable for any damages
 - ❌ Claiming as your own work
 
 ---
@@ -262,16 +284,16 @@ Use at your own risk. We are not responsible for any account actions taken by Ro
 ---
 
 <!-- Badge Links -->
-[badge-license]:   https://img.shields.io/badge/license-BoneFish-blue?style=flat-square
-[badge-actions]:   https://img.shields.io/badge/build-passing-brightgreen?style=flat-square&label=builds
-[badge-downloads]: https://img.shields.io/badge/downloads-10k%2B-brightgreen?style=flat-square
-[badge-latest]:    https://img.shields.io/badge/version-v3.5.0-blue?style=flat-square
+[badge-license]:   https://img.shields.io/badge/license-MIT-blue?style=flat-square
+[badge-actions]:   https://img.shields.io/github/actions/workflow/status/BoneFishStudio/BoneFish/ci-release.yml?style=flat-square&label=build
+[badge-downloads]: https://img.shields.io/github/downloads/BoneFishStudio/BoneFish/total?style=flat-square
+[badge-latest]:    https://img.shields.io/github/v/release/BoneFishStudio/BoneFish?style=flat-square
 [badge-discord]:   https://img.shields.io/discord/1299397064165429360?style=flat-square&logo=discord&logoColor=white&label=discord&color=4d3dff
-[badge-stars]:     https://img.shields.io/github/stars/faizinuha/BoneFish?style=flat-square&color=dd9900
+[badge-stars]:     https://img.shields.io/github/stars/BoneFishStudio/BoneFish?style=flat-square&color=dd9900
 
 <!-- Repository Links -->
-[repo-latest]:    https://github.com/faizinuha/BoneFish/releases/latest
-[repo-new-issue]: https://github.com/faizinuha/BoneFish/issues/new/choose
+[repo-latest]:    https://github.com/BoneFishStudio/BoneFish/releases/latest
+[repo-new-issue]: https://github.com/BoneFishStudio/BoneFish/issues/new/choose
 [discord-invite]: https://discord.gg/SRs5zb9BJd
 
 <!-- External Links -->
@@ -280,3 +302,4 @@ Use at your own risk. We are not responsible for any account actions taken by Ro
 [appleblox]:  https://github.com/AppleBlox/appleblox
 [sober]:      https://sober.vinegarhq.org
 [rovalra]:    https://www.rovalra.com
+[website]:    https://bonefishstudioo.vercel.app

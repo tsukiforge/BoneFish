@@ -4983,5 +4983,41 @@ namespace Bloxstrap.Resources {
                 return ResourceManager.GetString("Uninstaller.Uninstall", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Roblox crash terdeteksi! Klik notifikasi ini untuk menyambung ulang ke game terakhir..
+        /// </summary>
+        public static string Watcher_CrashDetected_Balloon {
+            get {
+                return ResourceManager.GetString("Watcher.CrashDetected.Balloon", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Roblox mengalami crash. Apakah Anda ingin menyambung ulang ke game terakhir?.
+        /// </summary>
+        public static string Watcher_CrashDetected_Message {
+            get {
+                return ResourceManager.GetString("Watcher.CrashDetected.Message", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Tawarkan sambung ulang setelah crash.
+        /// </summary>
+        public static string Watcher_AutoReconnect_Title {
+            get {
+                return ResourceManager.GetString("Watcher.AutoReconnect.Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Saat Roblox crash, BoneFish akan menampilkan notifikasi dengan tombol \"Sambung Ulang\" untuk kembali ke game yang sama. Hanya menawarkan, tidak auto-rejoin..
+        /// </summary>
+        public static string Watcher_AutoReconnect_Description {
+            get {
+                return ResourceManager.GetString("Watcher.AutoReconnect.Description", resourceCulture);
+            }
+        }
     }
 }

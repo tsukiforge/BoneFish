@@ -1533,4 +1533,16 @@ Beralih ke {1}.</value>
   <data name="Menu.FastFlags.FastLoading.Description" xml:space="preserve">
     <value>Optimasi loading: texture &amp; mesh loading lebih cepat dengan meningkatkan paralelisme texture compositor dan thread scheduler. Stack dengan preset apa pun. Aktif secara conditional berdasarkan jumlah core CPU.</value>
   </data>
+  <data name="Watcher.CrashDetected.Balloon" xml:space="preserve">
+    <value>Roblox crash terdeteksi! Klik notifikasi ini untuk menyambung ulang ke game terakhir.</value>
+  </data>
+  <data name="Watcher.CrashDetected.Message" xml:space="preserve">
+    <value>Roblox mengalami crash. Apakah Anda ingin menyambung ulang ke game terakhir?</value>
+  </data>
+  <data name="Watcher.AutoReconnect.Title" xml:space="preserve">
+    <value>Tawarkan sambung ulang setelah crash</value>
+  </data>
+  <data name="Watcher.AutoReconnect.Description" xml:space="preserve">
+    <value>Saat Roblox crash, BoneFish akan menampilkan notifikasi dengan tombol "Sambung Ulang" untuk kembali ke game yang sama. Hanya menawarkan, tidak auto-rejoin.</value>
+  </data>
 </root>
