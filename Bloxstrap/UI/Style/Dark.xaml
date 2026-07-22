@@ -1,4 +1,6 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <SolidColorBrush x:Key="NewTextEditorBackground" Color="#2D2D2D" />
     <SolidColorBrush x:Key="NewTextEditorForeground" Color="White" />
     <SolidColorBrush x:Key="NewTextEditorLink" Color="#3A9CEA" />
@@ -69,4 +71,9 @@
             </Trigger>
         </Style.Triggers>
     </Style>
+    <!-- ★ Color scheme: kurangi dominasi aksen — navigasi item lebih muted ★ -->
+    <Style TargetType="ui:NavigationItem">
+        <Setter Property="Foreground" Value="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+    </Style>
+
 </ResourceDictionary>

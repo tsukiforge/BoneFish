@@ -9,7 +9,8 @@
       mc:Ignorable="d" 
       d:DesignHeight="450" d:DesignWidth="800"
       Scrollable="True"
-      Title="FastFlagsDisabled">
+      Title="FastFlagsDisabled"
+      TextElement.FontFamily="{StaticResource JetBrainsMonoRegular}">
 
     <StackPanel VerticalAlignment="Center">
         <Image HorizontalAlignment="Center" Source="pack://application:,,,/Resources/MessageBox/Warning.png" RenderOptions.BitmapScalingMode="HighQuality" Width="96" />

@@ -35,7 +35,7 @@
                 <TextBlock x:Name="TitleTextBlock" Text="? is unable to connect to ?" FontSize="18" Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap" />
                 <controls:MarkdownTextBlock x:Name="DescriptionTextBlock" MarkdownText="?" Margin="0,16,0,0" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                 <TextBlock Text="{x:Static resources:Strings.Dialog_Connectivity_MoreInfo}" Margin="0,16,0,0" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                <RichTextBox x:Name="ErrorRichTextBox" Padding="8" Margin="0,8,0,0" Block.LineHeight="2" FontFamily="Courier New" IsReadOnly="True" />
+                <RichTextBox x:Name="ErrorRichTextBox" Padding="8" Margin="0,8,0,0" Block.LineHeight="2" FontFamily="{StaticResource JetBrainsMonoRegular}" IsReadOnly="True" />
             </StackPanel>
         </Grid>
 
