@@ -10,7 +10,8 @@
       mc:Ignorable="d"
       d:DesignHeight="900" d:DesignWidth="800"
       Title="AppearancePage"
-      Scrollable="True">
+      Scrollable="True"
+      TextElement.FontFamily="{StaticResource JetBrainsMonoRegular}">
     <!-- ★ GAP 3: Layout 2 kolom -->
     <Grid Margin="0,0,14,14">
         <Grid.RowDefinitions>

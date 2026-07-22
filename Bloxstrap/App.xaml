@@ -15,11 +15,10 @@
                 <ResourceDictionary x:Name="Default" Source="UI/Style/Default.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <FontFamily x:Key="Rubik">pack://application:,,,/Resources/Fonts/#Rubik Light</FontFamily>
-            <FontFamily x:Key="InterRegular">pack://application:,,,/Resources/Fonts/#Inter</FontFamily>
-            <FontFamily x:Key="InterMedium">pack://application:,,,/Resources/Fonts/#Inter Medium</FontFamily>
-            <FontFamily x:Key="InterSemiBold">pack://application:,,,/Resources/Fonts/#Inter SemiBold</FontFamily>
-            <FontFamily x:Key="InterLight">pack://application:,,,/Resources/Fonts/#Inter Light</FontFamily>
+            <FontFamily x:Key="Rubik">pack://application:,,,/Resources/Fonts/#Rubik</FontFamily>
+            <FontFamily x:Key="JetBrainsMonoRegular">pack://application:,,,/Resources/Fonts/#JetBrains Mono</FontFamily>
+            <FontFamily x:Key="JetBrainsMonoMedium">pack://application:,,,/Resources/Fonts/#JetBrains Mono Medium</FontFamily>
+            <FontFamily x:Key="JetBrainsMonoBold">pack://application:,,,/Resources/Fonts/#JetBrains Mono Bold</FontFamily>
 
             <Style TargetType="Hyperlink">
                 <Style.Triggers>

@@ -7,8 +7,8 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
     <ApplicationIcon>Bloxstrap.ico</ApplicationIcon>
-    <Version>6.1.0</Version>
-    <FileVersion>6.1.0</FileVersion>
+    <Version>6.3.1</Version>
+    <FileVersion>6.3.1</FileVersion>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -29,10 +29,9 @@
     <Resource Include="Resources\LightEditor.xshd" />
     <Resource Include="Resources\Fonts\NotoSansThai-VariableFont_wdth,wght.ttf" />
     <Resource Include="Resources\Fonts\Rubik-VariableFont_wght.ttf" />
-    <Resource Include="Resources\Fonts\Inter-Regular.ttf" />
-    <Resource Include="Resources\Fonts\Inter-Medium.ttf" />
-    <Resource Include="Resources\Fonts\Inter-SemiBold.ttf" />
-    <Resource Include="Resources\Fonts\Inter-Light.ttf" />
+    <Resource Include="Resources\Fonts\JetBrainsMono-Regular.ttf" />
+    <Resource Include="Resources\Fonts\JetBrainsMono-Medium.ttf" />
+    <Resource Include="Resources\Fonts\JetBrainsMono-Bold.ttf" />
     <Resource Include="Resources\BootstrapperStyles\ByfronDialog\ByfronLogoDark.jpg" />
     <Resource Include="Resources\BootstrapperStyles\ByfronDialog\ByfronLogoLight.jpg" />
     <Resource Include="Resources\BootstrapperStyles\ByfronDialog\Matt.png" />
@@ -40,6 +39,8 @@
     <Resource Include="Resources\MessageBox\Information.png" />
     <Resource Include="Resources\MessageBox\Question.png" />
     <Resource Include="Resources\MessageBox\Warning.png" />
+
+
     <EmbeddedResource Include="UI\Style\Editor-Theme-Dark.xshd" />
     <EmbeddedResource Include="UI\Style\Editor-Theme-Light.xshd" />
   </ItemGroup>

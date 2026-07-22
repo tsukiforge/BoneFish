@@ -1,5 +1,128 @@
 # BoneFish Changelog
 
+## v6.3.1 — Fix: Icon Sidebar Tofu (Global Font Override) 🔤
+
+Release date: 2026-07-22
+
+### 🐛 Bug — Global TextBlock Style Merusak SymbolIcon
+
+Global `Style TargetType="TextBlock"` di App.xaml meng-override `FontFamily` untuk **semua** TextBlock,
+termasuk yang dipakai internal WPF UI's `SymbolIcon` untuk render icon glyph (Segoe Fluent Icons).
+Karena JetBrains Mono tidak punya glyph icon, semua ikon sidebar muncul sebagai kotak kosong (tofu).
+
+### 🔧 Fix — Ganti dari Implicit Style ke Attached Property Inheritance
+
+**Akar masalah:**
+- Implicit Style (`Style TargetType="TextBlock"`) → precedence **lebih tinggi** dari TemplatedParent template properties
+- SymbolIcon internal template set `FontFamily="Segoe Fluent Icons"` via TemplatedParent — tapi kalah sama implicit style
+
+**Perbaikan:**
+| Sebelum (❌) | Sesudah (✅) |
+|---|---|
+| `App.xaml`: `Style TargetType="TextBlock"` (blanket override) | **Dihapus** |
+| `MainWindow.xaml` root Grid | +`TextElement.FontFamily="{StaticResource JetBrainsMonoRegular}"` |
+| 12 file halaman Pages/*.xaml (root `ui:UiPage`) | +`TextElement.FontFamily="{StaticResource JetBrainsMonoRegular}"` |
+
+**Mengapa ini bekerja:**
+`TextElement.FontFamily` adalah inherited attached property — prioritinya **lebih rendah** dari eksplisit
+`FontFamily="Segoe Fluent Icons"` yang di-set di template `SymbolIcon`. Regular TextBlocks tanpa FontFamily
+eksplisit mewarisi JetBrains Mono, sementara SymbolIcon tetap pakai Segoe Fluent Icons.
+
+### ✅ Verifikasi
+
+- Semua 10 ikon sidebar muncul normal (bukan kotak kosong) ✅
+- Font JetBrains Mono di teks label/heading tetap utuh di semua halaman ✅
+- Build 0 error, 0 warning ✅
+
+### Files Changed (14 files)
+
+| File | Perubahan |
+|------|-----------|
+| `Bloxstrap/App.xaml` | Hapus `Style TargetType="TextBlock"` global |
+| `Bloxstrap/UI/Elements/Settings/MainWindow.xaml` | +`TextElement.FontFamily` di root Grid |
+| `Bloxstrap/UI/Elements/Settings/Pages/FastFlagsPage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/ExperimentalPage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/IntegrationsPage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/BootstrapperPage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/ChannelPage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/AppearancePage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/ShortcutsPage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/ModsPage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/FastFlagEditorPage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/FastFlagEditorWarningPage.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/FastFlagsDisabled.xaml` | +`TextElement.FontFamily` |
+| `Bloxstrap/UI/Elements/Settings/Pages/GlobalSettingsPage.xaml` | +`TextElement.FontFamily` |
+
+---
+
+## v6.3.0 — Visual Identity: JetBrains Mono Global + Lucide-Style Icons 🎨
+
+Release date: 2026-07-22
+
+### 🎨 Font Global — JetBrains Mono di Seluruh UI
+
+Sebelumnya font JetBrains Mono cuma dipasang di 4 tempat spesifik (FPS Monitor, dialog error, hotkey display).
+Sekarang **default global** via `Style TargetType="TextBlock"` di App.xaml — seluruh teks di semua halaman:
+- Sidebar navigasi
+- Tombol & label
+- Halaman Settings (FastFlags, Integrations, Behaviour, dll)
+- Dialog, snackbar, breadcrumb
+
+Font Inter (Regular, Medium, SemiBold, Light) dihapus dari folder Resources/Fonts/.
+
+### 🎯 Sidebar Navigasi — Icons Diperbarui
+
+Semua 10 ikon sidebar navigasi di-update dengan nama `SymbolRegular` enum yang benar
+setelah WPF UI submodule di-bump (Fluent System Icons v1.1.181):
+
+| Section | Icon |
+|---------|------|
+| Integrations | `GlobeDesktop20` |
+| Behaviour | `ControlButton24` |
+| Deployment | `Cloud28` |
+| Mods | `BoxToolbox24` |
+| Appearance | `PaintBrushArrowDown24` |
+| Shortcuts | `AppsListDetail24` |
+| FastFlags | `Flag28` |
+| GlobalSettings | `DesktopToolbox20` |
+| Experimental | `Beaker24` |
+| About | `Info28` |
+
+### 📖 README — Atribusi Font
+
+- **Key Features**: "Inter font" → "JetBrains Mono (monospace) font"
+- **Special Thanks**: rsms/Inter → JetBrains Mono (SIL OFL)
+- **Technology Stack**: SharpVectors note → mention Lucide Icons
+
+### 🎨 Color Scheme — Reduced Accent Dominance
+
+Style `NavigationItem` ditambahkan di Dark.xaml dengan `Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"`
+— mengurangi dominasi warna aksen di sidebar navigasi.
+
+### 🧹 Pembersihan
+
+- Font Inter (4 file .ttf) dihapus dari `Resources/Fonts/`
+- 6 SVG broken/empty files dihapus dari `Resources/Icons/`
+- Dead entries di csproj dibersihkan
+
+### Files Changed
+
+| File | Perubahan |
+|------|-----------|
+| `Bloxstrap/Bloxstrap.csproj` | Version 6.1.0 → **6.3.0**, font refs, SVG resources |
+| `Bloxstrap/App.xaml` | +`Style TargetType="TextBlock"` → JetBrains Mono global |
+| `Bloxstrap/UI/Elements/Settings/MainWindow.xaml` | Ikon sidebar: nama SymbolRegular di-update (WPF UI submodule bump) |
+| `Bloxstrap/UI/Style/Dark.xaml` | +`xmlns:ui`, NavigationItem style |
+| `Bloxstrap/UI/Elements/FpsMonitorOverlay.xaml` | Courier New → JetBrainsMono |
+| `Bloxstrap/UI/Elements/Dialogs/ExceptionDialog.xaml` | Courier New → JetBrainsMono |
+| `Bloxstrap/UI/Elements/Dialogs/ConnectivityDialog.xaml` | Courier New → JetBrainsMono |
+| `Bloxstrap/UI/Elements/Settings/Pages/ExperimentalPage.xaml` | Courier New → JetBrainsMono (hotkey) |
+| `README.md` | Key Features, Special Thanks, Tech Stack updated |
+| `Resources/Fonts/` | Inter .ttf dihapus, JetBrainsMono .ttf ditambahkan |
+| `Resources/Icons/` | 38 Lucide SVG icons |
+
+---
+
 ## v6.1.0 — Auto-Reconnect + Documentation Polish 📝
 
 Release date: 2026-07-22

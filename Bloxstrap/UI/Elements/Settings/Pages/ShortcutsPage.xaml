@@ -12,7 +12,8 @@
       d:DataContext="{d:DesignInstance dmodels:ShortcutsViewModel, IsDesignTimeCreatable=True}"
       d:DesignHeight="600" d:DesignWidth="800"
       Title="ShortcutsPage"
-      Scrollable="True">
+      Scrollable="True"
+      TextElement.FontFamily="{StaticResource JetBrainsMonoRegular}">
 
     <StackPanel Margin="0,0,14,14">
         <ui:Snackbar x:Name="RepairSnackbar" Title="Pemberitahuan" Message="" Appearance="Success" Icon="CheckmarkCircle32" Timeout="5000" Margin="0,0,0,16" Visibility="Collapsed" />
