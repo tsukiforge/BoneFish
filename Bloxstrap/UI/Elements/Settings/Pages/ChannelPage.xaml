@@ -99,6 +99,23 @@
                               ItemsSource="{Binding ChannelChangeModes.Keys, Mode=OneTime}" 
                               Text="{Binding SelectedChannelChangeMode, Mode=TwoWay}" />
                 </ui:CardControl>
+
+                <!-- Pembersihan Roblox -->
+                <TextBlock Text="{x:Static resources:Strings.Menu_Channel_Cleanup_Title}" FontSize="16" FontWeight="Medium" Margin="0,16,0,0" />
+
+                <controls:OptionControl
+                    Header="{x:Static resources:Strings.Menu_Channel_Cleanup_Player}"
+                    Description="{x:Static resources:Strings.Menu_Channel_Cleanup_Player_Description}">
+                    <ui:Button Icon="Delete12" Content="{x:Static resources:Strings.Menu_Channel_Cleanup_Player}" 
+                               Appearance="Danger" Command="{Binding CleanRobloxPlayerCommand}" />
+                </controls:OptionControl>
+
+                <controls:OptionControl
+                    Header="{x:Static resources:Strings.Menu_Channel_Cleanup_Studio}"
+                    Description="{x:Static resources:Strings.Menu_Channel_Cleanup_Studio_Description}">
+                    <ui:Button Icon="Delete12" Content="{x:Static resources:Strings.Menu_Channel_Cleanup_Studio}" 
+                               Appearance="Danger" Command="{Binding CleanRobloxStudioCommand}" />
+                </controls:OptionControl>
             </StackPanel>
 
             <!-- KOLOM KANAN: Channel info -->

@@ -1545,4 +1545,43 @@ Beralih ke {1}.</value>
   <data name="Watcher.AutoReconnect.Description" xml:space="preserve">
     <value>Saat Roblox crash, BoneFish akan menampilkan notifikasi dengan tombol "Sambung Ulang" untuk kembali ke game yang sama. Hanya menawarkan, tidak auto-rejoin.</value>
   </data>
+  <data name="Menu.Channel.Cleanup.Title" xml:space="preserve">
+    <value>Pembersihan Roblox</value>
+  </data>
+  <data name="Menu.Channel.Cleanup.Description" xml:space="preserve">
+    <value>Hapus data Roblox Player dan/atau Studio secara independen dari BoneFish.</value>
+  </data>
+  <data name="Menu.Channel.Cleanup.Player" xml:space="preserve">
+    <value>Bersihkan Roblox Player</value>
+  </data>
+  <data name="Menu.Channel.Cleanup.Player.Description" xml:space="preserve">
+    <value>Hapus binari Player, entri registry, log, dan cache.</value>
+  </data>
+  <data name="Menu.Channel.Cleanup.Studio" xml:space="preserve">
+    <value>Bersihkan Roblox Studio</value>
+  </data>
+  <data name="Menu.Channel.Cleanup.Studio.Description" xml:space="preserve">
+    <value>Hapus binari Studio, entri registry, log, dan cache.</value>
+  </data>
+  <data name="Menu.Mods.ImportMod.Title" xml:space="preserve">
+    <value>Import Paket Mod</value>
+  </data>
+  <data name="Menu.Mods.ImportMod.Description" xml:space="preserve">
+    <value>Import mod komunitas dari file .zip. Zip harus mengandung struktur mod yang valid (content/, ExtraContent/, atau ClientSettings/).</value>
+  </data>
+  <data name="Menu.Mods.ImportMod.FilePicker" xml:space="preserve">
+    <value>Paket ZIP Mod</value>
+  </data>
+  <data name="Menu.Mods.ImportMod.InvalidStructure" xml:space="preserve">
+    <value>File ZIP yang dipilih tidak mengandung struktur mod yang dikenal. Pastikan ZIP berisi folder seperti content/, ExtraContent/, atau ClientSettings/.</value>
+  </data>
+  <data name="Menu.Mods.ImportMod.ConfirmOverwrite" xml:space="preserve">
+    <value>File berikut akan ditimpa:
+{0}
+
+Apakah Anda ingin melanjutkan?</value>
+  </data>
+  <data name="Menu.Mods.ImportMod.Success" xml:space="preserve">
+    <value>Mod berhasil diimport! {0} file ditambahkan/diperbarui.</value>
+  </data>
 </root>
