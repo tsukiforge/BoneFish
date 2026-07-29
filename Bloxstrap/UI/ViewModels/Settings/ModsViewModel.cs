@@ -11,6 +11,8 @@ using Windows.Win32.Foundation;
 
 using CommunityToolkit.Mvvm.Input;
 
+using ICSharpCode.SharpZipLib.Zip;
+
 using Bloxstrap.Models.SettingTasks;
 using Bloxstrap.AppData;
 
@@ -75,6 +77,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
 
         public ICommand OpenModsFolderCommand => new RelayCommand(OpenModsFolder);
+        public ICommand ImportModCommand => new RelayCommand(ImportMod);
 
         public Visibility ChooseCustomFontVisibility => !String.IsNullOrEmpty(TextFontTask.NewState) ? Visibility.Collapsed : Visibility.Visible;
 
@@ -196,6 +199,126 @@ namespace Bloxstrap.UI.ViewModels.Settings
         });
 
         public FontModPresetTask TextFontTask { get; } = new();
+
+        // ── FITUR 2: Import Mod Package ──────────────────────────────────
+        private void ImportMod()
+        {
+            const string LOG_IDENT = "ModsViewModel::ImportMod";
+
+            var dialog = new OpenFileDialog
+            {
+                Filter = $"{Strings.Menu_Mods_ImportMod_FilePicker}|*.zip"
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            string zipPath = dialog.FileName;
+
+            try
+            {
+                // Step 1: Extract to temp directory menggunakan SharpZipLib (konsisten dengan Bootstrapper.cs)
+                string tempDir = Path.Combine(Path.GetTempPath(), "BoneFishModImport", Guid.NewGuid().ToString());
+                Directory.CreateDirectory(tempDir);
+
+                var fastZip = new FastZip();
+                fastZip.ExtractZip(zipPath, tempDir, null);
+
+                // Step 2: Detect valid mod structure
+                // Valid known prefixes berdasarkan riset struktur mod Bloxstrap komunitas:
+                //   content/        — main Roblox content (textures, sounds, fonts, etc.)
+                //   ExtraContent/   — extra content seperti place files
+                //   ClientSettings/ — FastFlag overrides (ClientAppSettings.json)
+                var validPrefixes = new[] { "content", "ExtraContent", "ClientSettings" };
+
+                var allFiles = Directory.GetFiles(tempDir, "*.*", SearchOption.AllDirectories);
+
+                var matchedFiles = allFiles
+                    .Select(f => Path.GetRelativePath(tempDir, f))
+                    .Where(relPath => validPrefixes.Any(prefix =>
+                        relPath.StartsWith(prefix + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                        relPath.StartsWith(prefix + '/', StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                if (!matchedFiles.Any())
+                {
+                    // Cleanup temp
+                    try { Directory.Delete(tempDir, true); } catch { }
+
+                    Frontend.ShowMessageBox(
+                        Strings.Menu_Mods_ImportMod_InvalidStructure,
+                        MessageBoxImage.Error
+                    );
+                    return;
+                }
+
+                // Step 3: Check for overwrites
+                var overwrites = new List<string>();
+                foreach (string relPath in matchedFiles)
+                {
+                    string destFile = Path.Combine(Paths.Modifications, relPath);
+                    if (File.Exists(destFile))
+                        overwrites.Add(relPath);
+                }
+
+                if (overwrites.Any())
+                {
+                    string fileList = string.Join("\n", overwrites.Take(20));
+                    if (overwrites.Count > 20)
+                        fileList += $"\n... dan {overwrites.Count - 20} file lainnya";
+
+                    var confirmResult = Frontend.ShowMessageBox(
+                        string.Format(Strings.Menu_Mods_ImportMod_ConfirmOverwrite, fileList),
+                        MessageBoxImage.Warning,
+                        MessageBoxButton.YesNo,
+                        MessageBoxResult.No
+                    );
+
+                    if (confirmResult != MessageBoxResult.Yes)
+                    {
+                        try { Directory.Delete(tempDir, true); } catch { }
+                        return;
+                    }
+                }
+
+                // Step 4: Copy files to Modifications folder
+                int copiedCount = 0;
+                foreach (string relPath in matchedFiles)
+                {
+                    string sourceFile = Path.Combine(tempDir, relPath);
+                    string destFile = Path.Combine(Paths.Modifications, relPath);
+
+                    Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
+                    File.Copy(sourceFile, destFile, true);
+                    copiedCount++;
+                }
+
+                // Cleanup temp
+                try { Directory.Delete(tempDir, true); } catch { }
+
+                // Step 5: Show success
+                App.Logger.WriteLine(LOG_IDENT, $"Imported {copiedCount} files from {zipPath}");
+                Frontend.ShowMessageBox(
+                    string.Format(Strings.Menu_Mods_ImportMod_Success, copiedCount),
+                    MessageBoxImage.Information
+                );
+            }
+            catch (ZipException)
+            {
+                Frontend.ShowMessageBox(
+                    Strings.Menu_Mods_ImportMod_InvalidStructure,
+                    MessageBoxImage.Error
+                );
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Import failed: {ex.Message}");
+                Frontend.ShowMessageBox(
+                    $"Gagal mengimport mod: {ex.Message}",
+                    MessageBoxImage.Error
+                );
+            }
+        }
 
         private void OpenCompatSettings()
         {

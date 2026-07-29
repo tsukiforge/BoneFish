@@ -1,6 +1,7 @@
 ﻿using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using Bloxstrap.RobloxInterfaces;
+using Bloxstrap.Integrations;
 
 namespace Bloxstrap.UI.ViewModels.Settings
 {
@@ -181,5 +182,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
 
         private void Notify(string message) => RequestNotificationEvent?.Invoke(this, message);
+
+        // ── FITUR 1: Clean Roblox Player & Studio ────────────────────────
+        // Dijalankan di UI thread karena Frontend.ShowMessageBox membutuhkan UI thread.
+        // Operasi file I/O (delete) cepat — tidak perlu background thread.
+
+        public ICommand CleanRobloxPlayerCommand => new RelayCommand(() => RobloxCleanupService.CleanPlayer());
+
+        public ICommand CleanRobloxStudioCommand => new RelayCommand(() => RobloxCleanupService.CleanStudio());
     }
 }
