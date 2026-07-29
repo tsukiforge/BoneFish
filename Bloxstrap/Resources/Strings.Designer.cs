@@ -5019,5 +5019,113 @@ namespace Bloxstrap.Resources {
                 return ResourceManager.GetString("Watcher.AutoReconnect.Description", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Roblox Cleanup.
+        /// </summary>
+        public static string Menu_Channel_Cleanup_Title {
+            get {
+                return ResourceManager.GetString("Menu.Channel.Cleanup.Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Remove Roblox Player and/or Studio data independently of BoneFish..
+        /// </summary>
+        public static string Menu_Channel_Cleanup_Description {
+            get {
+                return ResourceManager.GetString("Menu.Channel.Cleanup.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Clean Roblox Player.
+        /// </summary>
+        public static string Menu_Channel_Cleanup_Player {
+            get {
+                return ResourceManager.GetString("Menu.Channel.Cleanup.Player", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Remove Roblox Player binaries, registry entries, logs and cache..
+        /// </summary>
+        public static string Menu_Channel_Cleanup_Player_Description {
+            get {
+                return ResourceManager.GetString("Menu.Channel.Cleanup.Player.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Clean Roblox Studio.
+        /// </summary>
+        public static string Menu_Channel_Cleanup_Studio {
+            get {
+                return ResourceManager.GetString("Menu.Channel.Cleanup.Studio", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Remove Roblox Studio binaries, registry entries, logs and cache..
+        /// </summary>
+        public static string Menu_Channel_Cleanup_Studio_Description {
+            get {
+                return ResourceManager.GetString("Menu.Channel.Cleanup.Studio.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Import Mod Package.
+        /// </summary>
+        public static string Menu_Mods_ImportMod_Title {
+            get {
+                return ResourceManager.GetString("Menu.Mods.ImportMod.Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Import a community mod from a .zip file..
+        /// </summary>
+        public static string Menu_Mods_ImportMod_Description {
+            get {
+                return ResourceManager.GetString("Menu.Mods.ImportMod.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Mod ZIP packages.
+        /// </summary>
+        public static string Menu_Mods_ImportMod_FilePicker {
+            get {
+                return ResourceManager.GetString("Menu.Mods.ImportMod.FilePicker", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid ZIP structure..
+        /// </summary>
+        public static string Menu_Mods_ImportMod_InvalidStructure {
+            get {
+                return ResourceManager.GetString("Menu.Mods.ImportMod.InvalidStructure", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Confirm overwrite..
+        /// </summary>
+        public static string Menu_Mods_ImportMod_ConfirmOverwrite {
+            get {
+                return ResourceManager.GetString("Menu.Mods.ImportMod.ConfirmOverwrite", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Mod imported successfully..
+        /// </summary>
+        public static string Menu_Mods_ImportMod_Success {
+            get {
+                return ResourceManager.GetString("Menu.Mods.ImportMod.Success", resourceCulture);
+            }
+        }
     }
 }
