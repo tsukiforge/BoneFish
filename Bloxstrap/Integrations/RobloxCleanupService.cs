@@ -23,25 +23,28 @@ namespace Bloxstrap.Integrations
 
         /// <summary>
         /// Bersihkan semua data Roblox Player. Tidak menyentuh instalasi BoneFish.
+        /// Operasi delete dijalankan di background thread supaya UI tidak freeze.
         /// </summary>
-        public static bool CleanPlayer()
+        public static Task<bool> CleanPlayerAsync()
         {
-            return Cleanup(cleanPlayer: true, cleanStudio: false);
+            return CleanupAsync(cleanPlayer: true, cleanStudio: false);
         }
 
         /// <summary>
         /// Bersihkan semua data Roblox Studio. Tidak menyentuh instalasi BoneFish.
+        /// Operasi delete dijalankan di background thread supaya UI tidak freeze.
         /// </summary>
-        public static bool CleanStudio()
+        public static Task<bool> CleanStudioAsync()
         {
-            return Cleanup(cleanPlayer: false, cleanStudio: true);
+            return CleanupAsync(cleanPlayer: false, cleanStudio: true);
         }
 
-        private static bool Cleanup(bool cleanPlayer, bool cleanStudio)
+        private static async Task<bool> CleanupAsync(bool cleanPlayer, bool cleanStudio)
         {
             string productLabel = cleanPlayer ? "Roblox Player" : "Roblox Studio";
 
             // ── Step 1: Cek & tutup proses terkait ──────────────────────────
+            // (UI thread — butuh dialog konfirmasi)
             var processes = new List<Process>();
 
             if (cleanPlayer)
@@ -72,22 +75,27 @@ namespace Bloxstrap.Integrations
                 if (result != MessageBoxResult.OK)
                     return false;
 
-                foreach (var process in processes)
+                // ★ FIX freeze: process.Kill() + WaitForExit(3000) di UI thread bisa
+                // memblokir sampai 3 detik PER PROSES — dipindah ke background.
+                await Task.Run(() =>
                 {
-                    try
+                    foreach (var process in processes)
                     {
-                        if (!process.HasExited)
+                        try
                         {
-                            process.Kill();
-                            process.WaitForExit(3000);
+                            if (!process.HasExited)
+                            {
+                                process.Kill();
+                                process.WaitForExit(3000);
+                            }
+                            process.Close();
                         }
-                        process.Close();
+                        catch (Exception ex)
+                        {
+                            App.Logger.WriteLine(LOG_IDENT, $"Failed to kill process {process.Id}: {ex.Message}");
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        App.Logger.WriteLine(LOG_IDENT, $"Failed to kill process {process.Id}: {ex.Message}");
-                    }
-                }
+                });
             }
 
             // ── Step 2: Dialog konfirmasi — destructive action ─────────────
@@ -154,51 +162,70 @@ namespace Bloxstrap.Integrations
             if (confirmResult != MessageBoxResult.Yes)
                 return false;
 
-            // ── Step 3: Eksekusi penghapusan ───────────────────────────────
-            long totalBytesFreed = 0;
+            // Snapshot nilai yang dibutuhkan dari RobloxState di UI thread,
+            // supaya background thread tidak baca/mutasi object yang sama
+            // saat UI masih bisa membaca Prop (mis. saat window closing).
+            string playerGuid = App.RobloxState.Prop.Player.VersionGuid;
+            string studioGuid = App.RobloxState.Prop.Studio.VersionGuid;
 
-            // Hapus direktori versi
+            // ── Step 3: Eksekusi penghapusan (BACKGROUND THREAD) ───────────
+            // ★ FIX: Directory.Delete folder Roblox (GB-an) + hitung ukuran
+            // sebelumnya dijalankan synchronous di UI thread → aplikasi freeze
+            // dan Windows menampilkan "Not Responding". Dipindah ke Task.Run.
+            long totalBytesFreed = await Task.Run(() =>
+            {
+                long freed = 0;
+
+                // Hapus direktori versi
+                if (cleanPlayer)
+                {
+                    freed += DeleteDirectorySafe(Path.Combine(Paths.Versions, "WindowsPlayer"));
+                    if (!string.IsNullOrEmpty(playerGuid))
+                        freed += DeleteDirectorySafe(Path.Combine(Paths.Versions, playerGuid));
+
+                    // Unreg registry Player (defensive — jangan crash AsyncRelayCommand
+                    // kalau registry access ditolak/di-lock oleh proses lain)
+                    try { WindowsRegistry.Unregister("roblox"); } catch (Exception ex) { App.Logger.WriteLine(LOG_IDENT, $"Unregister 'roblox' failed: {ex.Message}"); }
+                    try { WindowsRegistry.Unregister("roblox-player"); } catch (Exception ex) { App.Logger.WriteLine(LOG_IDENT, $"Unregister 'roblox-player' failed: {ex.Message}"); }
+                }
+
+                if (cleanStudio)
+                {
+                    freed += DeleteDirectorySafe(Path.Combine(Paths.Versions, "WindowsStudio64"));
+                    if (!string.IsNullOrEmpty(studioGuid))
+                        freed += DeleteDirectorySafe(Path.Combine(Paths.Versions, studioGuid));
+
+                    // Unreg registry Studio (defensive)
+                    try { WindowsRegistry.Unregister("roblox-studio"); } catch (Exception ex) { App.Logger.WriteLine(LOG_IDENT, $"Unregister 'roblox-studio' failed: {ex.Message}"); }
+                    try { WindowsRegistry.Unregister("roblox-studio-auth"); } catch (Exception ex) { App.Logger.WriteLine(LOG_IDENT, $"Unregister 'roblox-studio-auth' failed: {ex.Message}"); }
+                    try { WindowsRegistry.Unregister("Roblox.Place"); } catch (Exception ex) { App.Logger.WriteLine(LOG_IDENT, $"Unregister 'Roblox.Place' failed: {ex.Message}"); }
+                    try { WindowsRegistry.Unregister(".rbxl"); } catch (Exception ex) { App.Logger.WriteLine(LOG_IDENT, $"Unregister '.rbxl' failed: {ex.Message}"); }
+                    try { WindowsRegistry.Unregister(".rbxlx"); } catch (Exception ex) { App.Logger.WriteLine(LOG_IDENT, $"Unregister '.rbxlx' failed: {ex.Message}"); }
+                }
+
+                // Hapus shared logs & cache
+                freed += DeleteDirectorySafe(Paths.RobloxLogs);
+                freed += DeleteDirectorySafe(Paths.RobloxCache);
+
+                return freed;
+            });
+
+            // Reset state (kembali ke UI thread setelah await)
             if (cleanPlayer)
             {
-                totalBytesFreed += DeleteDirectorySafe(Path.Combine(Paths.Versions, "WindowsPlayer"));
-                if (!string.IsNullOrEmpty(App.RobloxState.Prop.Player.VersionGuid))
-                    totalBytesFreed += DeleteDirectorySafe(Path.Combine(Paths.Versions, App.RobloxState.Prop.Player.VersionGuid));
-
-                // Unreg registry Player
-                WindowsRegistry.Unregister("roblox");
-                WindowsRegistry.Unregister("roblox-player");
-
-                // Reset state Player
                 App.RobloxState.Prop.Player.VersionGuid = "";
                 App.RobloxState.Prop.Player.Size = 0;
             }
 
             if (cleanStudio)
             {
-                totalBytesFreed += DeleteDirectorySafe(Path.Combine(Paths.Versions, "WindowsStudio64"));
-                if (!string.IsNullOrEmpty(App.RobloxState.Prop.Studio.VersionGuid))
-                    totalBytesFreed += DeleteDirectorySafe(Path.Combine(Paths.Versions, App.RobloxState.Prop.Studio.VersionGuid));
-
-                // Unreg registry Studio
-                WindowsRegistry.Unregister("roblox-studio");
-                WindowsRegistry.Unregister("roblox-studio-auth");
-                WindowsRegistry.Unregister("Roblox.Place");
-                WindowsRegistry.Unregister(".rbxl");
-                WindowsRegistry.Unregister(".rbxlx");
-
-                // Reset state Studio
                 App.RobloxState.Prop.Studio.VersionGuid = "";
                 App.RobloxState.Prop.Studio.Size = 0;
             }
 
-            // Hapus shared logs & cache
-            totalBytesFreed += DeleteDirectorySafe(Paths.RobloxLogs);
-            totalBytesFreed += DeleteDirectorySafe(Paths.RobloxCache);
-
-            // Simpan state
             App.RobloxState.Save();
 
-            // ── Step 4: Tampilkan hasil ────────────────────────────────────
+            // ── Step 4: Tampilkan hasil (kembali ke UI thread) ─────────────
             string freedSize = FormatBytes(totalBytesFreed);
             Frontend.ShowMessageBox(
                 $"{productLabel} berhasil dibersihkan!\n\n" +
