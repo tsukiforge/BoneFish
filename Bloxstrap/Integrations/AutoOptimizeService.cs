@@ -421,6 +421,18 @@ namespace Bloxstrap.Integrations
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Rendering optimizations applied for low-end");
                 }
+
+                // ── Network Optimizations ("sekelas NASA") ─────────────────────────
+                // ★ FIX: PurgeAllKnownFlags() di awal method ini MENGHAPUS flag network
+                // (FIntRakNetPacketRateLimit, DFIntMaxReceivePPS, DFIntMaxSendPPS,
+                // DFIntConnectionMTUSize, DFIntOptimizeSendQueue), tapi sebelumnya TIDAK
+                // pernah di-apply ulang di path low-end auto. Akibatnya user LowEnd/UltraLow
+                // yang tidak pilih preset manual justru KEHILANGAN optimasi jaringan —
+                // padahal preset manual (UltraLow, Balanced, dst) selalu memakainya.
+                // Sekarang semua path low-end (auto, HDD Balanced, Turbo Mode) juga
+                // mendapat network boost yang sama.
+                ApplyNetworkOptimizations();
+                App.Logger.WriteLine(LOG_IDENT, "Network optimizations applied (low-end path)");
             }
             catch (Exception ex)
             {
@@ -693,6 +705,11 @@ namespace Bloxstrap.Integrations
                 }
                 if (removedAny)
                     App.Logger.WriteLine(LOG_IDENT, "Removed low-end optimization FastFlags");
+
+                // CATATAN: EnableBetterMatchmaking / EnableBetterMatchmakingRandomization
+                // TIDAK di-reset di sini — dua setting ini juga bisa di-set manual oleh
+                // user di halaman Behaviour (bukan hanya oleh preset). Meresetnya di sini
+                // akan menimpa pilihan manual user. Ini pola yang sudah ada sejak v6.0.0.
                 return removedAny;
             }
             catch (Exception ex)

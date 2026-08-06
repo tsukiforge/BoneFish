@@ -184,11 +184,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private void Notify(string message) => RequestNotificationEvent?.Invoke(this, message);
 
         // ── FITUR 1: Clean Roblox Player & Studio ────────────────────────
-        // Dijalankan di UI thread karena Frontend.ShowMessageBox membutuhkan UI thread.
-        // Operasi file I/O (delete) cepat — tidak perlu background thread.
+        // ★ FIX freeze: delete folder Roblox (GB-an) sekarang dijalankan di
+        // background thread (lihat RobloxCleanupService.CleanupAsync). Dialog
+        // konfirmasi tetap di UI thread; hanya operasi disk yang dipindah.
 
-        public ICommand CleanRobloxPlayerCommand => new RelayCommand(() => RobloxCleanupService.CleanPlayer());
+        public ICommand CleanRobloxPlayerCommand => new AsyncRelayCommand(() => RobloxCleanupService.CleanPlayerAsync());
 
-        public ICommand CleanRobloxStudioCommand => new RelayCommand(() => RobloxCleanupService.CleanStudio());
+        public ICommand CleanRobloxStudioCommand => new AsyncRelayCommand(() => RobloxCleanupService.CleanStudioAsync());
     }
 }
