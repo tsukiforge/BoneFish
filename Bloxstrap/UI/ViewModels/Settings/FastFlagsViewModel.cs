@@ -65,21 +65,24 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand OpenFastFlagEditorCommand => new RelayCommand(OpenFastFlagEditor);
 
-        public ICommand ApplyRecommendedFastFlagsCommand => new RelayCommand(ApplyRecommendedFastFlags);
+        // ★ FIX freeze: semua preset pindahkan disk scan (CleanupLegacyRobloxFlags
+        // yang iterasi folder Roblox/Versions/version-* + baca/tulis JSON) ke
+        // background thread supaya klik preset tidak bikin UI "Not Responding".
+        public ICommand ApplyRecommendedFastFlagsCommand => new AsyncRelayCommand(ApplyRecommendedFastFlags);
 
         public ICommand ApplyRecommendedNetworkSettingsCommand => new RelayCommand(ApplyRecommendedNetworkSettings);
 
-        public ICommand ApplyRecommendedStabilityPresetCommand => new RelayCommand(ApplyRecommendedStabilityPreset);
+        public ICommand ApplyRecommendedStabilityPresetCommand => new AsyncRelayCommand(ApplyRecommendedStabilityPreset);
 
-        public ICommand ApplyUltraLowSpecPresetCommand => new RelayCommand(ApplyUltraLowSpecPreset);
+        public ICommand ApplyUltraLowSpecPresetCommand => new AsyncRelayCommand(ApplyUltraLowSpecPreset);
 
-        public ICommand ApplyBalancedPresetCommand => new RelayCommand(ApplyBalancedPreset);
+        public ICommand ApplyBalancedPresetCommand => new AsyncRelayCommand(ApplyBalancedPreset);
 
-        public ICommand ApplyExtremePerformancePresetCommand => new RelayCommand(ApplyExtremePerformancePreset);
+        public ICommand ApplyExtremePerformancePresetCommand => new AsyncRelayCommand(ApplyExtremePerformancePreset);
 
         // ToggleNightVisionCommand dihapus (GAP 4 — Night Vision deprecated)
 
-        public ICommand ClearClientAppSettingsCommand => new RelayCommand(ClearClientAppSettings);
+        public ICommand ClearClientAppSettingsCommand => new AsyncRelayCommand(ClearClientAppSettings);
 
         public ICommand ApplyAndRestartRobloxCommand => new RelayCommand(ApplyAndRestartRoblox);
 
@@ -365,14 +368,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        private void ApplyRecommendedFastFlags()
+        private async Task ApplyRecommendedFastFlags()
         {
-            // Bersihkan semua flag lama sebelum apply preset baru.
-            // CleanupLegacyRobloxFlags bersihkan di DISK (path Roblox + BoneFish),
-            // PurgeAllKnownFlags bersihkan di MEMORY (App.FastFlags.Prop).
-            // Reset Night Vision state karena flag-nya ikut terhapus oleh purge.
-            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
+            // ★ FIX freeze: CleanupLegacyRobloxFlags scan semua folder Roblox
+            // Versions/version-* + baca/tulis JSON — dipindah ke background.
+            await Task.Run(() =>
+            {
+                Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            });
             // NightVisionEnabled = false — dihapus (GAP 4)
             // ForceExtremeMode harus di-reset saat pindah ke preset lain,
             // agar AutoOptimizeService.DetectSystemTier() tidak memaksa ExtremePerformance
@@ -410,11 +415,15 @@ namespace Bloxstrap.UI.ViewModels.Settings
             OnRequestPageReload();
         }
 
-        private void ApplyRecommendedStabilityPreset()
+        private async Task ApplyRecommendedStabilityPreset()
         {
             // ── Cleanup (sekali vs sebelumnya ter-delegate 3x save/notify/reload) ─────
-            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            // ★ FIX freeze: disk scan ke background thread.
+            await Task.Run(() =>
+            {
+                Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            });
             // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
@@ -451,11 +460,15 @@ namespace Bloxstrap.UI.ViewModels.Settings
             OnRequestPageReload();
         }
 
-        private void ApplyUltraLowSpecPreset()
+        private async Task ApplyUltraLowSpecPreset()
         {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
-            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            // ★ FIX freeze: disk scan ke background thread.
+            await Task.Run(() =>
+            {
+                Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            });
             // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
@@ -512,11 +525,15 @@ namespace Bloxstrap.UI.ViewModels.Settings
             OnRequestPageReload();
         }
 
-        private void ApplyBalancedPreset()
+        private async Task ApplyBalancedPreset()
         {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
-            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            // ★ FIX freeze: disk scan ke background thread.
+            await Task.Run(() =>
+            {
+                Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            });
             // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
@@ -600,11 +617,15 @@ namespace Bloxstrap.UI.ViewModels.Settings
         ///    - Dokumentasi ini untuk transparansi — bukan dead code.
         /// ═══════════════════════════════════════════════════════════════════
         /// </summary>
-        private void ApplyExtremePerformancePreset()
+        private async Task ApplyExtremePerformancePreset()
         {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
-            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            // ★ FIX freeze: disk scan ke background thread.
+            await Task.Run(() =>
+            {
+                Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+            });
             // NightVisionEnabled = false — dihapus (GAP 4)
 
             UseFastFlagManager = true;
@@ -870,7 +891,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         /// Berguna saat terjadi bug visual (gelap, aneh) akibat akumulasi flag lama.
         /// Setelah clear, user bisa pilih ulang preset yang diinginkan.
         /// </summary>
-        private void ClearClientAppSettings()
+        private async Task ClearClientAppSettings()
         {
             var result = System.Windows.MessageBox.Show(
                 "Ini akan menghapus SEMUA FastFlag dari ClientAppSettings.json\n" +
@@ -886,15 +907,22 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (result != System.Windows.MessageBoxResult.Yes)
                 return;
 
-            // 1. Clear via FastFlagManager (path BoneFish) — bersihkan MEMORY
-            Integrations.AutoOptimizeService.PurgeAllKnownFlags();
-            App.FastFlags.Prop.Clear();
-            try { App.FastFlags.Save(); } catch { }
+            // ★ FIX freeze: CleanupLegacyRobloxFlags() men-scan SEMUA folder
+            // Roblox/Versions/version-* lalu baca & tulis JSON tiap folder.
+            // Di HDD ini bisa butuh beberapa detik — synchronous di UI thread
+            // bikin aplikasi "Not Responding". Dipindah ke Task.Run.
+            await Task.Run(() =>
+            {
+                // 1. Clear via FastFlagManager (path BoneFish) — bersihkan MEMORY
+                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                App.FastFlags.Prop.Clear();
+                try { App.FastFlags.Save(); } catch { }
 
-            // 2. Clear path Roblox + BoneFish via DISK scan
-            Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+                // 2. Clear path Roblox + BoneFish via DISK scan
+                Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+            });
 
-            // 3. Reset preset indicator
+            // 3. Reset preset indicator (kembali ke UI thread)
             App.Settings.Prop.SelectedPerformancePreset = "None";
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));

@@ -1,5 +1,73 @@
 # BoneFish Changelog
 
+## v7.0.0 — Fix Krusial: Freeze "Not Responding" saat Hapus + Jaringan Low-End "Sekelas NASA" 🚀
+
+Release date: 2026-08-06
+
+### 🐛 Bug Krusial — Klik "Hapus" → Klik "Yes" → BoneFish Langsung "Not Responding"
+
+**Gejala:** Setelah user menekan tombol Hapus/Bersihkan (mis. Clear ClientAppSettings, Bersihkan Roblox Player/Studio, Import Mod, Hapus Custom Theme) lalu mengkonfirmasi dengan "Yes", aplikasi langsung membeku dan Windows menampilkan judul window "Not Responding".
+
+**Akar masalah:** Semua operasi penghapusan dijalankan **synchronous di UI thread**:
+
+| Operasi | Biang Kerok Freeze |
+|---------|-------------------|
+| `RobloxCleanupService.Cleanup()` | `CalculateDirectorySize()` + `Directory.Delete()` folder Roblox **GB-an** + `process.Kill()/WaitForExit(3000)` per proses |
+| `ClearClientAppSettings()` (FastFlags) | `CleanupLegacyRobloxFlags()` scan SEMUA folder `Roblox/Versions/version-*` + baca/tulis JSON tiap folder |
+| `ImportMod()` (Mods) | Ekstrak zip + copy ribuan file ke folder Modifications |
+| `DeleteCustomTheme()` (Appearance) | `Directory.Delete(dir, true)` recursive |
+| 5 tombol preset performa (FastFlags) | `CleanupLegacyRobloxFlags()` + `PurgeAllKnownFlags()` + `Save()` — pola freeze yang SAMA |
+
+Di HDD dengan banyak versi Roblox, scan + delete ini butuh beberapa detik — cukup lama sampai Windows menandai window sebagai "Not Responding".
+
+**Perbaikan — semua operasi disk dipindah ke background thread (`Task.Run`):**
+
+| File | Perubahan |
+|------|-----------|
+| `RobloxCleanupService.cs` | `CleanPlayer()`/`CleanStudio()` → `CleanPlayerAsync()`/`CleanStudioAsync()`. Process-kill (`Kill` + `WaitForExit`) DAN `Directory.Delete` GB-an dipindah ke `Task.Run`. Nilai `RobloxState` di-snapshot di UI thread sebelum background work; mutasi state + `Save()` dikembalikan ke UI thread setelah `await`. |
+| `ChannelViewModel.cs` | Command `CleanPlayer`/`CleanStudio` → `AsyncRelayCommand` |
+| `FastFlagsViewModel.cs` | `ClearClientAppSettings()` → async, disk scan di `Task.Run`. **Bonus:** 5 preset method (`ApplyRecommendedFastFlags`, `ApplyRecommendedStabilityPreset`, `ApplyUltraLowSpecPreset`, `ApplyBalancedPreset`, `ApplyExtremePerformancePreset`) juga di-async-kan — pola freeze yang sama ikut diperbaiki. |
+| `ModsViewModel.cs` | `ImportMod()` → async. Ekstrak zip, cek overwrite, dan copy file semua di `Task.Run`; dialog tetap di UI thread. |
+| `AppearanceViewModel.cs` | `DeleteCustomTheme()` → async, `Directory.Delete` di `Task.Run` |
+
+Dialog konfirmasi & notifikasi (`Frontend.ShowMessageBox`) **tetap di UI thread** — hanya operasi disk yang dipindah, jadi UX tidak berubah.
+
+### 🚀 Improve — Jaringan "Sekelas NASA" di Path Low-End
+
+**Gap yang ditemukan:** `ApplyAggressiveOptimizations()` (path auto-detection low-end) memanggil `PurgeAllKnownFlags()` di awal — yang **menghapus flag network** (`FIntRakNetPacketRateLimit`, `DFIntMaxReceivePPS`, `DFIntMaxSendPPS`, `DFIntConnectionMTUSize`, `DFIntOptimizeSendQueue`) — tapi **tidak pernah meng-apply ulang**. Akibatnya user LowEnd/UltraLow yang TIDAK pilih preset manual justru **kehilangan** optimasi jaringan, padahal preset manual (UltraLow, Balanced, dst) selalu memakainya.
+
+**Fix:** `ApplyNetworkOptimizations()` sekarang dipanggil di akhir `ApplyAggressiveOptimizations()` — semua path low-end (auto-detection, HDD Balanced, Turbo Mode) mendapat network boost yang sama:
+
+```
+FIntRakNetPacketRateLimit = 50000   (rate limit paket dinaikkan)
+DFIntMaxReceivePPS        = 50000   (paket terima per detik maksimal)
+DFIntMaxSendPPS           = 50000   (paket kirim per detik maksimal)
+DFIntConnectionMTUSize    = 1500    (MTU maksimum ethernet standar)
+DFIntOptimizeSendQueue    = 1       (antrian kirim dioptimalkan)
+```
+
+**Catatan verifikasi:** Nilai-nilai ini adalah set standar komunitas yang sudah terverifikasi (dipakai semua preset sejak v6.0.0). `MTU=1500` adalah maksimum ethernet standar; `50000 PPS` adalah rekomendasi tertinggi komunitas. Flag tambahan lain (`DFIntRakNetResendBufferSize`, `DFIntMaxIncomingDataSize`, dll) TIDAK ditambahkan karena belum terverifikasi di Allowlist Roblox resmi — konsisten dengan constraint project untuk tidak menebak nama flag.
+
+### ✅ Verifikasi
+
+- Build 0 error, 0 warning ✅
+- Semua flow Hapus → Yes sekarang async — UI tetap responsif ✅
+- Dialogs tetap di UI thread (tidak ada perubahan UX) ✅
+- Tidak ada dead code / caller lama (`CleanPlayer()`/`CleanStudio()` sync dihapus) ✅
+
+### Files Changed (6 files)
+
+| File | Perubahan |
+|------|-----------|
+| `Bloxstrap/Integrations/RobloxCleanupService.cs` | Async + `Task.Run` untuk kill proses & delete GB-an |
+| `Bloxstrap/UI/ViewModels/Settings/ChannelViewModel.cs` | `AsyncRelayCommand` untuk Clean Player/Studio |
+| `Bloxstrap/UI/ViewModels/Settings/FastFlagsViewModel.cs` | `ClearClientAppSettings` + 5 preset → async |
+| `Bloxstrap/UI/ViewModels/Settings/ModsViewModel.cs` | `ImportMod` → async |
+| `Bloxstrap/UI/ViewModels/Settings/AppearanceViewModel.cs` | `DeleteCustomTheme` → async |
+| `Bloxstrap/Integrations/AutoOptimizeService.cs` | +`ApplyNetworkOptimizations()` di path low-end |
+
+---
+
 ## v6.3.1 — Fix: Icon Sidebar Tofu (Global Font Override) 🔤
 
 Release date: 2026-07-22

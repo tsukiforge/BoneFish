@@ -77,7 +77,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
 
         public ICommand OpenModsFolderCommand => new RelayCommand(OpenModsFolder);
-        public ICommand ImportModCommand => new RelayCommand(ImportMod);
+        public ICommand ImportModCommand => new AsyncRelayCommand(ImportMod);
 
         public Visibility ChooseCustomFontVisibility => !String.IsNullOrEmpty(TextFontTask.NewState) ? Visibility.Collapsed : Visibility.Visible;
 
@@ -201,7 +201,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public FontModPresetTask TextFontTask { get; } = new();
 
         // ── FITUR 2: Import Mod Package ──────────────────────────────────
-        private void ImportMod()
+        // ★ FIX freeze: ekstrak zip + copy ribuan file sebelumnya synchronous
+        // di UI thread → aplikasi "Not Responding" saat import mod besar.
+        // Semua operasi disk dipindah ke Task.Run; dialog tetap di UI thread.
+        private async Task ImportMod()
         {
             const string LOG_IDENT = "ModsViewModel::ImportMod";
 
@@ -214,31 +217,38 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 return;
 
             string zipPath = dialog.FileName;
+            string tempDir = "";
+            List<string> matchedFiles = new();
 
             try
             {
-                // Step 1: Extract to temp directory menggunakan SharpZipLib (konsisten dengan Bootstrapper.cs)
-                string tempDir = Path.Combine(Path.GetTempPath(), "BoneFishModImport", Guid.NewGuid().ToString());
-                Directory.CreateDirectory(tempDir);
+                // Step 1+2: Extract + detect struktur valid (BACKGROUND)
+                (tempDir, matchedFiles) = await Task.Run(() =>
+                {
+                    // Extract ke temp directory menggunakan SharpZipLib (konsisten dengan Bootstrapper.cs)
+                    string temp = Path.Combine(Path.GetTempPath(), "BoneFishModImport", Guid.NewGuid().ToString());
+                    Directory.CreateDirectory(temp);
 
-                var fastZip = new FastZip();
-                fastZip.ExtractZip(zipPath, tempDir, null);
+                    var fastZip = new FastZip();
+                    fastZip.ExtractZip(zipPath, temp, null);
 
-                // Step 2: Detect valid mod structure
-                // Valid known prefixes berdasarkan riset struktur mod Bloxstrap komunitas:
-                //   content/        — main Roblox content (textures, sounds, fonts, etc.)
-                //   ExtraContent/   — extra content seperti place files
-                //   ClientSettings/ — FastFlag overrides (ClientAppSettings.json)
-                var validPrefixes = new[] { "content", "ExtraContent", "ClientSettings" };
+                    // Valid known prefixes berdasarkan riset struktur mod Bloxstrap komunitas:
+                    //   content/        — main Roblox content (textures, sounds, fonts, etc.)
+                    //   ExtraContent/   — extra content seperti place files
+                    //   ClientSettings/ — FastFlag overrides (ClientAppSettings.json)
+                    var validPrefixes = new[] { "content", "ExtraContent", "ClientSettings" };
 
-                var allFiles = Directory.GetFiles(tempDir, "*.*", SearchOption.AllDirectories);
+                    var allFiles = Directory.GetFiles(temp, "*.*", SearchOption.AllDirectories);
 
-                var matchedFiles = allFiles
-                    .Select(f => Path.GetRelativePath(tempDir, f))
-                    .Where(relPath => validPrefixes.Any(prefix =>
-                        relPath.StartsWith(prefix + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
-                        relPath.StartsWith(prefix + '/', StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
+                    var matched = allFiles
+                        .Select(f => Path.GetRelativePath(temp, f))
+                        .Where(relPath => validPrefixes.Any(prefix =>
+                            relPath.StartsWith(prefix + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                            relPath.StartsWith(prefix + '/', StringComparison.OrdinalIgnoreCase)))
+                        .ToList();
+
+                    return (temp, matched);
+                });
 
                 if (!matchedFiles.Any())
                 {
@@ -252,14 +262,18 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     return;
                 }
 
-                // Step 3: Check for overwrites
-                var overwrites = new List<string>();
-                foreach (string relPath in matchedFiles)
+                // Step 3: Check overwrites (BACKGROUND)
+                var overwrites = await Task.Run(() =>
                 {
-                    string destFile = Path.Combine(Paths.Modifications, relPath);
-                    if (File.Exists(destFile))
-                        overwrites.Add(relPath);
-                }
+                    var existing = new List<string>();
+                    foreach (string relPath in matchedFiles)
+                    {
+                        string destFile = Path.Combine(Paths.Modifications, relPath);
+                        if (File.Exists(destFile))
+                            existing.Add(relPath);
+                    }
+                    return existing;
+                });
 
                 if (overwrites.Any())
                 {
@@ -281,20 +295,24 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     }
                 }
 
-                // Step 4: Copy files to Modifications folder
-                int copiedCount = 0;
-                foreach (string relPath in matchedFiles)
+                // Step 4: Copy files ke Modifications folder (BACKGROUND)
+                int copiedCount = await Task.Run(() =>
                 {
-                    string sourceFile = Path.Combine(tempDir, relPath);
-                    string destFile = Path.Combine(Paths.Modifications, relPath);
+                    int copied = 0;
+                    foreach (string relPath in matchedFiles)
+                    {
+                        string sourceFile = Path.Combine(tempDir, relPath);
+                        string destFile = Path.Combine(Paths.Modifications, relPath);
 
-                    Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
-                    File.Copy(sourceFile, destFile, true);
-                    copiedCount++;
-                }
+                        Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
+                        File.Copy(sourceFile, destFile, true);
+                        copied++;
+                    }
 
-                // Cleanup temp
-                try { Directory.Delete(tempDir, true); } catch { }
+                    // Cleanup temp
+                    try { Directory.Delete(tempDir, true); } catch { }
+                    return copied;
+                });
 
                 // Step 5: Show success
                 App.Logger.WriteLine(LOG_IDENT, $"Imported {copiedCount} files from {zipPath}");
@@ -305,6 +323,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
             catch (ZipException)
             {
+                // Bersihkan temp yang mungkin tersisa
+                try { if (!string.IsNullOrEmpty(tempDir)) Directory.Delete(tempDir, true); } catch { }
+
                 Frontend.ShowMessageBox(
                     Strings.Menu_Mods_ImportMod_InvalidStructure,
                     MessageBoxImage.Error

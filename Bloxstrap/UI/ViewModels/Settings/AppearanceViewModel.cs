@@ -24,7 +24,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ICommand BrowseCustomRobloxIconLocationCommand => new RelayCommand(BrowseCustomRobloxIconLocation);
 
         public ICommand AddCustomThemeCommand => new RelayCommand(AddCustomTheme);
-        public ICommand DeleteCustomThemeCommand => new RelayCommand(DeleteCustomTheme);
+        public ICommand DeleteCustomThemeCommand => new AsyncRelayCommand(DeleteCustomTheme);
         public ICommand RenameCustomThemeCommand => new RelayCommand(RenameCustomTheme);
         public ICommand EditCustomThemeCommand => new RelayCommand(EditCustomTheme);
         public ICommand ExportCustomThemeCommand => new RelayCommand(ExportCustomTheme);
@@ -247,14 +247,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        private void DeleteCustomTheme()
+        private async Task DeleteCustomTheme()
         {
             if (SelectedCustomTheme is null)
                 return;
 
+            // ★ FIX freeze: Directory.Delete recursive bisa lambat kalau folder
+            // theme berisi banyak file (apalagi di HDD) — pindah ke background.
             try
             {
-                DeleteCustomThemeStructure(SelectedCustomTheme);
+                await Task.Run(() => DeleteCustomThemeStructure(SelectedCustomTheme!));
             }
             catch (Exception ex)
             {
