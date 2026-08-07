@@ -615,7 +615,13 @@ namespace Bloxstrap.Integrations
                 ulong totalMemBytes = GetTotalPhysicalMemory();
                 ulong totalMemGB = totalMemBytes / (1024UL * 1024 * 1024);
 
-                if (totalMemGB < 5)
+                // ★ FIX (audit white-screen v7.x): Memory trim HANYA di SSD.
+                // EmptyWorkingSet memaksa proses yang di-trim untuk page-in BALIK dari
+                // disk saat mereka butuh memorinya lagi. Di HDD, ini terjadi tepat saat
+                // game baru launch (fase loading aset paling kritis) → disk storm yang
+                // bisa memperparah stall render / white screen. Di SSD page-in hampir
+                // instan, jadi trimming tetap aman di sana.
+                if (totalMemGB < 5 && IsSSD())
                     TrimBackgroundProcesses(robloxPid);
             }
             catch (Exception ex)
