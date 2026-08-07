@@ -2,6 +2,8 @@ using Bloxstrap.AppData;
 using Bloxstrap.Integrations;
 using System.Web;
 using System.Windows;
+using Windows.Win32;
+using Windows.Win32.Foundation;
 
 namespace Bloxstrap
 {
@@ -32,6 +34,22 @@ namespace Bloxstrap
         public readonly CrosshairService? Crosshair;
 
         public readonly HotkeyService? Hotkeys;
+
+        // ── Render-Stall Detector (diagnostik, BUKAN auto-restart) ──────────────────
+        // Hasil audit white-screen v7.x: pola "freeze → layar putih → pulih" di iGPU
+        // Intel tua hampir selalu TDR driver (Event ID 4101) atau texture streaming HDD,
+        // bukan crash Roblox. Detektor ini membedakan: proses hidup + window tidak
+        // merespons = RENDER STALL (dictat), vs proses mati = crash (diproses terpisah
+        // via exit code). HANYA mencatat ke log — tidak me-restart Roblox, tidak
+        // mengubah FastFlag saat stall berlangsung.
+        private int _stallCheckCount = 0;
+        private DateTime? _stallStartUtc = null;
+        private bool _stallLogged = false;
+
+        // IsHungAppWindow baru true setelah window tidak merespons ~5 detik
+        // (SendMessageTimeout internal default OS). 3 tick berturut-turut menekan
+        // false positive dari window yang cuma sibuk sesaat.
+        private const int StallCheckThreshold = 3;
 
         public Watcher()
         {
@@ -126,6 +144,12 @@ namespace Bloxstrap
             _joinJobId = _watcherData.JobId;
             if (_joinPlaceId.HasValue)
                 App.Logger.WriteLine(LOG_IDENT, $"Game join data tersimpan: PlaceId={_joinPlaceId}, JobId={_joinJobId ?? "(none)"}");
+
+            // Render-stall detector butuh window handle yang valid. Kalau handle 0
+            // (edge case di sebagian jalur launch), IsHungAppWindow selalu false dan
+            // deteksi diam-diam tidak jalan — catat sekali supaya user tahu dari log.
+            if (_watcherData.Handle == 0)
+                App.Logger.WriteLine(LOG_IDENT, "Render-stall detector INACTIVE: window handle = 0 (stall tidak akan terdeteksi)");
 
             WindowManipulation = new(_watcherData.Handle, _watcherData.ProcessId);
 
@@ -425,7 +449,7 @@ namespace Bloxstrap
                 using var robloxProcess = Process.GetProcessById(_watcherData.ProcessId);
                 try { sessionStart = robloxProcess.StartTime.ToUniversalTime(); } catch { }
 
-                while (Utilities.GetProcessesSafe().Any(x => x.Id == _watcherData.ProcessId))
+                while (WaitForRobloxTick())
                     await Task.Delay(1000);
 
                 // Process sudah exit — baca exit code dari Process object yang masih valid
@@ -442,7 +466,7 @@ namespace Bloxstrap
                 // Gunakan polling loop tanpa tracking exit code
                 App.Logger.WriteLine(LOG_IDENT, $"Could not attach to process for exit code tracking: {ex.Message}");
 
-                while (Utilities.GetProcessesSafe().Any(x => x.Id == _watcherData.ProcessId))
+                while (WaitForRobloxTick())
                     await Task.Delay(1000);
             }
 
@@ -518,6 +542,98 @@ namespace Bloxstrap
 
             if (App.LaunchSettings.TestModeFlag.Active)
                 Process.Start(Paths.Process, "-settings -testmode");
+        }
+
+        /// <summary>
+        /// Satu tick dari loop tunggu Roblox exit. Mengembalikan false jika Roblox sudah
+        /// mati (loop berhenti), true jika masih hidup (lanjut tick berikutnya).
+        /// Sambil menunggu, deteksi render stall: proses hidup tapi window tidak
+        /// merespons pesan Windows — dicatat ke log sebagai diagnostik ringan.
+        /// </summary>
+        private bool WaitForRobloxTick()
+        {
+            const string LOG_IDENT = "Watcher::StallDetector";
+
+            bool processAlive = Utilities.GetProcessesSafe().Any(x => x.Id == _watcherData!.ProcessId);
+            if (!processAlive)
+                return false;
+
+            bool hung = false;
+            try
+            {
+                hung = PInvoke.IsHungAppWindow((HWND)(IntPtr)_watcherData!.Handle);
+            }
+            catch (Exception ex)
+            {
+                // Handle stale/hilang (mis. Roblox recreate window setelah TDR) — non-fatal.
+                App.Logger.WriteLine(LOG_IDENT, $"IsHungAppWindow gagal (non-fatal): {ex.Message}");
+            }
+
+            if (hung)
+            {
+                _stallCheckCount++;
+                _stallStartUtc ??= DateTime.UtcNow;
+
+                if (_stallCheckCount >= StallCheckThreshold && !_stallLogged)
+                {
+                    _stallLogged = true;
+                    LogRenderStallDiagnostic();
+                }
+            }
+            else
+            {
+                if (_stallLogged)
+                {
+                    double stallSeconds = (DateTime.UtcNow - (_stallStartUtc ?? DateTime.UtcNow)).TotalSeconds;
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Roblox pulih dari render stall setelah ~{stallSeconds:F1} detik (proses tetap hidup)");
+                }
+                _stallCheckCount = 0;
+                _stallStartUtc = null;
+                _stallLogged = false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Tulis satu baris diagnostik saat render stall terdeteksi. Data ringan, tanpa
+        /// informasi pribadi. Membantu membedakan penyebab: TDR GPU (Event Viewer 4101)
+        /// vs texture streaming HDD vs hang permanen.
+        /// </summary>
+        private void LogRenderStallDiagnostic()
+        {
+            const string LOG_IDENT = "Watcher::StallDetector";
+
+            try
+            {
+                long workingSetMB = 0;
+                try
+                {
+                    using var proc = Process.GetProcessById(_watcherData!.ProcessId);
+                    workingSetMB = proc.WorkingSet64 / 1024 / 1024;
+                }
+                catch { /* proses mati di antara cek — pakai data yang ada */ }
+
+                // Reuse AutoOptimizeService.GetSystemInfo() — sudah memberi CPU/RAM/
+                // Storage(HDD/SSD)/Tier yang relevan dengan teori HDD-paging, tanpa
+                // menambah dependency baru (deteksi storage sudah di-cache).
+                string sysInfo = "";
+                try { sysInfo = Integrations.AutoOptimizeService.GetSystemInfo(); } catch { }
+
+                App.Logger.WriteLine(LOG_IDENT,
+                    "RENDER STALL TERDETEKSI (Roblox hang, proses MASIH HIDUP — bukan crash) | " +
+                    $"PID={_watcherData!.ProcessId} | windowHandle={_watcherData.Handle} | " +
+                    $"workingSet={workingSetMB}MB | preset={App.Settings.Prop.SelectedPerformancePreset ?? "None"} | " +
+                    $"OptimizeForLowEnd={App.Settings.Prop.OptimizeForLowEnd} | " +
+                    $"FakeBorderless={App.Settings.Prop.FakeBorderlessFullscreen} | " +
+                    $"FpsMonitor={App.Settings.Prop.EnableFpsMonitor} | Crosshair={App.Settings.Prop.EnableCrosshair} | " +
+                    $"System={sysInfo}");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Gagal menulis diagnostik stall: {ex.Message}");
+            }
         }
 
         public void Dispose()

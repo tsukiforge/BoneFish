@@ -1,5 +1,60 @@
 # BoneFish Changelog
 
+## v7.0.1 — Audit White-Screen: Memory Trim Aman di HDD + Render-Stall Detector 🛡️
+
+Release date: 2026-08-07
+
+### 🔍 Konteks — Investigasi "Freeze → Layar Putih → Pulih Sendiri"
+
+Audit mendalam terhadap gejala: **Roblox jalan normal → freeze → window jadi putih total → pulih setelah beberapa detik → game lanjut**. Target device: i3 Gen 4, Intel HD 4400, 8GB RAM, HDD, Windows 10.
+
+**Kesimpulan audit (diurutkan dari yang paling mungkin):**
+
+| # | Penyebab | Status |
+|---|----------|--------|
+| 1 | **Intel iGPU Driver TDR** (Timeout Detection & Recovery) — GPU tidak merespons >2 detik, driver di-reset oleh Windows, render context dibuat ulang. Roblox TETAP hidup (bukan crash). Konfirmasi: Event Viewer → System → **Event ID 4101** | 🥇 LIKELY |
+| 2 | **Texture streaming di HDD + RAM 8GB dipakai bareng iGPU** (shared memory) — render thread menunggu aset dari HDD → stall/putih sampai aset selesai | 🥈 LIKELY |
+| 3 | **BoneFish sebagai amplifier** — flag frame-pacing bisa membuat stall lebih terasa, tapi tidak memicu TDR | 🥉 POSSIBLE |
+| 4 | Memory trimming & CPU affinity — **TIDAK aktif di device 8GB/4-core** (gated <5GB dan <=2 core) | ❌ UNLIKELY |
+
+**Kesimpulan penting:** Tidak ada satu pun FastFlag BoneFish yang terbukti memicu white screen. Malah sebaliknya — flag low-end (texture quality 0, SSAO off, FPS cap 30) menurunkan beban GPU/RAM dan cenderung **mengurangi** frekuensi TDR.
+
+### 🔧 FIX 1 — Memory Trim Kini Hanya di SSD
+
+**Sebelum:** `EmptyWorkingSet()` dipanggil ke SEMUA proses background >20MB (kecuali Roblox & sistem) saat RAM < 5GB — **termasuk di HDD**. Di HDD, proses yang di-trim harus page-in BALIK dari disk tepat saat game baru launch (fase loading aset paling kritis) → disk storm yang bisa memperparah stall render.
+
+**Sesudah:** `AutoOptimizeService.OptimizeRobloxProcess()` kini gate `if (totalMemGB < 5 && IsSSD())` — trimming hanya jalan di SSD (page-in hampir instan, aman). Device HDD + RAM rendah terlindungi.
+
+### 🛡️ FIX 2 — Render-Stall Detector (Diagnostik, Tanpa Auto-Restart)
+
+Detektor ringan baru di `Watcher.cs` yang berjalan di loop tunggu Roblox exit (1 cek/detik):
+
+- **Deteksi hang vs crash:** proses Roblox MASIH HIDUP + window tidak merespons pesan Windows (`IsHungAppWindow`, baru true setelah ~5 detik tidak responsif)
+- Setelah **3 tick berturut-turut** (~5-7 detik hang nyata, menekan false positive) → tulis 1 baris diagnostik ke log: PID, window handle, working set, preset aktif, OptimizeForLowEnd, FakeBorderless, FpsMonitor, Crosshair, + info sistem (CPU/RAM/Storage/Tier via `GetSystemInfo()`)
+- Saat pulih → dicatat durasi stall-nya
+- **HANYA mencatat — TIDAK me-restart Roblox, TIDAK mengubah FastFlag saat stall** (prinsip: kumpulkan bukti dulu)
+- Jika window handle = 0 (edge case) → log sekali bahwa detector inactive
+- P/Invoke baru `IsHungAppWindow` ditambahkan ke `NativeMethods.txt` (pola CsWin32 project)
+
+**Cara pakai diagnostik:** main seperti biasa → saat white screen terjadi → buka log (`%LocalAppData%\BoneFish\Logs\` atau folder install `Logs/`) → cari baris **`RENDER STALL TERDETEKSI`**. Bandingkan dengan Event ID 4101 di Event Viewer untuk konfirmasi TDR.
+
+### ✅ Verifikasi
+
+- Build **0 error, 0 warning** ✅
+- Code review: loop semantics tidak berubah, thread-safe (user32 via SendMessageTimeout), reuse `GetSystemInfo()` ✅
+- Tidak ada dead code ✅
+- Semua fungsionalitas existing dipertahankan (preset, FastFlags, launcher, cleanup) ✅
+
+### Files Changed (3 files)
+
+| File | Perubahan |
+|------|-----------|
+| `Bloxstrap/Integrations/AutoOptimizeService.cs` | Memory trim gated: `totalMemGB < 5` → `totalMemGB < 5 && IsSSD()` |
+| `Bloxstrap/NativeMethods.txt` | +`IsHungAppWindow` |
+| `Bloxstrap/Watcher.cs` | +Render-Stall Detector (`WaitForRobloxTick()`, `LogRenderStallDiagnostic()`), kedua loop tunggu Roblox memakainya |
+
+---
+
 ## v7.0.0 — Fix Krusial: Freeze "Not Responding" saat Hapus + Jaringan Low-End "Sekelas NASA" 🚀
 
 Release date: 2026-08-06

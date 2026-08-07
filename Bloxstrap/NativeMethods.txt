@@ -5,6 +5,7 @@ SetWindowLong
 SetWindowPos
 CopyIcon
 GetWindowText
+IsHungAppWindow
 SetWindowText
 SetWinEventHook
 SendMessage
