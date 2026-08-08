@@ -44,7 +44,7 @@
 ### 🎨 **Visual Customization**
 - **Wallpaper Background System** — Choose from 5 background types (Default, Cool, Quality, Extra, Custom) or enable random mode for a fresh look every launch
 - **Custom Wallpaper** — Upload your own images from your PC, with auto-fallback to `images/img/` folder scanning
-- **Custom Loading Screens** — Upload your own images for a personalized loading experience.png / .jpg / .jpeg / .bmp supported
+- **Custom Loading Screens** — Upload your own PNG / JPG / JPEG / BMP images for a personalized loading experience
 - **Crosshair Overlay** — In-game custom crosshair with 4 styles (Cross, Dot, Circle, CrossDot), adjustable size (20-200px), opacity (10-100%), 8 color presets, and drag-to-move positioning
 - **Global Hotkeys** — Keyboard shortcuts for instant feature toggles: `Ctrl+Shift+C` (Crosshair), `Ctrl+Shift+F` (FPS Monitor)
 - **FPS Monitor Overlay** — Real-time FPS display via ETW with color coding (green/yellow/red), draggable positioning, and persistent mode (stays active after game exit)
@@ -60,9 +60,10 @@
   - 🥔 **Extreme Performance (Potato Mode)** — Maximum FPS with configurable FPS cap (24-60)
   - ⚖️ **Balanced** — Middle ground between performance and visuals
 - **Fast Loading Toggle** — Accelerate asset loading by increasing texture compositor parallelism and thread limits (conditional: activates based on CPU core count)
+- **Smart Preset Combination** (v7.0.2+) — Presets stack safely: Force Extreme + HDD/low-end is now HDD-aware (keeps ultra-aggressive LOD & disk-friendly compositor jobs), Fast Loading keeps top priority on every launch, and only officially allowlisted flags are written to the client
 - **Turbo Mode** — One-click performance burst: forces Extreme Performance preset, applies aggressive FastFlags, resets on restart (non-permanent)
 - **HDD/SSD Auto-Detection** — 100% accurate detection via `DeviceIoControl` + `IOCTL_STORAGE_QUERY_PROPERTY`, with automatic HDD Balanced preset for low-end HDD systems
-- **Anti Not-Responding System** — 3-layer protection: FastFlags (animation limits, telemetry disable), process priority boost, and RAM trimming for low-end devices
+- **Anti Not-Responding System** — 3-layer protection: FastFlags (Roblox allowlist-compliant since v7.0.2), process priority boost, and RAM trimming for low-end devices
 - **FPS Monitor** — ETW-based overlay with color-coded FPS, frame time, and Vulkan detection
 
 ### 🔧 **Advanced Tools**
@@ -83,7 +84,7 @@
 - **Friend Online Notifications** — Get notified when friends come online (Windows native notifications)
 - **Notification Sounds** — Audio alerts for notifications
 - **Low-End Optimization** — Reduced update frequency for older hardware
-- **Network Optimizations** — Better Matchmaking with server region prioritization, MTU tuning, and telemetry reduction
+- **Network Optimizations** — Better matchmaking with server region prioritization and packet tuning (RakNet rate limits, MTU)
 - **Multiple Instance Support** — Launch multiple Roblox instances simultaneously
 - **DNS Resilience** — Automatic DNS connectivity testing with backoff on failure
 - **Advanced Memory Management** — Low-memory mode, working set trimming, and CPU affinity control for dual-core systems
@@ -149,7 +150,7 @@
 
 Navigate to **Experimental** page to:
 - **Toggle** random background changes on app launch
-- **Select** from 4 wallpaper presets instantly
+- **Select** from the available wallpaper presets instantly
 - Changes apply immediately without restart
 
 ### Custom Loading Screen
@@ -169,9 +170,23 @@ Enable in **Experimental** page:
 
 ---
 
-## 🔌 Hooks System
+## 📋 Changelog
 
-## 🎥 YouTube Content Script
+**v7.0.2** *(2026-08-08)* — Preset combination fix
+- Force Extreme + HDD/low-end no longer tanks FPS — LOD distances and texture compositor jobs now adapt to the detected drive type
+- Fast Loading toggle no longer gets silently removed on every launch — it is re-applied with top priority at boot
+- Removed non-functional FastFlags (telemetry, animation tracks, light fade) — Roblox ignores any flag outside its official allowlist (Sep 2025+); leftover values are still cleaned up on boot
+
+**v7.0.1** *(2026-08-07)* — White-screen audit
+- Memory trimming now runs on SSD-only systems; Render-Stall Detector added
+
+**v7.0.0** *(2026-08-06)* — Stability overhaul
+- Fixed "Not Responding" freeze when removing a Roblox installation (Hapus → Yes dialog)
+- "NASA-grade" network optimizations extended to low-end paths
+
+---
+
+## 🎬 YouTube Content Script
 
 BoneFish includes a detailed **YouTube content script** for creators who want to showcase the application.
 
