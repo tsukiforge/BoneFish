@@ -602,13 +602,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
         ///    — TIDAK memengaruhi gameplay, lighting, atau shadow.
         ///
         /// 3. FLAG ANTI-FREEZE/STABILITY:
-        ///    - DFIntMaxActiveAnimationTracks=32 — batasi animasi
-        ///    - FIntRenderLocalLightFadeInMs=0  — fade light instan
-        ///    - 7 flag telemetry off              — kurangi I/O disk
-        ///    Flag ini TIDAK dipisah jadi toggle terpisah karena:
-        ///    a) Preset ini adalah SATU KESATUAN agresif untuk device lemah.
-        ///    b) Anti-freeze tanpa pengorbanan visual tidak cukup efektif.
-        ///    c) User masih bisa stack toggle lain (Fast Loading, dsb).
+        ///    ★ AUDIT v7.x: DFIntMaxActiveAnimationTracks, FIntRenderLocalLightFadeInMs
+        ///    dan 7 flag telemetry off TIDAK ADA di Fast Flag Allowlist resmi Roblox
+        ///    (aktif sejak 2025-09-29; devforum 3966569) → client mengabaikannya.
+        ///    Flag-flag itu TIDAK LAGI ditulis oleh preset (nilai lama dibersihkan
+        ///    oleh purge AllKnownManagedFlags).
         ///
         /// 4. KEPUTUSAN FINAL:
         ///    - Tidak dibuat toggle EnableAntiFreezeMode terpisah.
@@ -650,7 +648,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // Light updates Max=4 agar senter/torch tidak bug gelap.
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
-            App.FastFlags.SetValue("FIntRenderLocalLightFadeInMs", "0");
+            // FIntRenderLocalLightFadeInMs tidak lagi ditulis (audit v7.x): tidak ada di
+            // allowlist resmi Roblox (Sep 2025+, thread devforum 3966569) → diabaikan client.
 
             // ── Post-processing ringan: hanya yang tidak merusak visual game ────────────
             App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
@@ -701,14 +700,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
 
             // ── Anti Not-Responding ───────────────────────────────────────────────────────
-            App.FastFlags.SetValue("DFIntMaxActiveAnimationTracks", "32");
-            App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralCounter", "True");
-            App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralStat",    "True");
-            App.FastFlags.SetValue("FFlagDebugDisableTelemetryEventIngest",      "True");
-            App.FastFlags.SetValue("FFlagDebugDisableTelemetryPoint",            "True");
-            App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Counter",        "True");
-            App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Event",          "True");
-            App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Stat",           "True");
+            // ★ AUDIT v7.x: DFIntMaxActiveAnimationTracks dan 7 flag telemetry
+            // (FFlagDebugDisableTelemetry*) TIDAK ADA di Fast Flag Allowlist resmi Roblox
+            // yang aktif sejak 29 Sep 2025 → client mengabaikannya. Tidak ditulis lagi;
+            // nilai lama tetap dihapus lewat purge (AllKnownManagedFlags).
 
             // ── FPS Cap ───────────────────────────────────────────────────────────────────
             int fpsCap = Math.Clamp(App.Settings.Prop.ExtremeModeFpsTarget, 24, 60);

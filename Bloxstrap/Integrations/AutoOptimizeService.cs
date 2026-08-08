@@ -339,11 +339,21 @@ namespace Bloxstrap.Integrations
                     }
                 }
 
-                tier ??= DetectSystemTier();
-                bool isExtreme = tier == SystemTier.ExtremePerformance;
-                bool isUltraOrExtreme = tier == SystemTier.UltraLow || isExtreme;
+tier ??= DetectSystemTier();
+            bool isExtreme = tier == SystemTier.ExtremePerformance;
+            bool isUltraOrExtreme = tier == SystemTier.UltraLow || isExtreme;
 
-                PurgeAllKnownFlags();
+            // ── Konflik kombinasi (v7.x): HDD + Extreme ─────────────────────────────
+            // ★ FIX: Saat ForceExtremeMode aktif, DetectSystemTier() mengembalikan
+            // ExtremePerformance SEPENUHNYA terlepas dari hardware — akibatnya
+            // ApplyHDDBalancedOptimizations() TIDAK PERNAH dipanggil (CheckAndApply
+            // return dulu di cabang OptimizeForLowEnd). Agar preset HDD tetap "hidup"
+            // saat dieksekusi: relatif terhadap HDD di sini (hddIoTweaks juga diset
+            // dari sina berlaku) sehingga kombinasi Extreme+HDD menghasilkan LOD &
+            // compositor yang BENAR untuk disk lambat, bukan nilai "generic Extreme".
+            bool isHDD = !IsSSD();
+
+            PurgeAllKnownFlags();
 
                 App.FastFlags.SetValue("DFFlagTextureQualityOverrideEnabled", "True");
                 App.FastFlags.SetValue("DFIntTextureQualityOverride", "0");
@@ -361,8 +371,15 @@ namespace Bloxstrap.Integrations
 
                 App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
                 App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    isExtreme ? "500" : "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    isExtreme ? "750" : "250");
+                // ── Konflik kombinasi Extreme + HDD pada LOD ────────────────────────
+                // Nilai Extreme 500/750 membuat geometri TETAP high-poly lebih jauh
+                // (switch LOD semakin jauh) = beban render lebih berat = FPS turun di
+                // perangkat 'potato' (bukti: LANGKAH 0 user — Extreme ON 36-40 FPS vs
+                // OFF 50-60). Saat dieksekusi bersamaan dengan HDD/LowEnd, LOD dipertahankan
+                // 250 (paling agresif) karena preset HDD sendiri TIDAK pernah jalan
+                // (CheckAndApply return duluan di cabang OptimizeForLowEnd).
+                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    isExtreme && !isHDD ? "500" : "250");
+                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    isExtreme && !isHDD ? "750" : "250");
                 App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
                 App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
 
@@ -384,22 +401,20 @@ namespace Bloxstrap.Integrations
                     App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
                 }
 
-                App.FastFlags.SetValue("DFIntMaxActiveAnimationTracks", "32");
-                App.FastFlags.SetValue("FIntRenderLocalLightFadeInMs", "0");
-
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralCounter", "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryEphemeralStat",    "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryEventIngest",      "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryPoint",            "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Counter",        "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Event",          "True");
-                App.FastFlags.SetValue("FFlagDebugDisableTelemetryV2Stat",           "True");
+                // ── ANR audit (v7.x) ❌ DIPERTAHANKAN ───────────────────────────────
+                // DFIntMaxActiveAnimationTracks, FIntRenderLocalLightFadeInMs, dan 7 flag
+                // telemetry (FFlagDebugDisableTelemetry*) TIDAK TERDAFTAR di Roblox Fast
+                // Flag Allowlist resmi yang aktif sejak 29 September 2025 (devforum thread
+                // 3966569; juga repo LeventGameing/allowlist) — client MODERN MENGABAIKAN
+                // flag ini (silent no-op). Tidak ada lagi SetValue untuk flag tersebut;
+                // nilai lama tetap dibersihkan lewat AllKnownManagedFlags saat purge.
 
                 if (isUltraOrExtreme)
                 {
                     App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
                     App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
-                    App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
+                    // Extreme+HDD → jobs=2 (selaras HDD Balanced); Extreme murni → 1
+                    App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", isHDD ? "2" : "1");
 
                     App.Settings.Prop.EnableFpsMonitor = false;
                     App.Settings.Prop.EnableRobloxNotifications = false;
@@ -422,7 +437,7 @@ namespace Bloxstrap.Integrations
                     App.Logger.WriteLine(LOG_IDENT, "Rendering optimizations applied for low-end");
                 }
 
-                // ── Network Optimizations ("sekelas NASA") ─────────────────────────
+// ── Network Optimizations ("sekelas NASA") ─────────────────────────
                 // ★ FIX: PurgeAllKnownFlags() di awal method ini MENGHAPUS flag network
                 // (FIntRakNetPacketRateLimit, DFIntMaxReceivePPS, DFIntMaxSendPPS,
                 // DFIntConnectionMTUSize, DFIntOptimizeSendQueue), tapi sebelumnya TIDAK
@@ -433,6 +448,18 @@ namespace Bloxstrap.Integrations
                 // mendapat network boost yang sama.
                 ApplyNetworkOptimizations();
                 App.Logger.WriteLine(LOG_IDENT, "Network optimizations applied (low-end path)");
+
+                // ── Konflik urutan / Fast Loading (toggle) ──────────────────────────
+                // ★ FIX: ApplyFastLoadingFlags() hanya dipanggil dari toggle UI, TIDAK
+                // pernah dari boot. Di relaunch, PurgeAllKnownFlags() + nilai di atas
+                // menghapus/menimpa 2 flag-nya (DFIntTextureCompositorActiveJobs dan
+                // FIntRuntimeMaxNumOfThreads) — toggle Fast Loading mati diam-diam.
+                // Re-apply PALING AKHIR agar kombinasi ini menang apa pun preset lain.
+                if (App.Settings.Prop.EnableFastLoadingFlags)
+                {
+                    try { ApplyFastLoadingFlags(); } catch { }
+                    App.Logger.WriteLine(LOG_IDENT, "FastLoading re-applied after aggressive path (priority: HIGHEST)");
+                }
             }
             catch (Exception ex)
             {
