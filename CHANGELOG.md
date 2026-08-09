@@ -1,5 +1,32 @@
 # BoneFish Changelog
 
+## v7.0.5 - Kombinasi Preset Cerdas: Extreme + HDD Bersatu (+ Info Tier Ganda)
+
+Release date: 2026-08-09
+
+### 🧩 Perbaikan utama - preset tidak saling menimpa lagi
+
+- Saat **Force Extreme Mode** aktif di perangkat HDD/low-end, kedua mode sekarang **bergabung**: nilai LOD & compositor pekerjaan dari mode HDD tetap dipertahankan, tidak lagi ditimpa total oleh mode Extreme generik yang buta terhadap bottleneck disk. Hasilnya FPS pada kombinasi Extreme+HDD lebih berdasarkan.
+- Panel System Info kini menampilkan **dua keterangan terpisah**: "Tier Asli" (kondisi perangkat sebenarnya) dan "Tier Efektif" (mode yang sedang aktif karena Force Extreme Mode) — tidak ada lagi kebingungan apa yang sedang diterapkan.
+
+### ✨ Pembersihan & konsistensi
+
+- Flag yang tidak lagi didukung client (berdasar daftar allowlist resmi Roblox) dibersihkan secara otomatis saat boot — konfigurasi lebih bersih, perilaku kaku dan terprediksi, dan aplikasi tetap kompatibel dengan update Roblox terbaru.
+
+---
+
+## v7.0.2 - Kombinasi Preset Aman: LOD Sadar-HDD + Fast Loading Prioritas + Pembersih Flag Non-Allowlist
+
+Release date: 2026-08-08
+
+### What's new
+
+- **Extreme + HDD/Low-End sekarang HDD-aware** — jarak LOD dan jumlah compositor menyesuaikan jenis penyimpanan (HDD), sehingga kombinasi Force Extreme tidak menurunkan FPS pada perangkat kentang.
+- **Fast Loading Toggle tidak lagi hilang diam-diam** saat relaunch — penambahan prioritas tertinggi di setiap boot, apa pun preset aktif.
+- **Pembersihan flag non-allowlist** — flag yang diabaikan oleh client modern (di luar daftar allowlist resmi yang aktif sejak 2025) dihapus dari preset; nilai lama tetap dibersihkan secara otomatis.
+
+---
+
 ## v7.0.1 — Audit White-Screen: Memory Trim Aman di HDD + Render-Stall Detector 🛡️
 
 Release date: 2026-08-07

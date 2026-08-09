@@ -224,11 +224,14 @@ namespace Bloxstrap.Integrations
             }
         }
 
-        private static SystemTier DetectSystemTier()
+        private static SystemTier DetectSystemTier(bool ignoreForceExtreme = false)
         {
             try
             {
-                if (App.Settings.Prop.ForceExtremeMode)
+                // v7.0.5: param ignoreForceExtreme=true dipakai caller yang butuh tier ASLI
+                // hardware (tanpa override ForceExtremeMode) — lihat CheckAndApply() dan
+                // GetSystemInfo().
+                if (!ignoreForceExtreme && App.Settings.Prop.ForceExtremeMode)
                     return SystemTier.ExtremePerformance;
 
                 int cpuCores = Environment.ProcessorCount;
@@ -260,6 +263,17 @@ namespace Bloxstrap.Integrations
         {
             try
             {
+                // ── v7.0.5: tier ASLI vs tier EFEKTIF ──────────────────────────────
+                // Bug (sebelum fix): DetectSystemTier() punya short-circuit
+                //   if (ForceExtremeMode) return ExtremePerformance;
+                // sehingga tier asli device (HDD + LowEnd/MidRange) tidak pernah sampai
+                // ke pengecekan HDD Balanced, dan cabang OptimizeForLowEnd di bawah
+                // return duluan — ApplyHDDBalancedOptimizations() TIDAK PERNAH terpanggil
+                // saat ForceExtremeMode aktif → semua tweak I/O HDD hilang, digantikan
+                // mode Extreme generik yang buta terhadap bottleneck disk.
+                // Sekarang: tier asli dihitung terpisah (ignoreForceExtreme) dan dipakai
+                // untuk memutuskan kombinasi Extreme+HDD.
+                SystemTier trueTier = DetectSystemTier(ignoreForceExtreme: true);
                 SystemTier tier = DetectSystemTier();
                 bool isExtreme = tier == SystemTier.ExtremePerformance;
                 bool shouldOptimize = isExtreme || tier == SystemTier.LowEnd || tier == SystemTier.UltraLow;
@@ -278,11 +292,34 @@ namespace Bloxstrap.Integrations
                     };
 
                     App.Logger.WriteLine(LOG_IDENT, $"System tier detected: {tierName}. OptimizeForLowEnd enabled.");
+                    if (trueTier != tier)
+                        App.Logger.WriteLine(LOG_IDENT, $"Original hardware tier: {trueTier} (hidden by ForceExtremeMode)");
                 }
 
                 if (App.Settings.Prop.OptimizeForLowEnd)
                 {
-                    ApplyAggressiveOptimizations(tier);
+                    // v7.0.5: ForceExtreme + HDD + tier asli LowEnd/MidRange → GABUNGAN
+                    // Extreme & HDD tweaks ("Extreme Mode sadar HDD"), bukan saling
+                    // menggantikan. hddIoTweaks=true diarahkan ke ApplyAggressiveOptimizations
+                    // yang sudah ada (reuse, bukan reimplement) — nilai 250/jobs=2 dll.
+                    // bypassLowEndGuard=true hanya untuk kasus combo: bukti dari log device
+                    // nyata — user memakai ForceExtremeMode TAPI guard UserHasManualPreset()
+                    // di ApplyAggressiveOptimizations membuat auto-optimize di-skip total
+                    // saat boot (ClientAppSettings.json hanya berisi 4 flag dasar). Karena
+                    // toggle ForceExtremeMode ADALAH ekspresi intent user untuk extreme,
+                    // combo tidak boleh diam-diam di-skip oleh guard preset manual.
+                    bool hddCombo = App.Settings.Prop.ForceExtremeMode
+                        && !IsSSD()
+                        && (trueTier == SystemTier.LowEnd || trueTier == SystemTier.MidRange);
+
+                    if (hddCombo)
+                        App.Logger.WriteLine(LOG_IDENT,
+                            $"ForceExtreme + HDD combo: tier asli {trueTier}, tier efektif ExtremePerformance — applying Extreme + HDD tweaks (bypass manual-preset guard)");
+
+                    ApplyAggressiveOptimizations(
+                        tier: tier,
+                        hddIoTweaks: hddCombo,
+                        bypassLowEndGuard: hddCombo);
                     return true;
                 }
 
@@ -309,10 +346,18 @@ namespace Bloxstrap.Integrations
                 int cpuCores = Environment.ProcessorCount;
                 ulong totalMemBytes = GetTotalPhysicalMemory();
                 ulong totalMemMB = totalMemBytes / (1024UL * 1024);
-                SystemTier tier = DetectSystemTier();
+                // v7.0.5: tampilkan DUA tier — asli (tanpa override ForceExtremeMode) dan
+                // efektif (dengan override) — supaya user tidak bingung device sebenarnya
+                // saat Force Extreme Mode menyembunyikan tier asli.
+                SystemTier trueTier = DetectSystemTier(ignoreForceExtreme: true);
+                SystemTier effectiveTier = DetectSystemTier();
                 string storageType = IsSSD() ? "SSD" : "HDD";
 
-                return $"CPU Cores: {cpuCores}, RAM: {totalMemMB}MB ({totalMemMB/1024}GB), Storage: {storageType}, Tier: {tier}";
+                string tierInfo = trueTier == effectiveTier
+                    ? $"Tier: {trueTier}"
+                    : $"Tier Asli: {trueTier}, Tier Efektif: {effectiveTier} (ForceExtremeMode aktif)";
+
+                return $"CPU Cores: {cpuCores}, RAM: {totalMemMB}MB ({totalMemMB/1024}GB), Storage: {storageType}, {tierInfo}";
             }
             catch
             {
@@ -421,6 +466,8 @@ tier ??= DetectSystemTier();
                     try { App.Settings.Save(); } catch { }
 
                     string label = isExtreme ? "ExtremePerformance (Potato Mode)" : "UltraLow";
+                    if (isExtreme && hddIoTweaks)
+                        label += " + HDD tweaks (HDD-aware combo)";
                     App.Logger.WriteLine(LOG_IDENT, $"Aggressive optimizations applied for {label}");
                 }
                 else if (hddIoTweaks)
