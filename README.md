@@ -172,6 +172,11 @@ Enable in **Experimental** page:
 
 ## 📋 Changelog
 
+**v7.0.5** *(2026-08-09)* — Smarter preset combos & clearer system info
+- Force Extreme + HDD/low-end now combine instead of overriding each other — HDD-aware LOD and compositor settings survive Extreme Mode, keeping FPS stable on slow storage
+- System Info panel shows both your real hardware tier and the active (effective) tier when Force Extreme Mode overrides it
+- Cleaner configs: unsupported flags are removed automatically on boot, keeping the app compatible with the latest Roblox client
+
 **v7.0.2** *(2026-08-08)* — Preset combination fix
 - Force Extreme + HDD/low-end no longer tanks FPS — LOD distances and texture compositor jobs now adapt to the detected drive type
 - Fast Loading toggle no longer gets silently removed on every launch — it is re-applied with top priority at boot
