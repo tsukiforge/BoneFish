@@ -114,6 +114,15 @@ namespace Bloxstrap.Models.Persistable
         // Fast Loading — toggle independen untuk percepat loading aset
         public bool EnableFastLoadingFlags { get; set; } = false;
 
+        // TDR Mitigation — toggle independen untuk KURANGI freeze/layar putih
+        // (Intel iGPU Driver TDR, Event ID 4101) dengan menurunkan beban GPU.
+        // Bukan menghilangkan total — akar masalah di driver, bukan software.
+        public bool EnableTdrMitigation { get; set; } = false;
+
+        // Backup nilai Flag sebelum ditimpa toggle TDR — dipakai saat toggle
+        // dimatikan agar nilai user/preset sebelum toggle bisa dikembalikan.
+        public Dictionary<string, string> TdrMitigationBackup { get; set; } = new();
+
         // Auto-Reconnect — tawarkan sambung ulang setelah Roblox crash
         public bool EnableAutoReconnectPrompt { get; set; } = true;
     }

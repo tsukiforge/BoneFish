@@ -3808,6 +3808,24 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to TDR Mitigation (Kurangi Freeze / Layar Putih).
+        /// </summary>
+        public static string Menu_FastFlags_TdrMitigation_Title {
+            get {
+                return ResourceManager.GetString("Menu.FastFlags.TdrMitigation.Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Aktifkan jika sering freeze/layar putih saat bermain, terutama di laptop lama. Mengurangi beban GPU (MSAA off, render quality &amp; texture minimum, FPS cap konsisten) untuk memperkecil kemungkinan TDR (Event 4101) terpicu — MENGURANGI frekuensi, bukan menghilangkan total (akar masalah di driver GPU legacy). Berlaku penuh saat Roblox launch berikutnya. Validasi: bandingkan frekuensi &quot;RENDER STALL TERDETEKSI&quot; di log sebelum vs sesudah toggle ini aktif..
+        /// </summary>
+        public static string Menu_FastFlags_TdrMitigation_Description {
+            get {
+                return ResourceManager.GetString("Menu.FastFlags.TdrMitigation.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Control how detailed meshes appear in-game..
         /// </summary>
         public static string Menu_FastFlags_MeshDetail_Description {

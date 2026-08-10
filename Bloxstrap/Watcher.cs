@@ -628,6 +628,7 @@ namespace Bloxstrap
                     $"OptimizeForLowEnd={App.Settings.Prop.OptimizeForLowEnd} | " +
                     $"FakeBorderless={App.Settings.Prop.FakeBorderlessFullscreen} | " +
                     $"FpsMonitor={App.Settings.Prop.EnableFpsMonitor} | Crosshair={App.Settings.Prop.EnableCrosshair} | " +
+                    $"TdrMitigation={App.Settings.Prop.EnableTdrMitigation} | " +
                     $"System={sysInfo}");
             }
             catch (Exception ex)
