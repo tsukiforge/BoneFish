@@ -368,8 +368,39 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        /// <summary>
+        /// TDR Mitigation — toggle independen untuk KURANGI freeze/layar putih pada
+        /// GPU legacy (Intel iGPU TDR, Event ID 4101). Menurunkan beban render GPU
+        /// (MSAA off, FRM rendah, texture rendah, FPS cap konsisten) — di luar itu
+        /// BUKAN menghilangkan total: akar masalah ada di driver GPU legacy yang
+        /// tidak punya update lagi. Stack dengan preset visual apa pun.
+        /// </summary>
+        public bool EnableTdrMitigation
+        {
+            get => App.Settings.Prop.EnableTdrMitigation;
+            set
+            {
+                App.Settings.Prop.EnableTdrMitigation = value;
+                if (value)
+                    Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+                else
+                    Integrations.AutoOptimizeService.RemoveTdrMitigationFlags();
+                OnPropertyChanged(nameof(EnableTdrMitigation));
+                try { App.FastFlags.Save(); } catch { }
+                try { App.Settings.Save(); } catch { }
+            }
+        }
+
         private async Task ApplyRecommendedFastFlags()
         {
+            // ── Re-entrancy guard ──────────────────────────────────────────────
+            // Cegah dua apply preset berjalan bersamaan (klik cepat). Tanpa guard,
+            // flow lama bisa "menghidupkan kembali" flag/FPS cap yang sudah dihapus
+            // flow baru — race condition saat transisi antar preset.
+            if (IsApplying) return;
+            IsApplying = true;
+            try
+            {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
             // ★ FIX freeze: CleanupLegacyRobloxFlags scan semua folder Roblox
             // Versions/version-* + baca/tulis JSON — dipindah ke background.
@@ -397,11 +428,20 @@ namespace Bloxstrap.UI.ViewModels.Settings
             DisableRobloxAnimations = true;
             EnableLowMemoryMode = true;
 
+            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif
+            if (App.Settings.Prop.EnableTdrMitigation)
+                Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
             SelectedPreset = "AutoOptimize";
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
             VerifyAndNotify("Auto-Optimize");
             OnRequestPageReload();
+        }
+        finally
+        {
+            IsApplying = false;
+        }
         }
 
         private void ApplyRecommendedNetworkSettings()
@@ -417,6 +457,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         private async Task ApplyRecommendedStabilityPreset()
         {
+            // ── Re-entrancy guard ──────────────────────────────────────────────
+            if (IsApplying) return;
+            IsApplying = true;
+            try
+            {
             // ── Cleanup (sekali vs sebelumnya ter-delegate 3x save/notify/reload) ─────
             // ★ FIX freeze: disk scan ke background thread.
             await Task.Run(() =>
@@ -459,9 +504,19 @@ namespace Bloxstrap.UI.ViewModels.Settings
             VerifyAndNotify("Stable");
             OnRequestPageReload();
         }
+        finally
+        {
+            IsApplying = false;
+        }
+        }
 
         private async Task ApplyUltraLowSpecPreset()
         {
+            // ── Re-entrancy guard ──────────────────────────────────────────────
+            if (IsApplying) return;
+            IsApplying = true;
+            try
+            {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
             // ★ FIX freeze: disk scan ke background thread.
             await Task.Run(() =>
@@ -507,6 +562,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
+            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif (priority
+            // HIGHEST) — override nilai MSAA/FRM/texture/FPS-cap dari preset di atas
+            // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
+            if (App.Settings.Prop.EnableTdrMitigation)
+                Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
 
@@ -524,9 +585,19 @@ namespace Bloxstrap.UI.ViewModels.Settings
             VerifyAndNotify("Ultra Low");
             OnRequestPageReload();
         }
+        finally
+        {
+            IsApplying = false;
+        }
+        }
 
         private async Task ApplyBalancedPreset()
         {
+            // ── Re-entrancy guard ──────────────────────────────────────────────
+            if (IsApplying) return;
+            IsApplying = true;
+            try
+            {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
             // ★ FIX freeze: disk scan ke background thread.
             await Task.Run(() =>
@@ -559,11 +630,22 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
+            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif (priority
+            // HIGHEST) — override nilai MSAA/FRM/texture/FPS-cap dari preset di atas
+            // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
+            if (App.Settings.Prop.EnableTdrMitigation)
+                Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
             SelectedPreset = "Balanced";
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
             VerifyAndNotify("Balanced");
             OnRequestPageReload();
+        }
+        finally
+        {
+            IsApplying = false;
+        }
         }
 
         /// <summary>
@@ -617,6 +699,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
         /// </summary>
         private async Task ApplyExtremePerformancePreset()
         {
+            // ── Re-entrancy guard ──────────────────────────────────────────────
+            if (IsApplying) return;
+            IsApplying = true;
+            try
+            {
             // Bersihkan semua flag lama sebelum apply preset baru — dari DISK dan MEMORY.
             // ★ FIX freeze: disk scan ke background thread.
             await Task.Run(() =>
@@ -729,6 +816,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
+            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif (priority
+            // HIGHEST) — override nilai MSAA/FRM/texture/FPS-cap dari preset di atas
+            // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
+            if (App.Settings.Prop.EnableTdrMitigation)
+                Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
             // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
             // Agar value "ExtremePerformance" tertulis ke disk. Lihat komentar di ApplyUltraLowSpecPreset.
             SelectedPreset = "ExtremePerformance";
@@ -739,6 +832,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             VerifyAndNotify("Potato Mode");
             OnRequestPageReload();
+        }
+        finally
+        {
+            IsApplying = false;
+        }
         }
 
         // ── Flag Verification ──────────────────────────────────────────────────────────────

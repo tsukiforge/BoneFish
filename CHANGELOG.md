@@ -1,6 +1,65 @@
 # BoneFish Changelog
 
-## v7.0.5 - Kombinasi Preset Cerdas: Extreme + HDD Bersatu (+ Info Tier Ganda)
+## v7.0.6 - TDR Mitigation Mode: Kurangi Freeze/Layar Putih (iGPU Legacy)
+
+Release date: 2026-08-10
+
+### 🔬 Latar belakang — TDR terkonfirmasi, jalur update driver buntu
+
+Investigasi log BoneFish + Event Viewer (Event ID 4101 cocok ±1 detik dengan
+timestamp stall, `15:10:54Z` vs `15:10:55Z`) mengonfirmasi: freeze "layar putih"
+= **Intel iGPU Driver TDR** di Intel HD 4400 (Haswell 2013-2014). Intel tidak
+merilis update lagi untuk chip ini (legacy sejak 2018; driver terpasang 2020 =
+versi terakhir yang akan pernah ada). Karena jalur update buntu, satu-satunya
+mitigasi yang jujur = **menurunkan beban kerja GPU** agar TDR lebih jarang
+terpicu.
+
+### 🎛️ Fitur baru — toggle "TDR Mitigation Mode"
+
+Toggle **terpisah** (bukan preset) di halaman Fast Flags, stack dengan preset
+visual apa pun, mengikuti pola Fast Loading. Flag yang ditulis (SEMUA diverifikasi
+ada di **Fast Flag Allowlist resmi Roblox**, sumber: devforum 3966569 +
+repo LeventGameing/allowlist):
+
+| Flag | Nilai | Efek |
+|---|---|---|
+| `FIntDebugForceMSAASamples` | `1` | MSAA off — beban render per-pixel GPU turun drastis (audit: preset lain sudah set x1; toggle ini menguncinya walau user pilih x2/x4) |
+| `DFIntDebugFRMQualityLevelOverride` | `3` | Render quality terendah yang AMAN (FRM=1 pernah bikin game gelap saat dipakai bareng shadow/voxelizer — audit Extreme v7.x) |
+| `DFFlagTextureQualityOverrideEnabled` + `DFIntTextureQualityOverride` | `True` + `0` | Texture terendah — bandwidth VRAM & RAM bersama iGPU turun |
+| `DFIntTaskSchedulerTargetFps` | `30` | Cap konsisten, di-re-apply PALING AKHIR di semua alur preset (tidak ada gap/race saat transisi) |
+
+**Flag yang TIDAK dipakai setelah riset (sengaja, bukan lupa):**
+- `DFIntDebugDynamicRenderKiloPixels` — satu-satunya flag penurun resolusi render
+  internal; ❌ **tidak ada di allowlist & di-veto Roblox** ("It was vetoed
+  internally, as the aim is to remove FFlags, not add more" — Bitdancer,
+  devforum 3966569, 2026-04-17). Menulisnya = dead code.
+- `DFIntTaskSchedulerTargetFps` ❌ tidak ada di allowlist sejak 2025-09-29 —
+  client modern mengabaikannya (pengganti: `GlobalBasicSettings_13.xml`
+  `FramerateCap`). Tetap ditulis demi konsistensi nilai preset yang ada.
+
+### ✅ Jujur soal batasan
+
+- Toggle ini **MENGURANGI frekuensi** TDR, **bukan menghilangkan total** — akar
+  masalah di driver GPU legacy, di luar kendali FastFlag apa pun.
+- Tanpa resolusi-render-scaling (diblokir Roblox), load reduction maksimum yang
+  bisa dicapai = kombinasi MSAA off + FRM rendah + texture rendah + cap konsisten.
+
+### 📊 Validasi oleh user (WAJIB manual — kode tidak bisa klaim sendiri)
+
+Bandingkan frekuensi baris **`RENDER STALL TERDETEKSI`** di log BoneFish
+(Logs/bonefish.log) sebelum vs sesudah toggle ini aktif, selama beberapa sesi
+main. Baris log stall kini menyertakan `TdrMitigation=true/false` agar
+perbandingannya mudah.
+
+### 🛡️ Perbaikan pendukung
+
+- **Re-entrancy guard** di semua alur apply preset — dua klik preset dalam waktu
+  singkat tidak lagi bisa berjalan bersamaan (race condition yang bisa membuat
+  flag/FPS cap dari flow lama "resurrect" saat transisi antar preset).
+- Nilai flag sebelum toggle aktif di-snapshot & direstorasi saat toggle dimatikan
+  (tidak merusak pilihan user/preset sebelumnya; persisten melewati restart).
+
+---
 
 Release date: 2026-08-09
 

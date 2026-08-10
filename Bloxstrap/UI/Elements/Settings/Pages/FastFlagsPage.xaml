@@ -191,6 +191,13 @@
                     <ui:ToggleSwitch IsChecked="{Binding EnableFastLoadingFlags, Mode=TwoWay}" />
                 </controls:OptionControl>
 
+                <!-- TDR MITIGATION TOGGLE -->
+                <controls:OptionControl
+                    Header="{x:Static resources:Strings.Menu_FastFlags_TdrMitigation_Title}"
+                    Description="{x:Static resources:Strings.Menu_FastFlags_TdrMitigation_Description}">
+                    <ui:ToggleSwitch IsChecked="{Binding EnableTdrMitigation, Mode=TwoWay}" />
+                </controls:OptionControl>
+
                 <!-- FPS TARGET -->
                 <ui:CardExpander Margin="0,4,0,0" IsExpanded="False">
                     <ui:CardExpander.Header>
