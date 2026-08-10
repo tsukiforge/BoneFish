@@ -337,6 +337,19 @@ namespace Bloxstrap.Integrations
                 App.Logger.WriteLine(LOG_IDENT, $"Error in CheckAndApply: {ex.Message}");
                 return false;
             }
+            finally
+            {
+                // ── TDR Mitigation (toggle) — chokepoint boot ──────────────────────
+                // ★ Re-apply PALING AKHIR lewat finally: berlaku untuk SEMUA path
+                // (aggressive, HDD Balanced, RemoveOptimizations, early return),
+                // jadi apa pun yang dijalankan path lain, nilai TDR menang pada
+                // launch berikutnya. Priority: HIGHEST (sama seperti Fast Loading).
+                if (App.Settings.Prop.EnableTdrMitigation)
+                {
+                    try { ApplyTdrMitigationFlags(); } catch { }
+                    App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation re-applied after CheckAndApply (priority: HIGHEST)");
+                }
+            }
         }
 
         public static string GetSystemInfo()
@@ -558,6 +571,7 @@ tier ??= DetectSystemTier();
             "FFlagLuaAppEnableLowMemoryMode",
             "FIntRakNetPacketRateLimit", "DFIntMaxReceivePPS", "DFIntMaxSendPPS", "DFIntConnectionMTUSize", "DFIntOptimizeSendQueue",
             "FFlagDebugDisplayFPS",
+            "FIntDebugForceMSAASamples",
         };
 
         public static void PurgeAllKnownFlags()
@@ -589,6 +603,7 @@ tier ??= DetectSystemTier();
             "FFlagLuaAppEnableLowMemoryMode",
             "FIntRakNetPacketRateLimit", "DFIntMaxReceivePPS", "DFIntMaxSendPPS", "DFIntConnectionMTUSize", "DFIntOptimizeSendQueue",
             "FFlagDebugDisplayFPS",
+            "FIntDebugForceMSAASamples",
         };
 
         public static void CleanupLegacyRobloxFlags()
@@ -886,6 +901,97 @@ tier ??= DetectSystemTier();
             App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", null);
             App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", null);
             App.Logger.WriteLine(LOG_IDENT, "FastLoading flags removed");
+        }
+
+        // ── TDR Mitigation Mode (Toggle Terpisah) ──────────────────────────────────
+        // ★ LATAR BELAKANG (v7.0.5): freeze "layar putih" terkonfirmasi = Intel iGPU
+        // Driver TDR (Event ID 4101 di Event Viewer, cocok ±1 detik dengan log stall).
+        // Device: Intel HD 4400 (Haswell 2013-2014) — legacy sejak 2018, TIDAK ada
+        // update driver lagi dari Intel (driver 2020 = versi terakhir). Karena jalur
+        // update buntu, satu-satunya mitigasi software yang jujur adalah MENURUNKAN
+        // BEBAN RENDER GPU agar TDR lebih jarang terpicu — BUKAN menghilangkan total
+        // (akar masalah di driver, di luar kendali FastFlag apa pun).
+        //
+        // Flag dipakai (SEMUA diverifikasi ADA di Fast Flag Allowlist resmi Roblox,
+        // aktif sejak 2025-09-29; sumber: devforum 3966569 + repo LeventGameing/allowlist):
+        //   FIntDebugForceMSAASamples=1              — MSAA off → beban per-pixel GPU turun
+        //                                              drastis (MSAA = beban render per-frame
+        //                                              paling signifikan yang bisa diatur).
+        //   DFIntDebugFRMQualityLevelOverride=3      — render quality terendah yang AMAN.
+        //                                              FRM=1 dulu dipakai versi lama BERSAMA
+        //                                              shadow/voxelizer dan terbukti bikin game
+        //                                              GELAP (audit Extreme v7.x) → sengaja
+        //                                              tidak dipakai; FRM=3 sudah teruji di
+        //                                              preset Extreme (ringan, lighting utuh).
+        //   DFFlagTextureQualityOverrideEnabled=True + DFIntTextureQualityOverride=0
+        //                                             — texture terendah → bandwidth VRAM &
+        //                                              pemakaian RAM bersama iGPU turun.
+        //
+        // Flag yang DITOLAK setelah riset (bukan karena malas riset, tapi karena
+        // client modern mengabaikannya):
+        //   DFIntDebugDynamicRenderKiloPixels        — satu-satunya flag yang menurunkan
+        //                                              RESOLUSI RENDER internal (pixel yang
+        //                                              di-render GPU). ❌ TIDAK di allowlist,
+        //                                              di-veto tim engineering Roblox:
+        //                                              "It was vetoed internally, as the aim
+        //                                              is to remove FFlags, not add more"
+        //                                              (Bitdancer, devforum 3966569 page 20,
+        //                                              2026-04-17). Menulisnya = dead code.
+        //   DFIntTaskSchedulerTargetFps              — ❌ TIDAK di allowlist sejak 2025-09-29
+        //                                              (client modern mengabaikannya; pengganti:
+        //                                              GlobalBasicSettings_13.xml FramerateCap).
+        //                                              Tetap ditulis di sini HANYA demi
+        //                                              konsistensi nilai dengan preset yang
+        //                                              sudah ada — bukan klaim efektif.
+        private static readonly string[] TdrMitigationFlags =
+        {
+            "FIntDebugForceMSAASamples",
+            "DFIntDebugFRMQualityLevelOverride",
+            "DFFlagTextureQualityOverrideEnabled",
+            "DFIntTextureQualityOverride",
+            "DFIntTaskSchedulerTargetFps",
+        };
+
+        public static void ApplyTdrMitigationFlags()
+        {
+            // Snapshot nilai SEBELUM ditimpa — hanya sekali (persisten di Settings,
+            // jadi tetap valid walau user restart app lalu mematikan toggle).
+            if (App.Settings.Prop.TdrMitigationBackup.Count == 0)
+            {
+                foreach (string flag in TdrMitigationFlags)
+                {
+                    string? current = App.FastFlags.GetValue(flag);
+                    if (current is not null)
+                        App.Settings.Prop.TdrMitigationBackup[flag] = current;
+                }
+                try { App.Settings.Save(); } catch { }
+            }
+
+            App.FastFlags.SetValue("FIntDebugForceMSAASamples", "1");
+            App.FastFlags.SetValue("DFIntDebugFRMQualityLevelOverride", "3");
+            App.FastFlags.SetValue("DFFlagTextureQualityOverrideEnabled", "True");
+            App.FastFlags.SetValue("DFIntTextureQualityOverride", "0");
+
+            // FPS cap konsisten 30 — dicegah "gap" antar preset: re-apply TDR selalu
+            // berjalan PALING AKHIR di tiap alur preset, jadi tidak ada kondisi
+            // transisi yang membiarkan FPS uncapped saat toggle ini aktif.
+            App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
+
+            App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation applied: MSAA=1, FRM=3, Texture=0, FPS cap=30 (allowlist-verified)");
+        }
+
+        public static void RemoveTdrMitigationFlags()
+        {
+            foreach (string flag in TdrMitigationFlags)
+            {
+                string? previous = App.Settings.Prop.TdrMitigationBackup.TryGetValue(flag, out string? value) ? value : null;
+                App.FastFlags.SetValue(flag, previous);
+            }
+
+            App.Settings.Prop.TdrMitigationBackup.Clear();
+            try { App.Settings.Save(); } catch { }
+
+            App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation flags removed (previous values restored)");
         }
     }
 }
