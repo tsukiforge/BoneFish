@@ -1,5 +1,55 @@
 # BoneFish Changelog
 
+## v7.1.0 - Optimization Sandbox: Eksperimen FastFlag yang Aman & Reversibel
+
+Release date: 2026-08-11
+
+### Fitur baru - Optimization Sandbox (halaman Settings baru)
+
+Halaman **Optimization Sandbox** memungkinkan kamu menguji perubahan FastFlag
+kinerja secara **terisolasi dan 100% reversibel** sebelum menguncinya ke profil
+aktif:
+
+- **Snapshot sebelum menerapkan** - setiap eksperimen memotret nilai flag yang
+  disentuh + hash konten file konfigurasi. Rollback mengembalikan nilai persis
+  seperti sebelum eksperimen, lalu **memverifikasi** hasilnya sebelum mengklaim
+  sukses.
+- **Alur lengkap**: Apply (validasi + snapshot + tulis + verifikasi) → Test →
+  Commit (integrasi ke profil aktif) atau Rollback (kembali ke keadaan awal).
+- **Pengukuran FPS nyata** - sampling median FPS via telemetri ETW (sumber yang
+  sama dengan FPS Monitor). Perubahan FPS di bawah ambang 5% dianggap *Similar*
+  (kinerja berisik), bukan hasil yang mengada-ada. Tanpa hak admin ETW atau data
+  cukup → jujur dilaporkan *Insufficient data*.
+- **Keamanan bawaan**:
+  - Jika Roblox berjalan, eksperimen butuh konfirmasi eksplisit (BoneFish tidak
+    pernah menutup Roblox).
+  - Nama flag divalidasi ketat (mencegah path traversal); nilai hanya primitif
+    (bool/int/desimal/string polos).
+  - Kegagalan tulis/verifikasi saat apply → **rollback otomatis seketika**, tidak
+    ada perubahan parsial yang tertinggal.
+  - File snapshot & journal ditulis atomik - crash/power loss tidak pernah
+    merusak data.
+- **Recovery crash**: jika BoneFish berhenti di tengah eksperimen (crash,
+  restart, mati listrik), pada start berikutnya muncul prompt: Restore
+  konfigurasi sebelumnya / Lanjutkan eksperimen / Abaikan.
+- **Riwayat eksperimen** - setiap eksperimen tercatat dengan status, snapshot,
+  hasil pengukuran dan error.
+
+### Pengujian
+
+- Proyek test baru `Bloxstrap.Tests` (xUnit) ditambahkan ke solution: **73 test
+  lulus** mencakup state machine, snapshot/integritas, diff & validasi,
+  auto-rollback, recovery, dan klasifikasi hasil.
+- Build: 0 warning, 0 error (Debug & Release).
+
+### Catatan
+
+- Pengukuran FPS butuh Roblox berjalan; baseline diukur dengan mengembalikan
+  konfigurasi lama sementara, lalu eksperimen di-apply ulang otomatis.
+- Halaman ini tidak menggantikan preset - eksperimen yang dikomit menjadi
+  permanen dan melindungi nilai-nilainya dari overwrite preset (guard preset
+  manual).
+
 ## v7.0.6 - TDR Mitigation Mode: Kurangi Freeze/Layar Putih (iGPU Legacy)
 
 Release date: 2026-08-10

@@ -68,6 +68,18 @@ namespace Bloxstrap
 
         public static readonly CookiesManager Cookies = new();
 
+        /// <summary>
+        /// Optimization Sandbox — isolated, reversible FastFlag experiments.
+        /// Wraps the existing FastFlagManager; see Bloxstrap.Sandbox.OptimizationSandboxService.
+        /// </summary>
+        public static readonly Bloxstrap.Sandbox.OptimizationSandboxService Sandbox = new(
+            new Bloxstrap.Sandbox.AppFastFlagStore(),
+            presetWriter: presetName =>
+            {
+                App.Settings.Prop.SelectedPerformancePreset = presetName;
+                try { App.Settings.Save(); } catch { }
+            });
+
         public static readonly HttpClient HttpClient = new(
             new HttpClientLoggingHandler(
                 new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All }
@@ -388,6 +400,20 @@ namespace Bloxstrap
                 // oleh block mana pun di OnStartup().
                 FastFlags.Load();
                 GlobalSettings.Load();
+
+                // Optimization Sandbox: detect experiments that did not finish correctly
+                // (crash, restart, power loss) and offer recovery once the UI is idle.
+                Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+                {
+                    try
+                    {
+                        Bloxstrap.Sandbox.ExperimentRecoveryService.PromptIfNeeded();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.WriteLine("App::OnStartup", $"Sandbox recovery check failed (non-fatal): {ex.Message}");
+                    }
+                }));
 
                 if (Settings.Prop.AllowCookieAccess)
                     Task.Run(Cookies.LoadCookies);

@@ -80,6 +80,7 @@
                     <ui:NavigationItem x:Name="fastflags" Content="{x:Static resources:Strings.Menu_FastFlags_Title}" PageType="{x:Type pages:FastFlagsPage}" Icon="Flag24" Tag="fastflags" />
                     <ui:NavigationItem x:Name="gbs" Content="{x:Static resources:Strings.Common_GlobalSettings}" PageType="{x:Type pages:GlobalSettingsPage}" Icon="Settings20" Tag="gbseditor"/>
                     <ui:NavigationItem Content="FastFlag New" PageType="{x:Type pages:ExperimentalPage}" Icon="Beaker24" Tag="experimental" />
+                    <ui:NavigationItem Content="Optimization Sandbox" PageType="{x:Type pages:SandboxPage}" Icon="BeakerEdit24" Tag="sandbox" />
 
                     <ui:NavigationItem Content="{x:Static resources:Strings.Menu_FastFlagEditor_Title}" PageType="{x:Type pages:FastFlagEditorPage}" Tag="fastflageditor" Visibility="Collapsed" />
                 </ui:NavigationFluent.Items>
