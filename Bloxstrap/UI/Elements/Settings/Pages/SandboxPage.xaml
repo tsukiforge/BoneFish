@@ -72,7 +72,7 @@
 
             <ui:InfoBar Margin="0,0,0,8" Padding="8" IsOpen="{Binding HasError}"
                         Title="Experiment error" Message="{Binding ErrorText}"
-                        Severity="Critical" IsClosable="False" />
+                        Severity="Error" IsClosable="False" />
         </StackPanel>
 
         <!-- ═══ EXPERIMENT EDITOR ═════════════════════════════════════ -->
