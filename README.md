@@ -172,6 +172,16 @@ Enable in **Experimental** page:
 
 ## 📋 Changelog
 
+**v7.1.0** *(2026-08-11)* — Optimization Sandbox
+- New **Optimization Sandbox** page: safely experiment with performance FastFlags — every experiment is snapshot-based, fully reversible and verified
+- Full flow: Apply (validate + snapshot + write + verify) → Test with real FPS measurement (ETW telemetry) → Commit to your active profile or Rollback
+- Crash recovery: interrupted experiments are detected on startup with one-click restore
+- Experiment history with results and measurements; 73 automated tests added (xUnit)
+
+**v7.0.6** *(2026-08-10)* — TDR Mitigation Mode for legacy iGPUs
+- New toggle reduces freezes/white screens on Intel HD 4000-series: MSAA off, lowest-safe render quality, lowest textures, consistent 30 FPS cap
+- Re-entrancy guard prevents preset race conditions on rapid clicks
+
 **v7.0.5** *(2026-08-09)* — Smarter preset combos & clearer system info
 - Force Extreme + HDD/low-end now combine instead of overriding each other — HDD-aware LOD and compositor settings survive Extreme Mode, keeping FPS stable on slow storage
 - System Info panel shows both your real hardware tier and the active (effective) tier when Force Extreme Mode overrides it
