@@ -88,9 +88,11 @@ namespace Bloxstrap.Sandbox
                 App.Logger.WriteLine(LOG_IDENT, $"Could not verify current configuration: {ex.Message}");
             }
 
-            string stateDescription = currentlyApplied
-                ? "The experiment's changes are still applied to your Roblox configuration."
-                : "The configuration does not match the experiment's changes (possibly partially applied).";
+            string stateDescription = experiment.State == SandboxExperimentState.SnapshotCreated
+                ? "The experiment was backed up but never applied — your current configuration is unchanged."
+                : currentlyApplied
+                    ? "The experiment's changes are still applied to your Roblox configuration."
+                    : "The configuration does not match the experiment's changes (possibly partially applied).";
 
             var choice = Frontend.ShowMessageBox(
                 $"⚠ Unfinished Optimization Experiment\n\n" +
