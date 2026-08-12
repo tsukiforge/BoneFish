@@ -172,6 +172,12 @@ Enable in **Experimental** page:
 
 ## 📋 Changelog
 
+**v7.1.2** *(2026-08-12)* — Toggle persistence fix + automatic device-based recommendations
+- **Fix: toggles no longer reset on reload** — manual FastFlags toggles (MSAA, Rendering Mode, Display Scaling, Texture Quality, FRM, Mesh LOD, Animations, Low Memory Mode) now save immediately, and the settings window saves FastFlags on close, so your choices survive a restart
+- **Recommend from Device** in Optimization Sandbox: reads your hardware (true system tier, HDD/SSD, cores) and suggests matching FastFlags — pure suggestion, nothing is applied without your review
+- **Review dialog with checkboxes**: each recommendation shows current → new value plus a one-line reason, with a selection counter and empty-selection validation; chosen flags enter the experiment through the same upsert path as Add Change
+- Recommended values match the existing presets (no second source of truth); 4 new tests (107 total)
+
 **v7.1.1** *(2026-08-12)* — Guided experiment flow + full telemetry
 - Clear **5-step experiment flow** (Configure → Snapshot → Apply → Test → Result) with a step indicator that always shows where you are; only valid actions are shown/enabled per state
 - **Add Configuration Change dialog**: search FastFlags, see the current value, preview the change, with validation (duplicate → updated in place, no-op → removed)

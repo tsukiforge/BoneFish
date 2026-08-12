@@ -184,9 +184,13 @@ namespace Bloxstrap.UI.Elements.Settings
 
             // Save settings sebelum window benar-benar close
             // App.Settings.Save() idempotent — aman dipanggil berkali-kali
+            // ★ FIX: App.FastFlags.Save() juga — setter toggle lama tidak semuanya
+            // memanggil Save() sendiri, jadi tanpa ini perubahan toggle hilang
+            // saat app ditutup / di-restart.
             if (!e.Cancel)
             {
                 try { App.Settings.Save(); } catch { }
+                try { App.FastFlags.Save(); } catch { }
             }
 
             _state.Width = this.Width;

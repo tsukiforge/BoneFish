@@ -201,8 +201,13 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <ui:Button Margin="0,8,0,0" Content="+ Add change" Icon="Add16"
-                           Command="{Binding AddChangeCommand}" IsEnabled="{Binding CanEditChanges}" />
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <ui:Button Content="+ Add change" Icon="Add16"
+                               Command="{Binding AddChangeCommand}" IsEnabled="{Binding CanEditChanges}" />
+                    <ui:Button Margin="8,0,0,0" Content="Recommend from Device" Icon="Sparkle24"
+                               ToolTip="Read your device and suggest matching FastFlags — tick the ones you want to add to the experiment."
+                               Command="{Binding ShowRecommendationsCommand}" IsEnabled="{Binding CanEditChanges}" />
+                </StackPanel>
             </StackPanel>
         </Border>
 

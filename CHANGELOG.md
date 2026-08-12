@@ -1,5 +1,43 @@
 # BoneFish Changelog
 
+## v7.1.2 - Fix Toggle Hilang Saat Reload + Rekomendasi FastFlag Otomatis
+
+Release date: 2026-08-12
+
+### 🐛 Fix: toggle FastFlag non-aktif setelah reload/restart
+
+Beberapa toggle manual di halaman FastFlags hanya hidup di memory — setter-nya
+tidak pernah menulis ke disk, dan penutupan window hanya menyimpan Settings.
+Akibatnya setelah BoneFish di-restart, toggle tampak mati padahal tadi aktif.
+
+- **Setter toggle manual kini menyimpan seketika** — MSAA, Rendering Mode,
+  Display Scaling, Texture Quality, FRM Quality, Mesh LOD, Animations, Low
+  Memory Mode, dan UseFastFlagManager memanggil `App.FastFlags.Save()`
+  (atau `App.Settings.Save()`) langsung saat diubah, dibungkus try/catch agar
+  tetap aman walau gagal tulis.
+- **Jaring pengaman saat window ditutup** — `WpfUiWindow_Closing` kini juga
+  menyimpan `App.FastFlags.Save()`, jadi tidak ada perubahan yang hilang lagi.
+
+### 🤖 Rekomendasi FastFlag otomatis dari spesifikasi perangkat
+
+Fitur automation baru di **Optimization Sandbox**: BoneFish membaca perangkat
+kamu (tier hardware asli, HDD/SSD, jumlah core, target FPS) lalu menyarankan
+FastFlag yang cocok — tanpa menerapkan apa pun tanpa persetujuanmu.
+
+- **Tombol "Recommend from Device"** di samping *Add change* — satu klik untuk
+  membuka dialog review rekomendasi.
+- **Dialog review dengan checkbox** — setiap rekomendasi menampilkan nama flag,
+  nilai saat ini → nilai baru, dan alasan singkat; pilih/deselect bebas, ada
+  penghitung pilihan, dan pilihan kosong ditolak dengan pesan jelas.
+- **Nilai selaras dengan preset yang sudah ada** — rekomendasi untuk tier
+  UltraLow/LowEnd/Extreme/Balanced memakai nilai yang sama dengan preset
+  applier (LOD 250, FRM, MSAA, FPS cap, network) — tidak ada sumber nilai kedua.
+- **Murni baca, tanpa efek samping** — `GetRecommendedFastFlags()` tidak
+  menulis apa pun; flag yang dipilih masuk eksperimen lewat jalur upsert yang
+  sama dengan dialog Add Change.
+- **4 unit test baru** — network baseline untuk semua tier, validitas semua
+  rekomendasi, upsert end-to-end, dan diff non-empty (total 107 tes).
+
 ## v7.1.1 - Optimization Sandbox: Alur Eksperimen yang Jelas + Telemetri Lengkap
 
 Release date: 2026-08-12
