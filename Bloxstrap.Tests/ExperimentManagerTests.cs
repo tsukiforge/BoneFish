@@ -73,9 +73,13 @@ public class ExperimentManagerTests
             Assert.True(ExperimentManager.IsTransitionAllowed(state, SandboxExperimentState.RollingBack));
         }
 
-        // Draft / SnapshotCreated cannot roll back directly (they cancel instead).
+        // Draft cannot roll back directly (it cancels instead).
         Assert.False(ExperimentManager.IsTransitionAllowed(SandboxExperimentState.Draft, SandboxExperimentState.RollingBack));
-        Assert.False(ExperimentManager.IsTransitionAllowed(SandboxExperimentState.SnapshotCreated, SandboxExperimentState.RollingBack));
+
+        // SnapshotCreated CAN roll back: with the staged Prepare/Apply flow this is a real state the
+        // user sits in (backup created, nothing applied). Rolling back from it restores the unchanged
+        // backup and is also required by the crash-recovery path, which transitions through RollingBack.
+        Assert.True(ExperimentManager.IsTransitionAllowed(SandboxExperimentState.SnapshotCreated, SandboxExperimentState.RollingBack));
     }
 
     [Fact]

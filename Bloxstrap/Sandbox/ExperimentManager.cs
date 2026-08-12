@@ -40,6 +40,7 @@ namespace Bloxstrap.Sandbox
                 [SandboxExperimentState.SnapshotCreated] = new HashSet<SandboxExperimentState>
                 {
                     SandboxExperimentState.Applying,
+                    SandboxExperimentState.RollingBack, // prepared but interrupted — restoring the (unchanged) backup is safe
                     SandboxExperimentState.Cancelled, // nothing written yet — safe to cancel
                     SandboxExperimentState.Failed
                 },

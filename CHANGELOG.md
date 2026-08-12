@@ -1,5 +1,74 @@
 # BoneFish Changelog
 
+## v7.1.1 - Optimization Sandbox: Alur Eksperimen yang Jelas + Telemetri Lengkap
+
+Release date: 2026-08-12
+
+### 🧭 Alur eksperimen 5 langkah yang jelas
+
+Halaman Optimization Sandbox dirombak dari editor konfigurasi yang membingungkan
+menjadi **laboratorium optimasi yang aman dan terpandu** — alur
+**Configure → Snapshot → Apply → Test → Result** sekarang terlihat eksplisit:
+
+- **Indikator langkah** di bagian atas halaman (`✓ Configure → ○ Snapshot → …`)
+  — langkah aktif selalu jelas, langkah selesai dicentang, dan status terminal
+  (Committed/Rolled Back) menampilkan seluruh perjalanan sebagai selesai.
+- **Tombol aksi kontekstual** — hanya aksi yang valid untuk state saat ini yang
+  tampil (mis. tombol *Apply* baru muncul setelah backup dibuat), aksi tidak valid
+  dinonaktifkan, bukan disembunyikan diam-diam.
+- **Base Profile** kini dijelaskan: titik awal eksperimen, bukan optimasi yang
+  langsung diterapkan — profil tersimpan tidak berubah sampai eksperimen di-commit.
+- **Diff perubahan yang manusiawi** — tabel `Flag | Current → New` sebagai area
+  review pusat, dengan keterangan "Only these values will be changed".
+
+### ➕ Dialog "Add Configuration Change"
+
+Tombol *+ Add Change* kini membuka dialog khusus:
+
+- Pencarian FastFlag (reuse basis data flag yang sudah ada, tidak ada basis data
+  kedua).
+- Nilai saat ini terdeteksi/dibaca (read-only) + pratinjau perubahan sebelum
+  ditambahkan.
+- **Validasi**: nama flag valid, nilai valid, duplikat di-*upsert* (bukan baris
+  ganda), dan perubahan yang menghasilkan no-op (`false → false`) otomatis
+  dihapus dari diff.
+- Eksperimen tanpa perubahan sama sekali tidak bisa di-apply/snapshot.
+
+### 📊 Telemetri pengukuran: 1% Low, RAM, CPU
+
+Bagian Measurements kini menampilkan lebih dari sekadar FPS rata-rata, semua
+berasal dari sumber telemetri yang **sudah ada** (tanpa sistem duplikat):
+
+- **1% Low FPS** diturunkan dari sampel FPS yang sama dengan median (gaya
+  PresentMon) — tidak ada sumber FPS kedua.
+- **RAM** (WorkingSet64) dan **CPU%** (delta TotalProcessorTime ternormalisasi
+  wall-clock & core) disampling di loop per-detik yang sama — **tetap berfungsi
+  tanpa hak admin** (hanya FPS yang butuh ETW).
+- **GPU jujur "N/A"** — BoneFish tidak punya sumber telemetri GPU; tidak ada
+  pengukuran yang diarang.
+- Nilai yang benar-benar terukur (termasuk 0%) ditampilkan apa adanya — tidak
+  pernah diganti "N/A" palsu.
+
+### 🎯 Klasifikasi hasil yang jujur
+
+Hasil eksperimen diklasifikasikan dengan ambang batas nyata, bukan asumsi:
+🟢 Potential Improvement / 🟡 Similar / 🔴 Degraded / ⚪ Not Enough Data —
+keputusan akhir (Commit/Rollback) tetap di tangan user.
+
+### 🛡️ Perbaikan & pemeliharaan
+
+- **Recovery crash** dipertahankan: eksperimen yang belum selesai terdeteksi
+  saat start dengan opsi Restore / Review / Ignore.
+- Perbaikan runtime XAML: `InfoBarSeverity` yang tidak valid di halaman Sandbox
+  (menyebabkan parse error saat membuka halaman) diganti `Error`.
+
+### Pengujian
+
+- **103 test lulus** (xUnit) — bertambah 13 tes baru: persentil FPS, normalisasi
+  CPU (termasuk penjagaan bagi-nol), round-trip JSON, kompatibilitas journal
+  lama, dan pembeda "terukur-nol vs tidak terukur".
+- Build: 0 warning, 0 error.
+
 ## v7.1.0 - Optimization Sandbox: Eksperimen FastFlag yang Aman & Reversibel
 
 Release date: 2026-08-11

@@ -34,8 +34,11 @@ namespace Bloxstrap.Sandbox
         }
 
         /// <summary>
-        /// Measure median FPS over <paramref name="duration"/>. Returns a reliable sample only
-        /// when ETW telemetry was available and enough samples were collected.
+        /// Measure FPS, 1% low, RAM and CPU over <paramref name="duration"/> by sampling the
+        /// Roblox process once per second. FPS comes from ETW (<see cref="RealFpsCounter"/>, the
+        /// same source the FPS Monitor overlay uses); RAM/CPU come from the process itself, so they
+        /// work even without administrator privileges. Returns a reliable sample only when ETW
+        /// telemetry was available and enough FPS samples were collected.
         /// </summary>
         public async Task<SandboxFpsSample> MeasureAsync(
             TimeSpan duration,
@@ -57,6 +60,8 @@ namespace Bloxstrap.Sandbox
             }
 
             var values = new List<double>();
+            var ramSamples = new List<double>();
+            var cpuSamples = new List<double>();
             RealFpsCounter? counter = null;
             bool counterUsable = false;
 
@@ -66,28 +71,76 @@ namespace Bloxstrap.Sandbox
 
                 if (!counter.Start())
                 {
-                    App.Logger.WriteLine(LOG_IDENT, "Measurement unavailable: ETW telemetry requires administrator privileges");
-                    return;
+                    // FPS needs ETW (admin), but RAM/CPU are still measured from the process.
+                    App.Logger.WriteLine(LOG_IDENT, "FPS telemetry unavailable: ETW requires administrator privileges (RAM/CPU still sampled)");
+                }
+                else
+                {
+                    counterUsable = true;
                 }
 
-                counterUsable = true;
-
                 DateTime started = DateTime.UtcNow;
+                TimeSpan? lastCpuTime = null;
+                DateTime lastCpuTick = started;
 
                 while (DateTime.UtcNow - started < duration)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (IsRobloxProcessAlive(processId.Value))
+                    Process? proc = null;
+                    try
                     {
-                        double fps = counter.SampleFps();
-                        if (fps > 0)
-                            values.Add(fps);
+                        proc = Process.GetProcessById(processId.Value);
+                        if (proc.HasExited)
+                        {
+                            proc.Dispose();
+                            proc = null;
+                        }
                     }
-                    else
+                    catch
+                    {
+                        proc?.Dispose();
+                        proc = null;
+                    }
+
+                    if (proc is null)
                     {
                         App.Logger.WriteLine(LOG_IDENT, "Roblox process exited during measurement");
                         break;
+                    }
+
+                    try
+                    {
+                        if (counterUsable)
+                        {
+                            double fps = counter.SampleFps();
+                            if (fps > 0)
+                                values.Add(fps);
+                        }
+
+                        // RAM: same working-set metric BoneFish already reports for Roblox elsewhere.
+                        ramSamples.Add(proc.WorkingSet64 / 1024.0 / 1024.0);
+
+                        // CPU: wall-clock-normalized delta of process CPU time, as % of all cores.
+                        TimeSpan cpuTime = proc.TotalProcessorTime;
+                        DateTime now = DateTime.UtcNow;
+                        if (lastCpuTime is not null)
+                        {
+                            cpuSamples.Add(ComputeCpuPercent(
+                                cpuTime - lastCpuTime.Value,
+                                now - lastCpuTick,
+                                Environment.ProcessorCount));
+                        }
+                        lastCpuTime = cpuTime;
+                        lastCpuTick = now;
+                    }
+                    catch
+                    {
+                        // process exited mid-tick; non-fatal
+                    }
+                    finally
+                    {
+                        proc.Dispose();
                     }
 
                     Thread.Sleep(1000);
@@ -96,22 +149,29 @@ namespace Bloxstrap.Sandbox
 
             try
             {
+                // RAM/CPU are recorded whenever the process could be sampled, independent of ETW.
+                if (ramSamples.Count > 0)
+                    sample.AverageRamMB = Math.Round(ramSamples.Average(), 1);
+                if (cpuSamples.Count > 0)
+                    sample.AverageCpuPercent = Math.Round(cpuSamples.Average(), 1);
+                sample.ProcessMetricsSampled = ramSamples.Count > 0 || cpuSamples.Count > 0;
+
                 if (counterUsable && values.Count >= MinReliableSamples && counter!.HasObservedFrames)
                 {
-                    values.Sort();
-                    double median = values.Count % 2 == 1
-                        ? values[values.Count / 2]
-                        : (values[values.Count / 2 - 1] + values[values.Count / 2]) / 2.0;
+                    (double median, double p1Low) = ComputeFpsPercentiles(values);
 
                     sample.MedianFps = median;
+                    sample.P1LowFps = p1Low;
                     sample.SampleCount = values.Count;
                     sample.Reliable = true;
 
-                    App.Logger.WriteLine(LOG_IDENT, $"Measurement complete: median {median:F1} FPS ({values.Count} samples)");
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Measurement complete: median {median:F1} FPS, 1% low {p1Low:F1}, " +
+                        $"RAM {sample.AverageRamMB:F0} MB, CPU {sample.AverageCpuPercent:F0}% ({values.Count} samples)");
                 }
                 else
                 {
-                    App.Logger.WriteLine(LOG_IDENT, $"Measurement insufficient: {values.Count} samples, ETW usable: {counterUsable}");
+                    App.Logger.WriteLine(LOG_IDENT, $"Measurement insufficient: {values.Count} FPS samples, ETW usable: {counterUsable}");
                 }
             }
             finally
@@ -122,17 +182,31 @@ namespace Bloxstrap.Sandbox
             return sample;
         }
 
-        private static bool IsRobloxProcessAlive(int processId)
+        /// <summary>
+        /// Median and PresentMon-style 1% low from per-second FPS samples: the 1% low is the FPS
+        /// value at the 1st percentile (equivalently the FPS of the 99th percentile frame time).
+        /// </summary>
+        public static (double Median, double P1Low) ComputeFpsPercentiles(IReadOnlyList<double> values)
         {
-            try
-            {
-                using var process = Process.GetProcessById(processId);
-                return !process.HasExited;
-            }
-            catch
-            {
-                return false;
-            }
+            if (values.Count == 0)
+                return (0, 0);
+
+            var sorted = values.OrderBy(v => v).ToList();
+
+            double median = sorted.Count % 2 == 1
+                ? sorted[sorted.Count / 2]
+                : (sorted[sorted.Count / 2 - 1] + sorted[sorted.Count / 2]) / 2.0;
+
+            int p1Index = Math.Clamp((int)(sorted.Count * 0.01), 0, sorted.Count - 1);
+            return (median, sorted[p1Index]);
+        }
+
+        /// <summary>Per-process CPU usage as a percentage of all logical processors.</summary>
+        public static double ComputeCpuPercent(TimeSpan cpuDelta, TimeSpan wallDelta, int processorCount)
+        {
+            if (wallDelta.TotalSeconds <= 0 || processorCount <= 0)
+                return 0;
+            return cpuDelta.TotalSeconds / wallDelta.TotalSeconds * 100.0 / processorCount;
         }
 
         /// <summary>
