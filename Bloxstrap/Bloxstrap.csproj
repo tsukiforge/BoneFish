@@ -7,8 +7,8 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
     <ApplicationIcon>Bloxstrap.ico</ApplicationIcon>
-    <Version>7.1.1</Version>
-    <FileVersion>7.1.1</FileVersion>
+    <Version>7.1.2</Version>
+    <FileVersion>7.1.2</FileVersion>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -92,6 +92,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\wpfui\src\Wpf.Ui\Wpf.Ui.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Expose internals (AutoOptimizeService etc.) to the unit test project only. -->
+    <InternalsVisibleTo Include="Bloxstrap.Tests" />
   </ItemGroup>
 
   <ItemGroup>
