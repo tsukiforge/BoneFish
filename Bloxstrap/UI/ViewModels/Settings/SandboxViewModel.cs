@@ -5,9 +5,33 @@ using CommunityToolkit.Mvvm.Input;
 using Bloxstrap.Sandbox;
 using Bloxstrap.Sandbox.Interfaces;
 using Bloxstrap.Sandbox.Models;
+using Bloxstrap.UI.Elements.Dialogs;
 
 namespace Bloxstrap.UI.ViewModels.Settings
 {
+    /// <summary>Visual state of one step in the Configure → Snapshot → Apply → Test → Result indicator.</summary>
+    public enum SandboxStepState
+    {
+        Pending,
+        Active,
+        Done
+    }
+
+    /// <summary>One entry of the workflow step indicator. Rebuilt from the experiment state on every refresh.</summary>
+    public class SandboxWorkflowStep
+    {
+        public string Label { get; init; } = "";
+        public SandboxStepState StepState { get; init; }
+        public bool IsLast { get; init; }
+
+        public string Marker => StepState switch
+        {
+            SandboxStepState.Done => "✓",
+            SandboxStepState.Active => "●",
+            _ => "○"
+        };
+    }
+
     /// <summary>Editable row in the experiment's change list.</summary>
     public class SandboxChangeRow : NotifyPropertyChangedViewModel
     {
@@ -16,16 +40,19 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private string? _currentValue;
         private string? _validationError;
 
+        /// <summary>Raised when the user edits the flag name or new value so the diff preview can refresh live.</summary>
+        public event Action? RowChanged;
+
         public string FlagName
         {
             get => _flagName;
-            set { _flagName = value; OnPropertyChanged(nameof(FlagName)); }
+            set { _flagName = value; OnPropertyChanged(nameof(FlagName)); RowChanged?.Invoke(); }
         }
 
         public string? NewValue
         {
             get => _newValue;
-            set { _newValue = value; OnPropertyChanged(nameof(NewValue)); }
+            set { _newValue = value; OnPropertyChanged(nameof(NewValue)); RowChanged?.Invoke(); }
         }
 
         public string? CurrentValue
@@ -81,6 +108,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        // ── Workflow steps ────────────────────────────────────────────────────────────
+
+        public ObservableCollection<SandboxWorkflowStep> WorkflowSteps { get; } = new();
+
+        public bool StepsVisible => _working is not null;
+
         // ── Change editor ─────────────────────────────────────────────────────────────
 
         public ObservableCollection<SandboxChangeRow> Changes { get; } = new();
@@ -88,6 +121,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ObservableCollection<SandboxDiffEntry> DiffPreview { get; } = new();
 
         public bool CanEditChanges => _working?.State == SandboxExperimentState.Draft;
+
+        /// <summary>True while editing when at least one real (non no-op) change is configured.</summary>
+        public bool HasActualChanges =>
+            _working?.State == SandboxExperimentState.Draft && DiffPreview.Any(e => e.Type != SandboxDiffType.Unchanged);
+
+        public bool NoChangesPlaceholderVisible => DiffPreview.Count == 0;
 
         public ICommand AddChangeCommand => new RelayCommand(AddChange);
 
@@ -97,9 +136,39 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         private void AddChange()
         {
-            if (!CanEditChanges) return;
-            Changes.Add(new SandboxChangeRow { CurrentValue = "" });
-            RefreshDiffPreview();
+            if (!CanEditChanges || _working is null) return;
+
+            var knownFlags = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var pair in _service.FastFlags.GetAll())
+                knownFlags.Add(pair.Key);
+            foreach (var preset in FastFlagManager.PresetFlags.Values)
+                knownFlags.Add(preset);
+            foreach (var existing in _working.Changes)
+                knownFlags.Add(existing.FlagName);
+
+            var dialog = new AddSandboxChangeDialog(
+                knownFlags: knownFlags,
+                currentValues: _service.FastFlags.GetAll(),
+                existingChangeNames: _working.Changes.Select(c => c.FlagName).ToHashSet(StringComparer.Ordinal));
+
+            dialog.ShowDialog();
+
+            if (dialog.Result != MessageBoxResult.OK)
+                return;
+
+            var change = new SandboxChange { FlagName = dialog.FlagName, NewValue = dialog.NewValue };
+
+            try
+            {
+                _service.UpsertChange(_working, change);
+                Notify($"✓ {change.FlagName} added to the experiment.");
+            }
+            catch (SandboxException ex)
+            {
+                Notify($"✗ {ex.Message}");
+            }
+
+            ReloadState();
         }
 
         private void RemoveChange(SandboxChangeRow? row)
@@ -111,6 +180,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         private void NewExperiment()
         {
+            if (_working is { IsUnfinished: true })
+            {
+                Notify("Finish or roll back the current experiment before starting a new one.");
+                return;
+            }
+
             if (_working is { State: SandboxExperimentState.Draft })
             {
                 // Reuse the existing draft id instead of spamming history.
@@ -125,7 +200,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
 
             ReloadState();
-            Notify("New experiment created. Add FastFlag changes below.");
+            Notify("New experiment created. Add a FastFlag to begin.");
         }
 
         // ── Status ────────────────────────────────────────────────────────────────────
@@ -148,25 +223,102 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public string StateText => _working is null
             ? "Idle"
-            : _working.State.ToString();
+            : _working.State.ToFriendlyName();
 
         public string SnapshotStatusText => _working is null
             ? "—"
-            : _working.State is SandboxExperimentState.Draft or SandboxExperimentState.Preparing
-                ? "Not created"
-                : "✓ Ready";
+            : _working.State switch
+            {
+                SandboxExperimentState.Draft or SandboxExperimentState.Preparing => "Not created",
+                SandboxExperimentState.RolledBack => "✓ Backup restored",
+                SandboxExperimentState.Cancelled => "—",
+                _ when _working.SnapshotId is not null => "✓ Backup created",
+                _ => "Not created"
+            };
 
-        public string RobloxStatusText => _service.IsRobloxRunning ? "● Roblox running" : "○ Roblox not running";
+        /// <summary>Honest checklist of what actually happened (driven by snapshot/apply markers on the experiment).</summary>
+        public string StatusChecklistText
+        {
+            get
+            {
+                if (_working is null) return "";
+
+                var lines = new List<string>();
+                if (_working.SnapshotId is not null)
+                    lines.Add("✓ Backup created");
+
+                if (_working.AppliedAt is not null)
+                    lines.Add("✓ Configuration applied");
+
+                switch (_working.State)
+                {
+                    case SandboxExperimentState.SnapshotCreated:
+                        lines.Add("• Backup verified — apply the changes when ready.");
+                        break;
+                    case SandboxExperimentState.ReadyForTesting:
+                        lines.Add("• Launch Roblox and play — changes take effect on the next Roblox start.");
+                        break;
+                    case SandboxExperimentState.Testing:
+                        lines.Add("• Testing in progress — measure, then record a result (or roll back).");
+                        break;
+                    case SandboxExperimentState.Completed:
+                        lines.Add("✓ Testing finished — keep the changes or restore the previous configuration.");
+                        break;
+                }
+
+                return string.Join("\n", lines);
+            }
+        }
+
+        public string RobloxStatusText => _service.IsRobloxRunning
+            ? "🟡 Roblox is running"
+            : "🟢 Roblox is not running";
 
         public bool IsRobloxRunning => _service.IsRobloxRunning;
 
+        public bool IsRobloxNotRunning => !IsRobloxRunning;
+
         public string ResultText => _working is null || _working.Result is null
-            ? "No result recorded"
-            : $"Result: {_working.ResultLabel}";
+            ? "No result recorded yet"
+            : $"Result: {_working.Result!.Value.ToFriendlyLabel()}";
 
         public string MeasurementText => _working?.Measurement is null
             ? "No measurements recorded"
             : $"Before: {(FormatFps(_working.Measurement.Before))}   After: {FormatFps(_working.Measurement.After)}";
+
+        public string BeforeFpsText => FormatFpsMetric(_working?.Measurement?.Before);
+
+        public string AfterFpsText => FormatFpsMetric(_working?.Measurement?.After);
+
+        public string BeforeP1LowText => FormatP1Low(_working?.Measurement?.Before);
+
+        public string AfterP1LowText => FormatP1Low(_working?.Measurement?.After);
+
+        public string BeforeRamText => FormatRam(_working?.Measurement?.Before);
+
+        public string AfterRamText => FormatRam(_working?.Measurement?.After);
+
+        public string BeforeCpuText => FormatCpu(_working?.Measurement?.Before);
+
+        public string AfterCpuText => FormatCpu(_working?.Measurement?.After);
+
+        // No GPU telemetry source exists in BoneFish — this stays honest "N/A" instead of
+        // inventing a number. Kept as a property so a future source can be plugged in.
+        public string BeforeGpuText => "N/A";
+
+        public string AfterGpuText => "N/A";
+
+        private static string FormatFpsMetric(SandboxFpsSample? sample) =>
+            sample is { Reliable: true } ? $"{sample.MedianFps:F1} FPS ({sample.SampleCount} samples)" : "N/A";
+
+        private static string FormatP1Low(SandboxFpsSample? sample) =>
+            sample is { Reliable: true, P1LowFps: > 0 } ? $"{sample.P1LowFps:F1} FPS" : "N/A";
+
+        private static string FormatRam(SandboxFpsSample? sample) =>
+            sample is { ProcessMetricsSampled: true } ? $"{sample.AverageRamMB:F0} MB" : "N/A";
+
+        private static string FormatCpu(SandboxFpsSample? sample) =>
+            sample is { ProcessMetricsSampled: true } ? $"{sample.AverageCpuPercent:F0}%" : "N/A";
 
         private static string FormatFps(SandboxFpsSample? sample) =>
             sample is null ? "not measured" : $"{sample.MedianFps:F1} FPS ({sample.SampleCount} samples)";
@@ -175,21 +327,48 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public bool HasError => !string.IsNullOrEmpty(ErrorText);
 
+        /// <summary>Shown in the diff card when inline rows contained the same flag twice (merged, last wins).</summary>
+        public string DuplicateWarningText { get; private set; } = "";
+
+        /// <summary>Short contextual hint under the action buttons explaining the current step.</summary>
+        public string ActionHintText => _working?.State switch
+        {
+            SandboxExperimentState.Draft => "Create a backup of the current Roblox configuration before applying these changes.",
+            SandboxExperimentState.SnapshotCreated => "Backup verified — apply the changes when you are ready.",
+            SandboxExperimentState.ReadyForTesting => "Play Roblox with the changes, then measure and record a result.",
+            SandboxExperimentState.Testing => "Play Roblox, then measure and record a result — or roll back.",
+            SandboxExperimentState.Completed => "Keep the changes or restore the previous configuration.",
+            _ => ""
+        };
+
         // ── Recovery banner ───────────────────────────────────────────────────────────
 
-        public bool RecoveryBannerVisible => _working?.IsUnfinished == true;
+        // Only states that genuinely need attention show the banner. States the user is
+        // intentionally working through (backup created, applied, testing) are communicated
+        // by the step indicator and status card instead — the banner must not look like an
+        // error during normal use.
+        public bool RecoveryBannerVisible => _working?.State is SandboxExperimentState.Failed
+            or SandboxExperimentState.RollingBack;
 
-        public string RecoveryBannerText => _working?.IsUnfinished == true
-            ? $"⚠ Unfinished experiment {_working.DisplayName} (state: {_working.State}). Choose an action below or use the recovery prompt at the next start."
+        public string RecoveryBannerText => _working?.IsUnfinished == true && RecoveryBannerVisible
+            ? $"⚠ Unfinished experiment {_working.DisplayName} (status: {_working.FriendlyStateName}). Your previous configuration can be restored with Rollback, or continue the experiment."
             : "";
+
+        /// <summary>"Roblox is not running — the experiment can be applied now" is only true once a backup exists.</summary>
+        public bool RobloxNotRunningBannerVisible => IsRobloxNotRunning && _working?.State is SandboxExperimentState.SnapshotCreated
+            or SandboxExperimentState.ReadyForTesting
+            or SandboxExperimentState.Testing
+            or SandboxExperimentState.Completed;
 
         // ── Command visibility ────────────────────────────────────────────────────────
 
-        public bool CanApply => _working?.State == SandboxExperimentState.Draft && Changes.Count > 0;
+        public bool CanPrepare => HasActualChanges;
+        public bool CanApply => _working?.State == SandboxExperimentState.SnapshotCreated;
         public bool CanStartTest => _working?.State == SandboxExperimentState.ReadyForTesting;
         public bool CanMeasure => _working?.State == SandboxExperimentState.Testing;
         public bool CanRecordResult => _working?.State == SandboxExperimentState.Testing;
-        public bool CanRollback => _working?.State is SandboxExperimentState.ReadyForTesting
+        public bool CanRollback => _working?.State is SandboxExperimentState.SnapshotCreated
+            or SandboxExperimentState.ReadyForTesting
             or SandboxExperimentState.Testing
             or SandboxExperimentState.Completed
             or SandboxExperimentState.Failed;
@@ -199,6 +378,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
             or SandboxExperimentState.Testing
             or SandboxExperimentState.Failed;
         public bool CanCommit => _working?.State == SandboxExperimentState.Completed;
+        public bool IsExperimentFinished => _working?.State is SandboxExperimentState.Committed
+            or SandboxExperimentState.RolledBack
+            or SandboxExperimentState.Cancelled;
 
         // ── History ───────────────────────────────────────────────────────────────────
 
@@ -222,21 +404,26 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     ? "  (no changes)"
                     : string.Join("\n", e.Changes.Select(c => $"  {c}"));
 
-                return $"{e.DisplayName}   created {e.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm}\n" +
-                       $"  Status: {e.State}" +
-                       (string.IsNullOrEmpty(e.BaseProfile) ? "" : $"   Base: {e.BaseProfile}") +
-                       (string.IsNullOrEmpty(e.SnapshotId) ? "" : $"   Snapshot: {e.SnapshotId}") +
-                       (e.Result is null ? "" : $"\n  Result: {e.ResultLabel}") +
-                       (e.Measurement is null ? "" : $"\n  {MeasurementTextFor(e)}") +
-                       $"\n  Changes:\n{changes}" +
+                return $"{e.DisplayName}\n" +
+                       $"  Base: {e.BaseProfile}\n" +
+                       $"  Changes: {e.Changes.Count}\n" +
+                       $"  Status: {e.FriendlyStateName}\n" +
+                       (e.Result is null ? "" : $"  Result: {e.ResultLabel}\n") +
+                       (e.Measurement is null ? "" : $"  {MeasurementTextFor(e)}\n") +
+                       $"  Created: {e.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm}\n" +
+                       $"  Changes:\n{changes}" +
                        (string.IsNullOrEmpty(e.LastError) ? "" : $"\n  Error: {e.LastError}");
             }
         }
 
         private static string MeasurementTextFor(SandboxExperiment e) =>
-            $"  Before: {FormatFps(e.Measurement!.Before)}   After: {FormatFps(e.Measurement.After)}";
+            $"  Before: {FormatFps(e.Measurement!.Before)}   After: {FormatFps(e.Measurement.After)}\n" +
+            $"  RAM: {FormatRam(e.Measurement.Before)} → {FormatRam(e.Measurement.After)}   " +
+            $"CPU: {FormatCpu(e.Measurement.Before)} → {FormatCpu(e.Measurement.After)}";
 
         // ── Commands ──────────────────────────────────────────────────────────────────
+
+        public ICommand PrepareCommand => new AsyncRelayCommand(PrepareExperimentAsync);
 
         public ICommand ApplyCommand => new AsyncRelayCommand(ApplyAsync);
 
@@ -254,33 +441,68 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand CancelCommand => new AsyncRelayCommand(CancelAsync);
 
+        private async Task PrepareExperimentAsync()
+        {
+            var exp = _working;
+            if (exp is null || !CanPrepare) return;
+
+            IsBusy = true;
+            BusyText = "Creating a backup of the current Roblox configuration...";
+            try
+            {
+                await _service.PrepareAsync(exp);
+                Notify("✓ Backup created and verified. You can now apply the experiment.");
+            }
+            catch (SandboxException ex)
+            {
+                Notify($"✗ {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Notify($"✗ Unexpected error: {ex.Message}");
+            }
+            finally
+            {
+                IsBusy = false;
+                BusyText = "";
+                ReloadState();
+            }
+        }
+
         private async Task ApplyAsync()
         {
             var exp = _working;
             if (exp is null) return;
 
-            bool confirmedRestart = true;
+            int changeCount = ConfigurationDiffService.CountActualChanges(DiffPreview);
+
+            var confirm = Frontend.ShowMessageBox(
+                $"You are about to apply {changeCount} configuration change(s).\n\n" +
+                "Your previous configuration has been backed up and can be restored at any time.\n\n" +
+                "Continue?",
+                MessageBoxImage.Question, MessageBoxButton.YesNo);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
 
             if (_service.IsRobloxRunning)
             {
                 var result = Frontend.ShowMessageBox(
-                    "Roblox is currently running.\n\n" +
-                    "This experiment requires Roblox to restart before the changes take effect.\n" +
+                    "🟡 Roblox is currently running.\n\n" +
+                    "These changes will take effect the next time Roblox starts.\n" +
                     "BoneFish will NOT close or restart Roblox for you.\n\n" +
                     "Continue applying while Roblox is running?",
                     MessageBoxImage.Question, MessageBoxButton.YesNo);
 
                 if (result != MessageBoxResult.Yes)
                     return;
-
-                confirmedRestart = true;
             }
 
             IsBusy = true;
-            BusyText = "Creating snapshot and applying changes...";
+            BusyText = "Applying the backed-up changes and verifying...";
             try
             {
-                bool ok = await _service.ApplyAsync(exp, confirmedRestart);
+                bool ok = await _service.ApplyAsync(exp, confirmedRestart: true);
                 if (ok)
                     Notify($"✓ {exp.DisplayName} applied and verified. Configuration is ready for testing.");
             }
@@ -369,7 +591,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (exp is null) return;
 
             IsBusy = true;
-            BusyText = "Restoring the snapshot...";
+            BusyText = "Restoring the previous configuration...";
             try
             {
                 await _service.RollbackAsync(exp);
@@ -393,7 +615,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (exp is null) return;
 
             IsBusy = true;
-            BusyText = "Committing changes to the active profile...";
+            BusyText = "Keeping the changes and saving them to the active profile...";
             try
             {
                 await _service.CommitAsync(exp);
@@ -463,15 +685,18 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 foreach (var change in _working.Changes)
                 {
-                    Changes.Add(new SandboxChangeRow
+                    var row = new SandboxChangeRow
                     {
                         FlagName = change.FlagName,
                         NewValue = change.NewValue,
                         CurrentValue = _service.FastFlags.GetValue(change.FlagName)
-                    });
+                    };
+                    row.RowChanged += RefreshDiffPreview;
+                    Changes.Add(row);
                 }
             }
 
+            RefreshWorkflowSteps();
             RefreshDiffPreview();
 
             History.Clear();
@@ -485,15 +710,30 @@ namespace Bloxstrap.UI.ViewModels.Settings
             OnPropertyChanged(nameof(ExperimentTitle));
             OnPropertyChanged(nameof(StateText));
             OnPropertyChanged(nameof(SnapshotStatusText));
+            OnPropertyChanged(nameof(StatusChecklistText));
             OnPropertyChanged(nameof(RobloxStatusText));
             OnPropertyChanged(nameof(IsRobloxRunning));
+            OnPropertyChanged(nameof(IsRobloxNotRunning));
             OnPropertyChanged(nameof(ResultText));
             OnPropertyChanged(nameof(MeasurementText));
+            OnPropertyChanged(nameof(BeforeFpsText));
+            OnPropertyChanged(nameof(AfterFpsText));
+            OnPropertyChanged(nameof(BeforeP1LowText));
+            OnPropertyChanged(nameof(AfterP1LowText));
+            OnPropertyChanged(nameof(BeforeRamText));
+            OnPropertyChanged(nameof(AfterRamText));
+            OnPropertyChanged(nameof(BeforeCpuText));
+            OnPropertyChanged(nameof(AfterCpuText));
+            OnPropertyChanged(nameof(BeforeGpuText));
+            OnPropertyChanged(nameof(AfterGpuText));
             OnPropertyChanged(nameof(ErrorText));
             OnPropertyChanged(nameof(HasError));
             OnPropertyChanged(nameof(RecoveryBannerVisible));
             OnPropertyChanged(nameof(RecoveryBannerText));
+            OnPropertyChanged(nameof(RobloxNotRunningBannerVisible));
             OnPropertyChanged(nameof(CanEditChanges));
+            OnPropertyChanged(nameof(HasActualChanges));
+            OnPropertyChanged(nameof(CanPrepare));
             OnPropertyChanged(nameof(CanApply));
             OnPropertyChanged(nameof(CanStartTest));
             OnPropertyChanged(nameof(CanMeasure));
@@ -501,8 +741,37 @@ namespace Bloxstrap.UI.ViewModels.Settings
             OnPropertyChanged(nameof(CanRollback));
             OnPropertyChanged(nameof(CanCancel));
             OnPropertyChanged(nameof(CanCommit));
+            OnPropertyChanged(nameof(IsExperimentFinished));
+            OnPropertyChanged(nameof(ActionHintText));
             OnPropertyChanged(nameof(SelectedBaseProfile));
             OnPropertyChanged(nameof(HistoryDetailText));
+            OnPropertyChanged(nameof(StepsVisible));
+            OnPropertyChanged(nameof(WorkflowSteps));
+            OnPropertyChanged(nameof(NoChangesPlaceholderVisible));
+        }
+
+        private void RefreshWorkflowSteps()
+        {
+            WorkflowSteps.Clear();
+
+            if (_working is null)
+                return;
+
+            int active = _working.GetWorkflowStepIndex();
+            bool allDone = _working.State.IsTerminal();
+            string[] labels = { "Configure", "Snapshot", "Apply", "Test", "Result" };
+
+            for (int i = 0; i < labels.Length; i++)
+            {
+                WorkflowSteps.Add(new SandboxWorkflowStep
+                {
+                    Label = labels[i],
+                    IsLast = i == labels.Length - 1,
+                    StepState = allDone || i < active ? SandboxStepState.Done : i == active ? SandboxStepState.Active : SandboxStepState.Pending
+                });
+            }
+
+            OnPropertyChanged(nameof(WorkflowSteps));
         }
 
         private void RefreshDiffPreview()
@@ -510,23 +779,42 @@ namespace Bloxstrap.UI.ViewModels.Settings
             DiffPreview.Clear();
 
             var baseFlags = new Dictionary<string, string>();
-            foreach (var change in Changes)
+
+            // Merge duplicate rows for the same flag (last value wins) so the diff never shows
+            // the same flag twice — consistent with the upsert semantics used by the dialog.
+            var deduped = new Dictionary<string, SandboxChange>(StringComparer.Ordinal);
+            bool hadDuplicates = false;
+
+            foreach (var row in Changes)
             {
+                var change = row.ToChange();
                 if (string.IsNullOrWhiteSpace(change.FlagName))
                     continue;
 
+                if (deduped.ContainsKey(change.FlagName))
+                    hadDuplicates = true;
+                deduped[change.FlagName] = change;
+
                 if (!baseFlags.ContainsKey(change.FlagName))
                 {
-                    string? current = _service.FastFlags.GetValue(change.FlagName.Trim());
-                    baseFlags[change.FlagName.Trim()] = current ?? "";
+                    string? current = _service.FastFlags.GetValue(change.FlagName);
+                    baseFlags[change.FlagName] = current ?? "";
                 }
             }
 
             // Flags currently on disk that the user has not touched stay out of the diff.
-            foreach (var entry in ConfigurationDiffService.ComputeDiff(baseFlags, Changes.Select(c => c.ToChange())))
+            foreach (var entry in ConfigurationDiffService.ComputeDiff(baseFlags, deduped.Values))
                 DiffPreview.Add(entry);
 
+            DuplicateWarningText = hadDuplicates
+                ? "Duplicate entries were merged (last value wins). Review the diff before preparing."
+                : "";
+
             OnPropertyChanged(nameof(DiffPreview));
+            OnPropertyChanged(nameof(NoChangesPlaceholderVisible));
+            OnPropertyChanged(nameof(HasActualChanges));
+            OnPropertyChanged(nameof(CanPrepare));
+            OnPropertyChanged(nameof(DuplicateWarningText));
         }
     }
 }
