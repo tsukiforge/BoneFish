@@ -56,30 +56,23 @@ namespace Bloxstrap.Sandbox
             }
         }
 
-        // ── Apply ─────────────────────────────────────────────────────────────────────
+        // ── Prepare (backup) ──────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Safely apply an experiment: validate, check Roblox state, snapshot, write, verify.
-        /// On any failure the configuration is rolled back immediately — partial changes are never left behind.
+        /// Stage 1 of the two-step apply flow: validate the experiment, create the backup snapshot
+        /// and verify it. The configuration is NOT modified here. On success the experiment moves to
+        /// <see cref="SandboxExperimentState.SnapshotCreated"/> and <see cref="ApplyAsync"/> becomes valid.
         /// </summary>
-        /// <param name="confirmedRestart">
-        /// Must be true when Roblox is running; the UI is responsible for informing the user that
-        /// the experiment requires a Roblox restart and asking for explicit confirmation.
-        /// </param>
-        public async Task<bool> ApplyAsync(
+        public async Task<SandboxSnapshot> PrepareAsync(
             SandboxExperiment experiment,
-            bool confirmedRestart,
             CancellationToken cancellationToken = default)
         {
             if (experiment.State != SandboxExperimentState.Draft)
-                throw new SandboxException($"Cannot apply experiment in state {experiment.State}");
+                throw new SandboxException($"Cannot prepare experiment in state {experiment.State}");
 
             ValidateChanges(experiment);
 
-            if (IsRobloxRunning && !confirmedRestart)
-                throw new SandboxException("Roblox is running. This experiment requires Roblox to restart — apply only after explicit confirmation.");
-
-            App.Logger.WriteLine(LOG_IDENT, $"{experiment.DisplayName}: apply started");
+            App.Logger.WriteLine(LOG_IDENT, $"{experiment.DisplayName}: prepare (backup) started");
 
             Manager.TransitionTo(experiment, SandboxExperimentState.Preparing);
 
@@ -90,9 +83,66 @@ namespace Bloxstrap.Sandbox
                 Manager.TransitionTo(experiment, SandboxExperimentState.SnapshotCreated);
                 App.Logger.WriteLine(LOG_IDENT, $"SandboxSnapshotCreated: {snapshot.Id}");
 
-                Manager.TransitionTo(experiment, SandboxExperimentState.Applying);
-                App.Logger.WriteLine(LOG_IDENT, $"SandboxApplyStarted: {experiment.DisplayName}");
+                // Verify the backup: it must be readable again and must capture the current configuration.
+                var reloaded = await Snapshots.LoadAsync(snapshot.Id, cancellationToken)
+                    ?? throw new SandboxException("Backup could not be re-read after creation — refusing to continue");
 
+                if (!await Snapshots.VerifyRestoredAsync(reloaded, experiment.Changes.Select(c => c.FlagName), cancellationToken))
+                    throw new SandboxException("Backup verification failed: the backup does not match the current configuration");
+
+                App.Logger.WriteLine(LOG_IDENT, $"SandboxBackupVerified: {snapshot.Id} ({experiment.DisplayName})");
+                return snapshot;
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"SandboxPrepareFailed: {experiment.DisplayName} — {ex.Message}");
+                Manager.MarkFailed(experiment, ex.Message);
+                throw;
+            }
+        }
+
+        // ── Apply ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Safely apply an experiment: check Roblox state, write, verify. On any failure the
+        /// configuration is rolled back immediately — partial changes are never left behind.
+        ///
+        /// Accepts an experiment in <see cref="SandboxExperimentState.SnapshotCreated"/> (staged flow:
+        /// <see cref="PrepareAsync"/> first) or — for compatibility — a Draft, in which case the backup
+        /// is created and verified inline before anything is written.
+        /// </summary>
+        /// <param name="confirmedRestart">
+        /// Must be true when Roblox is running; the UI is responsible for informing the user that
+        /// the experiment requires a Roblox restart and asking for explicit confirmation.
+        /// </param>
+        public async Task<bool> ApplyAsync(
+            SandboxExperiment experiment,
+            bool confirmedRestart,
+            CancellationToken cancellationToken = default)
+        {
+            if (experiment.State is not (SandboxExperimentState.Draft or SandboxExperimentState.SnapshotCreated))
+                throw new SandboxException($"Cannot apply experiment in state {experiment.State}");
+
+            if (IsRobloxRunning && !confirmedRestart)
+                throw new SandboxException("Roblox is running. This experiment requires Roblox to restart — apply only after explicit confirmation.");
+
+            if (experiment.State == SandboxExperimentState.Draft)
+            {
+                // Compatibility one-shot flow: create + verify the backup first.
+                await PrepareAsync(experiment, cancellationToken);
+            }
+            else if (experiment.SnapshotId is null)
+            {
+                throw new SandboxException("No backup available. Prepare the experiment before applying.");
+            }
+
+            App.Logger.WriteLine(LOG_IDENT, $"{experiment.DisplayName}: apply started");
+
+            Manager.TransitionTo(experiment, SandboxExperimentState.Applying);
+            App.Logger.WriteLine(LOG_IDENT, $"SandboxApplyStarted: {experiment.DisplayName}");
+
+            try
+            {
                 await WriteChangesAsync(experiment.Changes, cancellationToken);
 
                 if (!await VerifyChangesAsync(experiment.Changes, cancellationToken))
@@ -122,16 +172,57 @@ namespace Bloxstrap.Sandbox
             }
         }
 
+        /// <summary>
+        /// Add or update a single change on a draft experiment (upsert semantics):
+        /// rejects invalid names/values, replaces an existing entry for the same flag instead of
+        /// creating a duplicate, and removes the entry when the new value equals the current value
+        /// (no actual change) or when removing a flag that does not exist.
+        /// </summary>
+        public void UpsertChange(SandboxExperiment experiment, SandboxChange change)
+        {
+            if (experiment.State != SandboxExperimentState.Draft)
+                throw new SandboxException("Changes can only be edited while the experiment is a draft.");
+
+            string? error = SandboxChangeValidator.GetFirstInvalidChangeMessage(change);
+            if (error is not null)
+                throw new SandboxException(error);
+
+            string? current = _store.GetValue(change.FlagName);
+
+            bool noActualChange =
+                (change.NewValue is not null && string.Equals(current, change.NewValue, StringComparison.Ordinal))
+                || (change.NewValue is null && current is null);
+
+            if (noActualChange)
+            {
+                experiment.Changes.RemoveAll(c => string.Equals(c.FlagName, change.FlagName, StringComparison.Ordinal));
+                Manager.Persist();
+                return;
+            }
+
+            var existing = experiment.Changes.FirstOrDefault(c => string.Equals(c.FlagName, change.FlagName, StringComparison.Ordinal));
+            if (existing is not null)
+                existing.NewValue = change.NewValue;
+            else
+                experiment.Changes.Add(change.Clone());
+
+            Manager.Persist();
+        }
+
         private void ValidateChanges(SandboxExperiment experiment)
         {
             if (experiment.Changes.Count == 0)
                 throw new SandboxException("The experiment has no changes to apply.");
 
+            var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var change in experiment.Changes)
             {
                 string? error = SandboxChangeValidator.GetFirstInvalidChangeMessage(change);
                 if (error is not null)
                     throw new SandboxException(error);
+
+                if (!seen.Add(change.FlagName))
+                    throw new SandboxException($"Duplicate change for flag '{change.FlagName}'. Remove the duplicate entry before continuing.");
             }
         }
 
