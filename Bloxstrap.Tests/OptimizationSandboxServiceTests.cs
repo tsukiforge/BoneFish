@@ -273,4 +273,245 @@ public class OptimizationSandboxServiceTests
 
         Assert.Equal("false", h.Store.GetValue("FFlagA"));
     }
+
+    // ── Staged workflow (Prepare → Apply) ────────────────────────────────────────────
+
+    [Fact]
+    public async Task Prepare_Creates_And_Verifies_Snapshot_Without_Applying()
+    {
+        using var h = new TestSandboxHarness();
+        h.Store.SetValue("FFlagA", "false");
+
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+
+        var snapshot = await h.Service.PrepareAsync(exp);
+
+        Assert.Equal(SandboxExperimentState.SnapshotCreated, exp.State);
+        Assert.NotNull(exp.SnapshotId);
+        Assert.Equal("false", snapshot.OriginalValues["FFlagA"]);
+        Assert.Equal("false", h.Store.GetValue("FFlagA")); // nothing written yet
+        Assert.True(File.Exists(Path.Combine(h.StorageRoot, "Snapshots", $"{snapshot.Id}.json")));
+    }
+
+    [Fact]
+    public async Task Prepare_Empty_Changes_Is_Rejected()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment();
+
+        await Assert.ThrowsAsync<SandboxException>(() => h.Service.PrepareAsync(exp));
+        Assert.Equal(SandboxExperimentState.Draft, exp.State);
+    }
+
+    [Fact]
+    public async Task Apply_From_SnapshotCreated_Writes_And_Verifies()
+    {
+        using var h = new TestSandboxHarness();
+        h.Store.SetValue("FFlagA", "false");
+
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+        await h.Service.PrepareAsync(exp);
+        Assert.Equal(SandboxExperimentState.SnapshotCreated, exp.State);
+
+        bool ok = await h.Service.ApplyAsync(exp, confirmedRestart: false);
+
+        Assert.True(ok);
+        Assert.Equal(SandboxExperimentState.ReadyForTesting, exp.State);
+        Assert.Equal("true", h.Store.GetValue("FFlagA"));
+    }
+
+    [Fact]
+    public async Task Apply_Blocked_Without_Snapshot()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+
+        // A state that requires a snapshot, but none exists.
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Preparing);
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.SnapshotCreated);
+
+        await Assert.ThrowsAsync<SandboxException>(() => h.Service.ApplyAsync(exp, false));
+        Assert.Equal(SandboxExperimentState.SnapshotCreated, exp.State);
+    }
+
+    [Fact]
+    public async Task Apply_Blocked_From_NonApplicable_States()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+        await h.Service.ApplyAsync(exp, false);
+        h.Service.StartTesting(exp);
+
+        await Assert.ThrowsAsync<SandboxException>(() => h.Service.ApplyAsync(exp, false));
+    }
+
+    [Fact]
+    public async Task Apply_Rejects_Duplicate_Flags()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment(
+            SandboxTestHelpers.Set("FFlagA", "true"),
+            SandboxTestHelpers.Set("FFlagA", "120"));
+
+        await Assert.ThrowsAsync<SandboxException>(() => h.Service.ApplyAsync(exp, false));
+        Assert.Equal(SandboxExperimentState.Draft, exp.State);
+    }
+
+    [Fact]
+    public async Task Rollback_From_SnapshotCreated_Is_Allowed()
+    {
+        using var h = new TestSandboxHarness();
+        h.Store.SetValue("FFlagA", "false");
+
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+        await h.Service.PrepareAsync(exp);
+
+        await h.Service.RollbackAsync(exp);
+
+        Assert.Equal(SandboxExperimentState.RolledBack, exp.State);
+        Assert.Equal("false", h.Store.GetValue("FFlagA"));
+    }
+
+    [Fact]
+    public async Task Recovery_Can_Restore_From_SnapshotCreated()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+        await h.Service.PrepareAsync(exp);
+
+        // The recovery path needs SnapshotCreated → RollingBack to be legal.
+        Assert.True(ExperimentManager.IsTransitionAllowed(SandboxExperimentState.SnapshotCreated, SandboxExperimentState.RollingBack));
+    }
+
+    // ── Upsert semantics (duplicates / no-ops) ───────────────────────────────────────
+
+    [Fact]
+    public void UpsertChange_Replaces_Duplicate_Entry()
+    {
+        using var h = new TestSandboxHarness();
+        h.Store.SetValue("FFlagA", "false");
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+
+        h.Service.UpsertChange(exp, SandboxTestHelpers.Set("FFlagA", "120"));
+
+        var change = Assert.Single(exp.Changes);
+        Assert.Equal("FFlagA", change.FlagName);
+        Assert.Equal("120", change.NewValue);
+    }
+
+    [Fact]
+    public void UpsertChange_NoOp_Value_Removes_Entry()
+    {
+        using var h = new TestSandboxHarness();
+        h.Store.SetValue("FFlagA", "false");
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+
+        // Same value as current → no actual change → entry disappears.
+        h.Service.UpsertChange(exp, SandboxTestHelpers.Set("FFlagA", "false"));
+
+        Assert.Empty(exp.Changes);
+    }
+
+    [Fact]
+    public void UpsertChange_Remove_Of_Nonexistent_Flag_Is_NoOp()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+
+        h.Service.UpsertChange(exp, SandboxTestHelpers.Remove("FFlagA"));
+
+        Assert.Empty(exp.Changes);
+    }
+
+    [Fact]
+    public void UpsertChange_Invalid_Flag_Is_Rejected()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment();
+
+        Assert.Throws<SandboxException>(() => h.Service.UpsertChange(exp, SandboxTestHelpers.Set("bad name", "true")));
+        Assert.Empty(exp.Changes);
+    }
+
+    [Fact]
+    public async Task UpsertChange_Is_Only_Allowed_On_Draft()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+        await h.Service.PrepareAsync(exp);
+
+        Assert.Throws<SandboxException>(() => h.Service.UpsertChange(exp, SandboxTestHelpers.Set("FFlagB", "true")));
+        Assert.Single(exp.Changes); // unchanged
+    }
+
+    // ── Workflow step indicator mapping ──────────────────────────────────────────────
+
+    [Fact]
+    public void Workflow_Step_Index_Maps_States()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+        Assert.Equal(0, exp.GetWorkflowStepIndex()); // Configure
+
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Preparing);
+        Assert.Equal(1, exp.GetWorkflowStepIndex()); // Snapshot
+
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.SnapshotCreated);
+        Assert.Equal(1, exp.GetWorkflowStepIndex()); // Snapshot
+
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Applying);
+        Assert.Equal(2, exp.GetWorkflowStepIndex()); // Apply
+
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.ReadyForTesting);
+        Assert.Equal(3, exp.GetWorkflowStepIndex()); // Test
+
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Testing);
+        Assert.Equal(3, exp.GetWorkflowStepIndex()); // Test
+
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Completed);
+        Assert.Equal(4, exp.GetWorkflowStepIndex()); // Result
+
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Committed);
+        Assert.Equal(4, exp.GetWorkflowStepIndex()); // Result (finished)
+    }
+
+    [Fact]
+    public void Workflow_Step_Index_Handles_Interrupted_States()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment(SandboxTestHelpers.Set("FFlagA", "true"));
+
+        // Failed before any snapshot → still on the Snapshot step.
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Preparing);
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Failed);
+        Assert.Equal(1, exp.GetWorkflowStepIndex());
+
+        // Failed after apply started → on the Apply step.
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Preparing);
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.SnapshotCreated);
+        exp.SnapshotId = "snapshot_x";
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Applying);
+        h.Service.Manager.TransitionTo(exp, SandboxExperimentState.Failed);
+        Assert.Equal(2, exp.GetWorkflowStepIndex());
+    }
+
+    [Fact]
+    public void Friendly_State_Names_Are_User_Facing()
+    {
+        Assert.Equal("Draft", SandboxExperimentState.Draft.ToFriendlyName());
+        Assert.Equal("Ready", SandboxExperimentState.SnapshotCreated.ToFriendlyName());
+        Assert.Equal("Ready for Testing", SandboxExperimentState.ReadyForTesting.ToFriendlyName());
+        Assert.Equal("Rolled Back", SandboxExperimentState.RolledBack.ToFriendlyName());
+        Assert.Equal("Committed", SandboxExperimentState.Committed.ToFriendlyName());
+    }
+
+    [Fact]
+    public void Friendly_Result_Labels_Never_Claim_Success_On_Weak_Data()
+    {
+        Assert.Equal("🟢 Potential Improvement", SandboxTestResult.Improved.ToFriendlyLabel());
+        Assert.Equal("🟡 Similar", SandboxTestResult.Similar.ToFriendlyLabel());
+        Assert.Equal("🔴 Degraded", SandboxTestResult.Degraded.ToFriendlyLabel());
+        Assert.Equal("🟡 Inconclusive", SandboxTestResult.Inconclusive.ToFriendlyLabel());
+        Assert.Equal("⚪ Not Enough Data", SandboxTestResult.InsufficientData.ToFriendlyLabel());
+    }
 }
