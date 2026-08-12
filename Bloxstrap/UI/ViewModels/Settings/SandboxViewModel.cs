@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
+using Bloxstrap.Integrations;
 using Bloxstrap.Sandbox;
 using Bloxstrap.Sandbox.Interfaces;
 using Bloxstrap.Sandbox.Models;
@@ -130,9 +131,90 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand AddChangeCommand => new RelayCommand(AddChange);
 
+        public ICommand ShowRecommendationsCommand => new RelayCommand(ShowRecommendations);
+
         public ICommand RemoveChangeCommand => new RelayCommand<SandboxChangeRow>(RemoveChange);
 
         public ICommand NewExperimentCommand => new RelayCommand(NewExperiment);
+
+        /// <summary>One-line reason per recommended flag, shown in the review dialog.</summary>
+        private static readonly IReadOnlyDictionary<string, string> RecommendationReasons = new Dictionary<string, string>
+        {
+            ["FIntDebugForceMSAASamples"] = "MSAA setting — lowers per-pixel GPU load",
+            ["DFFlagTextureQualityOverrideEnabled"] = "Texture override — reduces VRAM/RAM usage",
+            ["DFIntTextureQualityOverride"] = "Lowest texture quality",
+            ["FIntTextureCompositorLowResFactor"] = "Compositor low-res factor",
+            ["DFIntDebugFRMQualityLevelOverride"] = "Render quality level (lowest safe)",
+            ["FIntRomarkStartWithGraphicQualityLevel"] = "Start at low graphic quality",
+            ["FIntRobloxGuiBlurIntensity"] = "Disables UI blur effects",
+            ["FFlagDebugSSAOForce"] = "Disables SSAO post-processing",
+            ["FIntSSAOMipLevels"] = "SSAO quality level",
+            ["FIntRenderGrainScale"] = "Disables film grain",
+            ["DFIntCSGLevelOfDetailSwitchingDistance"] = "Shorter LOD distance — lighter geometry",
+            ["DFIntCSGLevelOfDetailSwitchingDistanceL12"] = "LOD distance L1→L2",
+            ["DFIntCSGLevelOfDetailSwitchingDistanceL23"] = "LOD distance L2→L3",
+            ["DFIntCSGLevelOfDetailSwitchingDistanceL34"] = "LOD distance L3→L4",
+            ["DFIntCSGLevelOfDetailSwitchingDistanceStatic"] = "Static geometry LOD",
+            ["DFIntCSGv2LodsToGenerate"] = "Fewer LOD levels generated",
+            ["FIntTerrainArraySliceSize"] = "Lighter terrain rendering",
+            ["FIntMaxBatchesPerFlush"] = "Larger render batches — fewer draw calls",
+            ["DFIntMaxFrameBufferSize"] = "Smaller frame buffer — lower input lag",
+            ["FIntRuntimeMaxNumOfThreads"] = "Limits scheduler threads",
+            ["DFFlagEnableRequestAsyncCompression"] = "Faster async asset downloads",
+            ["DFIntTaskSchedulerTargetFps"] = "FPS cap lowers CPU/GPU load",
+            ["FIntRenderLocalLightUpdatesMax"] = "Limits local light updates",
+            ["FIntRenderLocalLightUpdatesMin"] = "Minimum local light updates",
+            ["DFIntTextureCompositorActiveJobs"] = "Texture compositor parallelism",
+            ["FIntRakNetPacketRateLimit"] = "Network: higher packet rate limit",
+            ["DFIntMaxReceivePPS"] = "Network: max receive packets/s",
+            ["DFIntMaxSendPPS"] = "Network: max send packets/s",
+            ["DFIntConnectionMTUSize"] = "Network: larger MTU",
+            ["DFIntOptimizeSendQueue"] = "Network: optimized send queue",
+            ["FFlagRenderUIAnimations"] = "Disables UI animations",
+        };
+
+        /// <summary>
+        /// Automation: read the device, suggest matching FastFlags, and let the user tick the ones
+        /// to add to the experiment. Pure suggestion — nothing is applied here; the selected flags
+        /// enter the experiment through the same upsert path as the Add Change dialog.
+        /// </summary>
+        private void ShowRecommendations()
+        {
+            if (!CanEditChanges || _working is null) return;
+
+            var recommendations = AutoOptimizeService.GetRecommendedFastFlags();
+            var currentValues = _service.FastFlags.GetAll();
+
+            var dialog = new SandboxRecommendationDialog(
+                systemInfo: AutoOptimizeService.GetSystemInfo(),
+                recommendations: recommendations,
+                currentValues: currentValues,
+                reasons: RecommendationReasons);
+
+            dialog.ShowDialog();
+
+            if (dialog.Result != MessageBoxResult.OK)
+                return;
+
+            int added = 0;
+            foreach (var change in dialog.SelectedChanges)
+            {
+                try
+                {
+                    _service.UpsertChange(_working, change);
+                    added++;
+                }
+                catch (SandboxException ex)
+                {
+                    Notify($"✗ {change.FlagName}: {ex.Message}");
+                }
+            }
+
+            if (added > 0)
+                Notify($"✓ {added} recommended change(s) added to the experiment. Review them, then prepare.");
+
+            ReloadState();
+        }
 
         private void AddChange()
         {

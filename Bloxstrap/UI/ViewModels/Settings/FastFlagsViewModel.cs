@@ -89,7 +89,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public bool UseFastFlagManager
         {
             get => App.Settings.Prop.UseFastFlagManager;
-            set => App.Settings.Prop.UseFastFlagManager = value;
+            set
+            {
+                App.Settings.Prop.UseFastFlagManager = value;
+                // ★ FIX: simpan seketika — setter lama tidak pernah Save(), jadi
+                // perubahan toggle hilang saat window ditutup / app di-restart.
+                try { App.Settings.Save(); } catch { }
+            }
         }
 
         public IReadOnlyDictionary<MSAAMode, string?> MSAALevels => FastFlagManager.MSAAModes;
@@ -97,7 +103,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public MSAAMode SelectedMSAALevel
         {
             get => MSAALevels.FirstOrDefault(x => x.Value == App.FastFlags.GetPreset("Rendering.MSAA")).Key;
-            set => App.FastFlags.SetPreset("Rendering.MSAA", MSAALevels[value]);
+            set
+            {
+                App.FastFlags.SetPreset("Rendering.MSAA", MSAALevels[value]);
+                // ★ FIX: simpan seketika agar pilihan bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
+            }
         }
 
         public IReadOnlyDictionary<RenderingMode, string> RenderingModes => FastFlagManager.RenderingModes;
@@ -111,13 +122,20 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     App.Settings.Prop.FakeBorderlessFullscreen = false; // vulkan exclusive
 
                 App.FastFlags.SetPresetEnum("Rendering.Mode", value.ToString(), "True");
+                // ★ FIX: simpan seketika agar pilihan bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
             }
         }
 
         public bool FixDisplayScaling
         {
             get => App.FastFlags.GetPreset("Rendering.DisableScaling") == "True";
-            set => App.FastFlags.SetPreset("Rendering.DisableScaling", value ? "True" : null);
+            set
+            {
+                App.FastFlags.SetPreset("Rendering.DisableScaling", value ? "True" : null);
+                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
+            }
         }
 
         public IReadOnlyDictionary<TextureQuality, string?> TextureQualities => FastFlagManager.TextureQualityLevels;
@@ -136,6 +154,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     App.FastFlags.SetPreset("Rendering.TextureQuality.OverrideEnabled", "True");
                     App.FastFlags.SetPreset("Rendering.TextureQuality.Level", TextureQualities[value]);
                 }
+                // ★ FIX: simpan seketika agar pilihan bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
             }
         }
 
@@ -153,6 +173,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
                 OnPropertyChanged(nameof(FRMQualityOverride));
                 OnPropertyChanged(nameof(FRMQualityOverrideEnabled));
+                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
             }
         }
 
@@ -164,6 +186,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.FastFlags.SetPreset("Rendering.FRMQualityOverride", value);
 
                 OnPropertyChanged(nameof(FRMQualityOverride));
+                // ★ FIX: simpan seketika agar nilai slider bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
             }
         }
 
@@ -186,6 +210,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 }
 
                 OnPropertyChanged(nameof(MeshQualityEnabled));
+                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
             }
         }
 
@@ -208,6 +234,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.FastFlags.SetPreset("Geometry.MeshLOD.Static", clamped);
                 OnPropertyChanged(nameof(MeshQuality));
                 OnPropertyChanged(nameof(MeshQualityEnabled));
+                // ★ FIX: simpan seketika agar nilai slider bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
             }
         }
 
@@ -250,6 +278,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     App.FastFlags.SetValue("FFlagRenderInventoryEffects", null);
                 }
                 OnPropertyChanged(nameof(DisableRobloxAnimations));
+                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
             }
         }
 
@@ -267,6 +297,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", null);
                 }
                 OnPropertyChanged(nameof(EnableLowMemoryMode));
+                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
+                try { App.FastFlags.Save(); } catch { }
             }
         }
 

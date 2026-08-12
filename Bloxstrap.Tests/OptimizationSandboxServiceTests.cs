@@ -514,4 +514,61 @@ public class OptimizationSandboxServiceTests
         Assert.Equal("🟡 Inconclusive", SandboxTestResult.Inconclusive.ToFriendlyLabel());
         Assert.Equal("⚪ Not Enough Data", SandboxTestResult.InsufficientData.ToFriendlyLabel());
     }
+
+    // ── Device recommendation automation ──────────────────────────────────────────────
+
+    [Fact]
+    public void GetRecommendedFastFlags_Always_Returns_Network_Flags()
+    {
+        var flags = Bloxstrap.Integrations.AutoOptimizeService.GetRecommendedFastFlags();
+
+        // The network set is the safe baseline for every tier.
+        Assert.Equal("50000", flags["FIntRakNetPacketRateLimit"]);
+        Assert.Equal("50000", flags["DFIntMaxReceivePPS"]);
+        Assert.Equal("50000", flags["DFIntMaxSendPPS"]);
+        Assert.Equal("1500", flags["DFIntConnectionMTUSize"]);
+        Assert.Equal("1", flags["DFIntOptimizeSendQueue"]);
+    }
+
+    [Fact]
+    public void GetRecommendedFastFlags_Only_Contains_Valid_Changes()
+    {
+        var flags = Bloxstrap.Integrations.AutoOptimizeService.GetRecommendedFastFlags();
+
+        Assert.NotEmpty(flags);
+
+        foreach (var pair in flags)
+        {
+            var change = new SandboxChange { FlagName = pair.Key, NewValue = pair.Value };
+            Assert.True(SandboxChangeValidator.IsChangeValid(change), $"Invalid recommendation: {pair.Key} = {pair.Value}");
+        }
+    }
+
+    [Fact]
+    public void Recommended_Changes_Can_Be_Upserted_Into_An_Experiment()
+    {
+        using var h = new TestSandboxHarness();
+        var exp = h.CreateExperiment();
+
+        var flags = Bloxstrap.Integrations.AutoOptimizeService.GetRecommendedFastFlags();
+
+        foreach (var pair in flags)
+            h.Service.UpsertChange(exp, new SandboxChange { FlagName = pair.Key, NewValue = pair.Value });
+
+        // Upsert semantics apply: any recommendation that matches the current (empty) state is
+        // treated as a real add, so every recommended flag should be present in the draft.
+        Assert.Equal(flags.Count, exp.Changes.Count);
+    }
+
+    [Fact]
+    public void Recommended_Changes_Produce_A_NonEmpty_Diff()
+    {
+        var flags = Bloxstrap.Integrations.AutoOptimizeService.GetRecommendedFastFlags();
+
+        var diff = ConfigurationDiffService.ComputeDiff(
+            new Dictionary<string, string>(),
+            flags.Select(f => new SandboxChange { FlagName = f.Key, NewValue = f.Value }));
+
+        Assert.Equal(flags.Count, diff.Count(e => e.Type is SandboxDiffType.Added or SandboxDiffType.Changed));
+    }
 }
