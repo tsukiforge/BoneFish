@@ -172,6 +172,12 @@ Enable in **Experimental** page:
 
 ## 📋 Changelog
 
+**v7.1.1** *(2026-08-12)* — Guided experiment flow + full telemetry
+- Clear **5-step experiment flow** (Configure → Snapshot → Apply → Test → Result) with a step indicator that always shows where you are; only valid actions are shown/enabled per state
+- **Add Configuration Change dialog**: search FastFlags, see the current value, preview the change, with validation (duplicate → updated in place, no-op → removed)
+- **Measurements now include 1% Low FPS, RAM, and CPU** (sampled from existing telemetry sources; RAM/CPU work without admin, GPU honestly stays N/A)
+- Honest result classification: Potential Improvement / Similar / Degraded / Not Enough Data
+
 **v7.1.0** *(2026-08-11)* — Optimization Sandbox
 - New **Optimization Sandbox** page: safely experiment with performance FastFlags — every experiment is snapshot-based, fully reversible and verified
 - Full flow: Apply (validate + snapshot + write + verify) → Test with real FPS measurement (ETW telemetry) → Commit to your active profile or Rollback
