@@ -1590,4 +1590,76 @@ Apakah Anda ingin melanjutkan?</value>
   <data name="Menu.Mods.ImportMod.Success" xml:space="preserve">
     <value>Mod berhasil diimport! {0} file ditambahkan/diperbarui.</value>
   </data>
+  <data name="Menu.GameSession.Title" xml:space="preserve">
+    <value>Game Session Manager</value>
+  </data>
+  <data name="Menu.GameSession.Description" xml:space="preserve">
+    <value>Kelola aplikasi background yang disetujui selama Roblox berjalan. Fitur ini independen dari preset FastFlag.</value>
+  </data>
+  <data name="GameSession.SuspendLabel" xml:space="preserve">
+    <value>Suspend saat bermain</value>
+  </data>
+  <data name="GameSession.AutoSelectTitle" xml:space="preserve">
+    <value>Pilih aplikasi aman secara otomatis</value>
+  </data>
+  <data name="GameSession.AutoSelectDescription" xml:space="preserve">
+    <value>Saat aktif, aplikasi baru yang lolos semua pemeriksaan keamanan akan dipilih otomatis. Anda tetap bisa menonaktifkan aplikasi apa pun di bawah; pengecualian tersebut akan diingat.</value>
+  </data>
+  <data name="GameSession.AutoCandidateCount" xml:space="preserve">
+    <value>{0} kandidat aplikasi aman terdeteksi</value>
+  </data>
+  <data name="GameSession.ScanNow" xml:space="preserve">
+    <value>Scan Sekarang</value>
+  </data>
+  <data name="GameSession.RulesTitle" xml:space="preserve">
+    <value>Aturan Game Session</value>
+  </data>
+  <data name="GameSession.NoAppsDetected" xml:space="preserve">
+    <value>Tidak ada aplikasi yang terdeteksi.</value>
+  </data>
+  <data name="GameSession.RiskNotice" xml:space="preserve">
+    <value>Peringatan keamanan: suspend proses dapat terlihat mencurigakan bagi antivirus atau EDR. BoneFish hanya menyentuh aplikasi yang Anda setujui dan tidak pernah men-suspend proses Windows, keamanan, BoneFish, atau Roblox.</value>
+  </data>
+  <data name="GameSession.DetectorUnavailable" xml:space="preserve">
+    <value>Deteksi keamanan tidak tersedia — mode aman aktif. Tidak ada proses yang belum terverifikasi yang akan di-suspend.</value>
+  </data>
+  <data name="GameSession.DetectorDegraded" xml:space="preserve">
+    <value>Deteksi keamanan tidak lengkap — aplikasi baru tetap dilindungi sampai deteksi pulih.</value>
+  </data>
+  <data name="GameSession.ZeroSuspended" xml:space="preserve">
+    <value>0 proses akan di-suspend selama deteksi keamanan tidak tersedia.</value>
+  </data>
+  <data name="GameSession.ProtectedSkipped" xml:space="preserve">
+    <value>{0} proses yang dilindungi dilewati.</value>
+  </data>
+  <data name="GameSession.SessionActive" xml:space="preserve">
+    <value>Game session aktif — {0} proses disuspend</value>
+  </data>
+  <data name="GameSession.SuspendedAppsHeader" xml:space="preserve">
+    <value>Aplikasi yang disuspend</value>
+  </data>
+  <data name="GameSession.SuspendedLabel" xml:space="preserve">
+    <value>Disuspend</value>
+  </data>
+  <data name="GameSession.PartialSuspended" xml:space="preserve">
+    <value>ter-suspend sebagian ({0} dari {1} thread)</value>
+  </data>
+  <data name="GameSession.LastSessionTitle" xml:space="preserve">
+    <value>Sesi terakhir</value>
+  </data>
+  <data name="GameSession.NoHistory" xml:space="preserve">
+    <value>Belum ada sesi yang selesai.</value>
+  </data>
+  <data name="GameSession.RestoredAll" xml:space="preserve">
+    <value>{0} aplikasi berhasil dipulihkan: {1}</value>
+  </data>
+  <data name="GameSession.RestoredPartial" xml:space="preserve">
+    <value>{0} dari {1} aplikasi berhasil dipulihkan. {2}</value>
+  </data>
+  <data name="GameSession.RestoredFailedEntry" xml:space="preserve">
+    <value>{0} tidak ditemukan (mungkin sudah ditutup manual).</value>
+  </data>
+  <data name="GameSession.RestoredFailedGeneric" xml:space="preserve">
+    <value>{0} gagal dipulihkan: {1}</value>
+  </data>
 </root>

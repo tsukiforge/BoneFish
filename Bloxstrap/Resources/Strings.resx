@@ -1919,4 +1919,76 @@ Do you want to continue?</value>
   <data name="Menu.Mods.ImportMod.Success" xml:space="preserve">
     <value>Mod imported successfully! {0} files were added/updated.</value>
   </data>
+  <data name="Menu.GameSession.Title" xml:space="preserve">
+    <value>Game Session Manager</value>
+  </data>
+  <data name="Menu.GameSession.Description" xml:space="preserve">
+    <value>Manage approved background applications while Roblox is running. This feature is independent of FastFlag presets.</value>
+  </data>
+  <data name="GameSession.SuspendLabel" xml:space="preserve">
+    <value>Suspend during game</value>
+  </data>
+  <data name="GameSession.AutoSelectTitle" xml:space="preserve">
+    <value>Automatically select safe applications</value>
+  </data>
+  <data name="GameSession.AutoSelectDescription" xml:space="preserve">
+    <value>When enabled, newly detected applications that pass all safety checks are selected automatically. You can turn off any application below; that exception is remembered.</value>
+  </data>
+  <data name="GameSession.AutoCandidateCount" xml:space="preserve">
+    <value>{0} safe application candidates detected</value>
+  </data>
+  <data name="GameSession.ScanNow" xml:space="preserve">
+    <value>Scan Now</value>
+  </data>
+  <data name="GameSession.RulesTitle" xml:space="preserve">
+    <value>Game Session Rules</value>
+  </data>
+  <data name="GameSession.NoAppsDetected" xml:space="preserve">
+    <value>No applications detected.</value>
+  </data>
+  <data name="GameSession.RiskNotice" xml:space="preserve">
+    <value>Security notice: suspending processes can look suspicious to antivirus or EDR software. BoneFish only touches applications you approve and never suspends Windows, security, BoneFish, or Roblox processes.</value>
+  </data>
+  <data name="GameSession.DetectorUnavailable" xml:space="preserve">
+    <value>Security detection is unavailable — safe mode is active. No unverified process will be suspended.</value>
+  </data>
+  <data name="GameSession.DetectorDegraded" xml:space="preserve">
+    <value>Security detection is incomplete — new applications will remain protected until detection recovers.</value>
+  </data>
+  <data name="GameSession.ZeroSuspended" xml:space="preserve">
+    <value>0 processes will be suspended while security detection is unavailable.</value>
+  </data>
+  <data name="GameSession.ProtectedSkipped" xml:space="preserve">
+    <value>{0} protected processes were skipped.</value>
+  </data>
+  <data name="GameSession.SessionActive" xml:space="preserve">
+    <value>Game session active — {0} processes suspended</value>
+  </data>
+  <data name="GameSession.SuspendedAppsHeader" xml:space="preserve">
+    <value>Suspended applications</value>
+  </data>
+  <data name="GameSession.SuspendedLabel" xml:space="preserve">
+    <value>Suspended</value>
+  </data>
+  <data name="GameSession.PartialSuspended" xml:space="preserve">
+    <value>partially suspended ({0} of {1} threads)</value>
+  </data>
+  <data name="GameSession.LastSessionTitle" xml:space="preserve">
+    <value>Last session</value>
+  </data>
+  <data name="GameSession.NoHistory" xml:space="preserve">
+    <value>No completed session yet.</value>
+  </data>
+  <data name="GameSession.RestoredAll" xml:space="preserve">
+    <value>{0} applications restored successfully: {1}</value>
+  </data>
+  <data name="GameSession.RestoredPartial" xml:space="preserve">
+    <value>{0} of {1} applications restored successfully. {2}</value>
+  </data>
+  <data name="GameSession.RestoredFailedEntry" xml:space="preserve">
+    <value>{0} was not found (it may have been closed manually).</value>
+  </data>
+  <data name="GameSession.RestoredFailedGeneric" xml:space="preserve">
+    <value>{0} could not be restored: {1}</value>
+  </data>
 </root>
