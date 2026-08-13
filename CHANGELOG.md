@@ -1,5 +1,32 @@
 # BoneFish Changelog
 
+## v7.2.0 - Game Session Manager: Pengganti Optimization Sandbox yang Fail-Safe
+
+Release date: 2026-08-13
+
+### 🗑️ Optimization Sandbox dihapus total
+
+Konsep auto-experiment 5 langkah (Snapshot → Experiment → Classifier → Result →
+Apply) dihapus seluruhnya — tidak pernah dirilis karena alur optimasi otomatis
+yang menyuspend proses nyata berisiko tinggi untuk perangkat pengguna, dan
+hasilnya tidak bisa dipertanggungjawabkan tanpa persetujuan.
+
+### 🎮 Game Session Manager (penggantinya)
+
+- Menyediakan approval per aplikasi untuk proses background selama sesi Roblox.
+- Semua rule baru default tidak aktif; tidak ada auto-suspend tanpa persetujuan user.
+- Windows, Roblox, BoneFish, dan proses security selalu dilindungi di level kode.
+- Detector security yang unavailable/degraded mengaktifkan safe mode dan men-suspend 0 proses.
+- Snapshot session menyimpan PID, path, waktu mulai, thread yang diubah, dan rule.
+- Restore memvalidasi identitas proses, memeriksa thread state, menyimpan ringkasan, dan melaporkan kegagalan dengan nama aplikasi.
+- Sweep suspend memiliki batas keras 5 pass dan timeout 2 detik per proses.
+- Tests: classifier, fail-safe detector, suspend cap, restore verification, service, dan atomic store (18 test, semuanya hijau).
+
+### 🧹 Kebersihan repo & website
+
+- README showcase diperbaiki — gambar yang direferensikan (`showcaseDefault.png`, `showcase2/3/4.png`) tidak pernah ada; kini memakai file screenshot asli di `showcase/`.
+- Screenshot nyasar `Screenshot_TDR_Mitigation_Toggle.png` di root repo dihapus dari git.
+
 ## v7.1.2 - Fix Toggle Hilang Saat Reload + Rekomendasi FastFlag Otomatis
 
 Release date: 2026-08-12
@@ -17,17 +44,6 @@ Akibatnya setelah BoneFish di-restart, toggle tampak mati padahal tadi aktif.
   tetap aman walau gagal tulis.
 - **Jaring pengaman saat window ditutup** — `WpfUiWindow_Closing` kini juga
   menyimpan `App.FastFlags.Save()`, jadi tidak ada perubahan yang hilang lagi.
-
-### Game Session Manager
-
-- Menyediakan approval per aplikasi untuk proses background selama sesi Roblox.
-- Semua rule baru default tidak aktif; tidak ada auto-suspend tanpa persetujuan user.
-- Windows, Roblox, BoneFish, dan proses security selalu dilindungi di level kode.
-- Detector security yang unavailable/degraded mengaktifkan safe mode dan men-suspend 0 proses.
-- Snapshot session menyimpan PID, path, waktu mulai, thread yang diubah, dan rule.
-- Restore memvalidasi identitas proses, memeriksa thread state, menyimpan ringkasan, dan melaporkan kegagalan dengan nama aplikasi.
-- Sweep suspend memiliki batas keras 5 pass dan timeout 2 detik per proses.
-- Tests: classifier, fail-safe detector, suspend cap, restore verification, service, dan atomic store.
 
 ## v7.0.6 - TDR Mitigation Mode: Kurangi Freeze/Layar Putih (iGPU Legacy)
 

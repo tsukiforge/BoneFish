@@ -97,28 +97,28 @@
 <div align="center">
 
 ### Default Interface
-<img src="showcase/showcaseDefault.png" alt="BoneFish Default Interface" width="800"/>
+<img src="showcase/13_final.png" alt="BoneFish Default Interface" width="800"/>
 
 *Clean, modern settings panel with organized navigation*
 
 ---
 
 ### Mods & Customization
-<img src="showcase/showcase2.png" alt="Mods Page" width="800"/>
+<img src="showcase/11_mods_full.png" alt="Mods Page" width="800"/>
 
 *Custom fonts, emojis, cursors, and loading screens*
 
 ---
 
 ### Visual Themes
-<img src="showcase/showcase3.png" alt="Theme Options" width="800"/>
+<img src="showcase/03_appearance_top.png" alt="Theme Options" width="800"/>
 
 *Multiple appearance options and bootstrapper styles*
 
 ---
 
 ### Experimental Features
-<img src="showcase/showcase4.png" alt="Experimental Page" width="800"/>
+<img src="showcase/05_fastflags_top.png" alt="Experimental Page" width="800"/>
 
 *Advanced features: Wallpaper Launcher, FPS Monitor, Notifications*
 
