@@ -50,6 +50,10 @@ namespace Bloxstrap.Models.Persistable
         public bool ShowServerDetails { get; set; } = false;
         public ObservableCollection<CustomIntegration> CustomIntegrations { get; set; } = new();
 
+        // Game Session Manager rules. New applications are persisted disabled.
+        public ObservableCollection<GameSessionRule> GameSessionRules { get; set; } = new();
+        public bool GameSessionAutoSelectSafeApps { get; set; } = false;
+
         // mod preset configuration
         public bool UseDisableAppPatch { get; set; } = false;
 

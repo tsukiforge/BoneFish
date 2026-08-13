@@ -18,144 +18,16 @@ Akibatnya setelah BoneFish di-restart, toggle tampak mati padahal tadi aktif.
 - **Jaring pengaman saat window ditutup** — `WpfUiWindow_Closing` kini juga
   menyimpan `App.FastFlags.Save()`, jadi tidak ada perubahan yang hilang lagi.
 
-### 🤖 Rekomendasi FastFlag otomatis dari spesifikasi perangkat
+### Game Session Manager
 
-Fitur automation baru di **Optimization Sandbox**: BoneFish membaca perangkat
-kamu (tier hardware asli, HDD/SSD, jumlah core, target FPS) lalu menyarankan
-FastFlag yang cocok — tanpa menerapkan apa pun tanpa persetujuanmu.
-
-- **Tombol "Recommend from Device"** di samping *Add change* — satu klik untuk
-  membuka dialog review rekomendasi.
-- **Dialog review dengan checkbox** — setiap rekomendasi menampilkan nama flag,
-  nilai saat ini → nilai baru, dan alasan singkat; pilih/deselect bebas, ada
-  penghitung pilihan, dan pilihan kosong ditolak dengan pesan jelas.
-- **Nilai selaras dengan preset yang sudah ada** — rekomendasi untuk tier
-  UltraLow/LowEnd/Extreme/Balanced memakai nilai yang sama dengan preset
-  applier (LOD 250, FRM, MSAA, FPS cap, network) — tidak ada sumber nilai kedua.
-- **Murni baca, tanpa efek samping** — `GetRecommendedFastFlags()` tidak
-  menulis apa pun; flag yang dipilih masuk eksperimen lewat jalur upsert yang
-  sama dengan dialog Add Change.
-- **4 unit test baru** — network baseline untuk semua tier, validitas semua
-  rekomendasi, upsert end-to-end, dan diff non-empty (total 107 tes).
-
-## v7.1.1 - Optimization Sandbox: Alur Eksperimen yang Jelas + Telemetri Lengkap
-
-Release date: 2026-08-12
-
-### 🧭 Alur eksperimen 5 langkah yang jelas
-
-Halaman Optimization Sandbox dirombak dari editor konfigurasi yang membingungkan
-menjadi **laboratorium optimasi yang aman dan terpandu** — alur
-**Configure → Snapshot → Apply → Test → Result** sekarang terlihat eksplisit:
-
-- **Indikator langkah** di bagian atas halaman (`✓ Configure → ○ Snapshot → …`)
-  — langkah aktif selalu jelas, langkah selesai dicentang, dan status terminal
-  (Committed/Rolled Back) menampilkan seluruh perjalanan sebagai selesai.
-- **Tombol aksi kontekstual** — hanya aksi yang valid untuk state saat ini yang
-  tampil (mis. tombol *Apply* baru muncul setelah backup dibuat), aksi tidak valid
-  dinonaktifkan, bukan disembunyikan diam-diam.
-- **Base Profile** kini dijelaskan: titik awal eksperimen, bukan optimasi yang
-  langsung diterapkan — profil tersimpan tidak berubah sampai eksperimen di-commit.
-- **Diff perubahan yang manusiawi** — tabel `Flag | Current → New` sebagai area
-  review pusat, dengan keterangan "Only these values will be changed".
-
-### ➕ Dialog "Add Configuration Change"
-
-Tombol *+ Add Change* kini membuka dialog khusus:
-
-- Pencarian FastFlag (reuse basis data flag yang sudah ada, tidak ada basis data
-  kedua).
-- Nilai saat ini terdeteksi/dibaca (read-only) + pratinjau perubahan sebelum
-  ditambahkan.
-- **Validasi**: nama flag valid, nilai valid, duplikat di-*upsert* (bukan baris
-  ganda), dan perubahan yang menghasilkan no-op (`false → false`) otomatis
-  dihapus dari diff.
-- Eksperimen tanpa perubahan sama sekali tidak bisa di-apply/snapshot.
-
-### 📊 Telemetri pengukuran: 1% Low, RAM, CPU
-
-Bagian Measurements kini menampilkan lebih dari sekadar FPS rata-rata, semua
-berasal dari sumber telemetri yang **sudah ada** (tanpa sistem duplikat):
-
-- **1% Low FPS** diturunkan dari sampel FPS yang sama dengan median (gaya
-  PresentMon) — tidak ada sumber FPS kedua.
-- **RAM** (WorkingSet64) dan **CPU%** (delta TotalProcessorTime ternormalisasi
-  wall-clock & core) disampling di loop per-detik yang sama — **tetap berfungsi
-  tanpa hak admin** (hanya FPS yang butuh ETW).
-- **GPU jujur "N/A"** — BoneFish tidak punya sumber telemetri GPU; tidak ada
-  pengukuran yang diarang.
-- Nilai yang benar-benar terukur (termasuk 0%) ditampilkan apa adanya — tidak
-  pernah diganti "N/A" palsu.
-
-### 🎯 Klasifikasi hasil yang jujur
-
-Hasil eksperimen diklasifikasikan dengan ambang batas nyata, bukan asumsi:
-🟢 Potential Improvement / 🟡 Similar / 🔴 Degraded / ⚪ Not Enough Data —
-keputusan akhir (Commit/Rollback) tetap di tangan user.
-
-### 🛡️ Perbaikan & pemeliharaan
-
-- **Recovery crash** dipertahankan: eksperimen yang belum selesai terdeteksi
-  saat start dengan opsi Restore / Review / Ignore.
-- Perbaikan runtime XAML: `InfoBarSeverity` yang tidak valid di halaman Sandbox
-  (menyebabkan parse error saat membuka halaman) diganti `Error`.
-
-### Pengujian
-
-- **103 test lulus** (xUnit) — bertambah 13 tes baru: persentil FPS, normalisasi
-  CPU (termasuk penjagaan bagi-nol), round-trip JSON, kompatibilitas journal
-  lama, dan pembeda "terukur-nol vs tidak terukur".
-- Build: 0 warning, 0 error.
-
-## v7.1.0 - Optimization Sandbox: Eksperimen FastFlag yang Aman & Reversibel
-
-Release date: 2026-08-11
-
-### Fitur baru - Optimization Sandbox (halaman Settings baru)
-
-Halaman **Optimization Sandbox** memungkinkan kamu menguji perubahan FastFlag
-kinerja secara **terisolasi dan 100% reversibel** sebelum menguncinya ke profil
-aktif:
-
-- **Snapshot sebelum menerapkan** - setiap eksperimen memotret nilai flag yang
-  disentuh + hash konten file konfigurasi. Rollback mengembalikan nilai persis
-  seperti sebelum eksperimen, lalu **memverifikasi** hasilnya sebelum mengklaim
-  sukses.
-- **Alur lengkap**: Apply (validasi + snapshot + tulis + verifikasi) → Test →
-  Commit (integrasi ke profil aktif) atau Rollback (kembali ke keadaan awal).
-- **Pengukuran FPS nyata** - sampling median FPS via telemetri ETW (sumber yang
-  sama dengan FPS Monitor). Perubahan FPS di bawah ambang 5% dianggap *Similar*
-  (kinerja berisik), bukan hasil yang mengada-ada. Tanpa hak admin ETW atau data
-  cukup → jujur dilaporkan *Insufficient data*.
-- **Keamanan bawaan**:
-  - Jika Roblox berjalan, eksperimen butuh konfirmasi eksplisit (BoneFish tidak
-    pernah menutup Roblox).
-  - Nama flag divalidasi ketat (mencegah path traversal); nilai hanya primitif
-    (bool/int/desimal/string polos).
-  - Kegagalan tulis/verifikasi saat apply → **rollback otomatis seketika**, tidak
-    ada perubahan parsial yang tertinggal.
-  - File snapshot & journal ditulis atomik - crash/power loss tidak pernah
-    merusak data.
-- **Recovery crash**: jika BoneFish berhenti di tengah eksperimen (crash,
-  restart, mati listrik), pada start berikutnya muncul prompt: Restore
-  konfigurasi sebelumnya / Lanjutkan eksperimen / Abaikan.
-- **Riwayat eksperimen** - setiap eksperimen tercatat dengan status, snapshot,
-  hasil pengukuran dan error.
-
-### Pengujian
-
-- Proyek test baru `Bloxstrap.Tests` (xUnit) ditambahkan ke solution: **73 test
-  lulus** mencakup state machine, snapshot/integritas, diff & validasi,
-  auto-rollback, recovery, dan klasifikasi hasil.
-- Build: 0 warning, 0 error (Debug & Release).
-
-### Catatan
-
-- Pengukuran FPS butuh Roblox berjalan; baseline diukur dengan mengembalikan
-  konfigurasi lama sementara, lalu eksperimen di-apply ulang otomatis.
-- Halaman ini tidak menggantikan preset - eksperimen yang dikomit menjadi
-  permanen dan melindungi nilai-nilainya dari overwrite preset (guard preset
-  manual).
+- Menyediakan approval per aplikasi untuk proses background selama sesi Roblox.
+- Semua rule baru default tidak aktif; tidak ada auto-suspend tanpa persetujuan user.
+- Windows, Roblox, BoneFish, dan proses security selalu dilindungi di level kode.
+- Detector security yang unavailable/degraded mengaktifkan safe mode dan men-suspend 0 proses.
+- Snapshot session menyimpan PID, path, waktu mulai, thread yang diubah, dan rule.
+- Restore memvalidasi identitas proses, memeriksa thread state, menyimpan ringkasan, dan melaporkan kegagalan dengan nama aplikasi.
+- Sweep suspend memiliki batas keras 5 pass dan timeout 2 detik per proses.
+- Tests: classifier, fail-safe detector, suspend cap, restore verification, service, dan atomic store.
 
 ## v7.0.6 - TDR Mitigation Mode: Kurangi Freeze/Layar Putih (iGPU Legacy)
 
@@ -528,7 +400,7 @@ Semua link `faizinuha/BoneFish` → **BoneFishStudio/BoneFish** di README.md dan
 
 #### 🌐 Website Link
 
-Tombol "Visit Website" → [https://bonefishstudioo.vercel.app](https://bonefishstudioo.vercel.app) di header README.
+Tombol "Visit Website" → [https://bonefishstudio.vercel.app](https://bonefishstudio.vercel.app) di header README.
 
 #### ✨ Key Features — Sinkron dengan Kode Terkini
 

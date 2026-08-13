@@ -5145,5 +5145,149 @@ namespace Bloxstrap.Resources {
                 return ResourceManager.GetString("Menu.Mods.ImportMod.Success", resourceCulture);
             }
         }
+
+        public static string Menu_GameSession_Title {
+            get {
+                return ResourceManager.GetString("Menu.GameSession.Title", resourceCulture);
+            }
+        }
+
+        public static string Menu_GameSession_Description {
+            get {
+                return ResourceManager.GetString("Menu.GameSession.Description", resourceCulture);
+            }
+        }
+
+        public static string GameSession_SuspendLabel {
+            get {
+                return ResourceManager.GetString("GameSession.SuspendLabel", resourceCulture);
+            }
+        }
+
+        public static string GameSession_AutoSelectTitle {
+            get {
+                return ResourceManager.GetString("GameSession.AutoSelectTitle", resourceCulture);
+            }
+        }
+
+        public static string GameSession_AutoSelectDescription {
+            get {
+                return ResourceManager.GetString("GameSession.AutoSelectDescription", resourceCulture);
+            }
+        }
+
+        public static string GameSession_AutoCandidateCount {
+            get {
+                return ResourceManager.GetString("GameSession.AutoCandidateCount", resourceCulture);
+            }
+        }
+
+        public static string GameSession_ScanNow {
+            get {
+                return ResourceManager.GetString("GameSession.ScanNow", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RulesTitle {
+            get {
+                return ResourceManager.GetString("GameSession.RulesTitle", resourceCulture);
+            }
+        }
+
+        public static string GameSession_NoAppsDetected {
+            get {
+                return ResourceManager.GetString("GameSession.NoAppsDetected", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RiskNotice {
+            get {
+                return ResourceManager.GetString("GameSession.RiskNotice", resourceCulture);
+            }
+        }
+
+        public static string GameSession_DetectorUnavailable {
+            get {
+                return ResourceManager.GetString("GameSession.DetectorUnavailable", resourceCulture);
+            }
+        }
+
+        public static string GameSession_DetectorDegraded {
+            get {
+                return ResourceManager.GetString("GameSession.DetectorDegraded", resourceCulture);
+            }
+        }
+
+        public static string GameSession_ZeroSuspended {
+            get {
+                return ResourceManager.GetString("GameSession.ZeroSuspended", resourceCulture);
+            }
+        }
+
+        public static string GameSession_ProtectedSkipped {
+            get {
+                return ResourceManager.GetString("GameSession.ProtectedSkipped", resourceCulture);
+            }
+        }
+
+        public static string GameSession_SessionActive {
+            get {
+                return ResourceManager.GetString("GameSession.SessionActive", resourceCulture);
+            }
+        }
+
+        public static string GameSession_SuspendedAppsHeader {
+            get {
+                return ResourceManager.GetString("GameSession.SuspendedAppsHeader", resourceCulture);
+            }
+        }
+
+        public static string GameSession_SuspendedLabel {
+            get {
+                return ResourceManager.GetString("GameSession.SuspendedLabel", resourceCulture);
+            }
+        }
+
+        public static string GameSession_PartialSuspended {
+            get {
+                return ResourceManager.GetString("GameSession.PartialSuspended", resourceCulture);
+            }
+        }
+
+        public static string GameSession_LastSessionTitle {
+            get {
+                return ResourceManager.GetString("GameSession.LastSessionTitle", resourceCulture);
+            }
+        }
+
+        public static string GameSession_NoHistory {
+            get {
+                return ResourceManager.GetString("GameSession.NoHistory", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoredAll {
+            get {
+                return ResourceManager.GetString("GameSession.RestoredAll", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoredPartial {
+            get {
+                return ResourceManager.GetString("GameSession.RestoredPartial", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoredFailedEntry {
+            get {
+                return ResourceManager.GetString("GameSession.RestoredFailedEntry", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoredFailedGeneric {
+            get {
+                return ResourceManager.GetString("GameSession.RestoredFailedGeneric", resourceCulture);
+            }
+        }
     }
 }

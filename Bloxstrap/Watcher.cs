@@ -470,6 +470,24 @@ namespace Bloxstrap
                     await Task.Delay(1000);
             }
 
+            // Restore immediately after Roblox exits. This must happen before the optional
+            // system-tray wait, otherwise background apps would remain suspended while the
+            // user is deciding whether to close BoneFish.
+            try
+            {
+                if (App.GameSession.Store.ReadActive() is { } session
+                    && (session.GameProcessId == 0 || session.GameProcessId == _watcherData.ProcessId))
+                {
+                    var summary = App.GameSession.EndSession(_watcherData.ProcessId);
+                    if (summary.TotalSuspended > 0)
+                        _notifyIcon?.ShowAlert("BoneFish", App.GameSession.FormatSummary(summary), 10, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Game Session restore failed (non-fatal): {ex.Message}");
+            }
+
             // ── Auto-Reconnect: Deteksi Crash ────────────────────────────────────
             bool isCrash = couldReadExitCode && IsCrashExit(exitCode);
             bool longEnoughSession = (DateTime.UtcNow - sessionStart).TotalMinutes > 2;

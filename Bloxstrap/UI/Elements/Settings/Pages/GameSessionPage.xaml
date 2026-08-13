@@ -1,0 +1,131 @@
+<ui:UiPage x:Class="Bloxstrap.UI.Elements.Settings.Pages.GameSessionPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:resources="clr-namespace:Bloxstrap.Resources"
+      xmlns:dmodels="clr-namespace:Bloxstrap.UI.ViewModels.Settings"
+      mc:Ignorable="d"
+      d:DataContext="{d:DesignInstance dmodels:GameSessionViewModel, IsDesignTimeCreatable=True}"
+      d:DesignHeight="800" d:DesignWidth="800"
+      Title="GameSessionPage"
+      Scrollable="False"
+      PreviewMouseWheel="Page_PreviewMouseWheel"
+      TextElement.FontFamily="{StaticResource JetBrainsMonoRegular}">
+    <ui:UiPage.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </ui:UiPage.Resources>
+
+    <ScrollViewer x:Name="PageScrollViewer"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  CanContentScroll="False"
+                  PanningMode="VerticalOnly"
+                  Focusable="True">
+      <StackPanel Margin="0,0,14,14">
+        <TextBlock Text="{x:Static resources:Strings.Menu_GameSession_Description}"
+                   TextWrapping="Wrap" FontSize="14"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+        <Border Margin="0,10,0,0" Padding="10" CornerRadius="4"
+                BorderThickness="1" BorderBrush="#41F2290A" Background="#F2290A">
+            <TextBlock Text="{x:Static resources:Strings.GameSession_RiskNotice}"
+                       TextWrapping="Wrap" Foreground="White" />
+        </Border>
+
+        <ui:InfoBar Margin="0,10,0,0" IsOpen="{Binding HasDetectorNotice}"
+                    Severity="Warning" IsClosable="False"
+                    Message="{Binding DetectorNotice}" />
+        <TextBlock Margin="0,5,0,0" Text="{Binding SuspensionStatus}" TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+        <ui:Card Margin="0,12,0,0" Padding="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="{x:Static resources:Strings.GameSession_AutoSelectTitle}" FontSize="14" FontWeight="Medium" />
+                    <TextBlock Margin="0,3,0,0" Text="{x:Static resources:Strings.GameSession_AutoSelectDescription}"
+                               TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                    <TextBlock Margin="0,4,0,0" Text="{Binding AutomaticCandidateCount, StringFormat={x:Static resources:Strings.GameSession_AutoCandidateCount}}"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
+                                 IsChecked="{Binding AutoSelectSafeApps, Mode=TwoWay}" />
+            </Grid>
+        </ui:Card>
+
+        <Grid Margin="0,16,0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{x:Static resources:Strings.GameSession_RulesTitle}" FontSize="20" FontWeight="Medium" />
+            <ui:Button Grid.Column="1" Content="{x:Static resources:Strings.GameSession_ScanNow}"
+                       Icon="ArrowSync20" Command="{Binding ScanCommand}" />
+        </Grid>
+
+        <ItemsControl ItemsSource="{Binding Applications}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <ui:Card Margin="0,4,0,0" Padding="10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}" FontWeight="Medium" />
+                                <TextBlock Text="{Binding Path}" FontSize="11" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="1" VerticalAlignment="Center"
+                                      Content="{x:Static resources:Strings.GameSession_SuspendLabel}"
+                                      IsChecked="{Binding SuspendDuringGame, Mode=TwoWay}" />
+                        </Grid>
+                    </ui:Card>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Margin="0,14,0,0" Text="{x:Static resources:Strings.GameSession_NoAppsDetected}"
+                   Visibility="{Binding HasNoApplications, Converter={StaticResource BooleanToVisibilityConverter}}"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+        <ui:Card Margin="0,16,0,0" Padding="12"
+                 Visibility="{Binding HasActiveSession, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+                <TextBlock Text="{Binding ActiveSessionText}" FontSize="16" FontWeight="Medium" />
+                <Expander Margin="0,8,0,0" Header="{x:Static resources:Strings.GameSession_SuspendedAppsHeader}">
+                    <ItemsControl ItemsSource="{Binding ActiveSuspendedApplications}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,3,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Status}"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Expander>
+            </StackPanel>
+        </ui:Card>
+
+        <ui:Card Margin="0,10,0,0" Padding="12">
+            <StackPanel>
+                <TextBlock Text="{x:Static resources:Strings.GameSession_LastSessionTitle}" FontSize="16" FontWeight="Medium" />
+                <TextBlock Margin="0,5,0,0" Text="{Binding LastSessionText}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </ui:Card>
+      </StackPanel>
+    </ScrollViewer>
+</ui:UiPage>
