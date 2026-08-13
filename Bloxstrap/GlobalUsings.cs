@@ -14,6 +14,7 @@ global using System.Threading;
 global using System.Threading.Tasks;
 
 global using Bloxstrap.Enums;
+global using Bloxstrap.GameSession.Models;
 global using Bloxstrap.Exceptions;
 global using Bloxstrap.Extensions;
 global using Bloxstrap.Models;

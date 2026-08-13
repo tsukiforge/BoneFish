@@ -68,17 +68,7 @@ namespace Bloxstrap
 
         public static readonly CookiesManager Cookies = new();
 
-        /// <summary>
-        /// Optimization Sandbox — isolated, reversible FastFlag experiments.
-        /// Wraps the existing FastFlagManager; see Bloxstrap.Sandbox.OptimizationSandboxService.
-        /// </summary>
-        public static readonly Bloxstrap.Sandbox.OptimizationSandboxService Sandbox = new(
-            new Bloxstrap.Sandbox.AppFastFlagStore(),
-            presetWriter: presetName =>
-            {
-                App.Settings.Prop.SelectedPerformancePreset = presetName;
-                try { App.Settings.Save(); } catch { }
-            });
+        public static readonly GameSession.GameSessionService GameSession = new();
 
         public static readonly HttpClient HttpClient = new(
             new HttpClientLoggingHandler(
@@ -401,19 +391,19 @@ namespace Bloxstrap
                 FastFlags.Load();
                 GlobalSettings.Load();
 
-                // Optimization Sandbox: detect experiments that did not finish correctly
-                // (crash, restart, power loss) and offer recovery once the UI is idle.
-                Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+                try
                 {
-                    try
+                    if (App.GameSession.Store.ReadActive() is { } stale
+                        && App.GameSession.ShouldRestoreStale(stale))
                     {
-                        Bloxstrap.Sandbox.ExperimentRecoveryService.PromptIfNeeded();
+                        Logger.WriteLine(LOG_IDENT, "Recovering a stale Game Session before continuing startup.");
+                        App.GameSession.EndSession();
                     }
-                    catch (Exception ex)
-                    {
-                        Logger.WriteLine("App::OnStartup", $"Sandbox recovery check failed (non-fatal): {ex.Message}");
-                    }
-                }));
+                }
+                catch (Exception ex)
+                {
+                    Logger.WriteLine(LOG_IDENT, $"Game Session stale recovery failed (non-fatal): {ex.Message}");
+                }
 
                 if (Settings.Prop.AllowCookieAccess)
                     Task.Run(Cookies.LoadCookies);
@@ -500,6 +490,19 @@ namespace Bloxstrap
         /// </summary>
         private static void CleanupServices()
         {
+            try
+            {
+                if (App.GameSession.ActiveSession is { HandedOffToWatcher: false })
+                {
+                    Logger.WriteLine("App::CleanupServices", "Restoring Game Session before process exit");
+                    App.GameSession.EndSession();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteLine("App::CleanupServices", $"Game Session cleanup: {ex.Message}");
+            }
+
             try
             {
                 if (CrosshairService.Instance != null)
