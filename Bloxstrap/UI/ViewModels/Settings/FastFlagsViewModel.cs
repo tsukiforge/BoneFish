@@ -262,42 +262,36 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public bool DisableRobloxAnimations
         {
-            get => App.FastFlags.GetValue("FFlagRenderUIAnimations") == "False";
+            get => App.Settings.Prop.DisableRobloxAnimations;
             set
             {
+                App.Settings.Prop.DisableRobloxAnimations = value;
                 if (value)
-                {
-                    App.FastFlags.SetValue("FFlagRenderUIAnimations", "False");
-                    App.FastFlags.SetValue("FFlagRenderMenuTransitions", "False");
-                    App.FastFlags.SetValue("FFlagRenderInventoryEffects", "False");
-                }
+                    Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
                 else
-                {
-                    App.FastFlags.SetValue("FFlagRenderUIAnimations", null);
-                    App.FastFlags.SetValue("FFlagRenderMenuTransitions", null);
-                    App.FastFlags.SetValue("FFlagRenderInventoryEffects", null);
-                }
+                    Integrations.AutoOptimizeService.RemoveDisableRobloxAnimations();
                 OnPropertyChanged(nameof(DisableRobloxAnimations));
-                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
+                // ★ FIX: simpan seketika — state toggle disimpan TERPISAH di Settings
+                // (bukan cuma dibaca dari FastFlags) supaya survive PurgeAllKnownFlags
+                // yang jalan setiap Play. FastFlags tetap ditulis untuk efek langsung.
+                try { App.Settings.Save(); } catch { }
                 try { App.FastFlags.Save(); } catch { }
             }
         }
 
         public bool EnableLowMemoryMode
         {
-            get => App.FastFlags.GetValue("FFlagLuaAppEnableLowMemoryMode") == "True";
+            get => App.Settings.Prop.EnableLowMemoryMode;
             set
             {
+                App.Settings.Prop.EnableLowMemoryMode = value;
                 if (value)
-                {
-                    App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", "True");
-                }
+                    Integrations.AutoOptimizeService.ApplyLowMemoryMode();
                 else
-                {
-                    App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", null);
-                }
+                    Integrations.AutoOptimizeService.RemoveLowMemoryMode();
                 OnPropertyChanged(nameof(EnableLowMemoryMode));
-                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
+                // ★ FIX: simpan seketika — state toggle disimpan TERPISAH di Settings.
+                try { App.Settings.Save(); } catch { }
                 try { App.FastFlags.Save(); } catch { }
             }
         }
@@ -457,12 +451,21 @@ namespace Bloxstrap.UI.ViewModels.Settings
             MeshQuality = 0;
             FRMQualityOverrideEnabled = true;
             FRMQualityOverride = 21;
-            DisableRobloxAnimations = true;
-            EnableLowMemoryMode = true;
+            // Manual flags ditulis langsung (bukan via toggle property) supaya preset
+            // TIDAK membalik state manual user di Settings — flag manual & preset
+            // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
+            Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             SelectedPreset = "AutoOptimize";
             try { App.FastFlags.Save(); } catch { }
@@ -515,8 +518,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             MeshQuality = 0;
             FRMQualityOverrideEnabled = true;
             FRMQualityOverride = 21;
-            DisableRobloxAnimations = true;
-            EnableLowMemoryMode = true;
+            // Manual flags ditulis langsung (bukan via toggle property) supaya preset
+            // TIDAK membalik state manual user di Settings — flag manual & preset
+            // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
+            Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // ── Network ────────────────────────────────────────────────────────────────
             Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
@@ -524,6 +530,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // ── Fast Loading: re-apply jika toggle aktif (stack dengan preset) ─────────
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
+
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // ── Stability-specific ──────────────────────────────────────────────────
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
@@ -584,8 +596,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
             App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
 
-            DisableRobloxAnimations = true;
-            EnableLowMemoryMode = true;
+            // Manual flags ditulis langsung (bukan via toggle property) supaya preset
+            // TIDAK membalik state manual user di Settings — flag manual & preset
+            // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
+            Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // Network flags langsung — panggil method reusable
             Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
@@ -599,6 +614,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
@@ -667,6 +688,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             SelectedPreset = "Balanced";
             try { App.FastFlags.Save(); } catch { }
@@ -836,8 +863,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // Extreme dipilih, menyebabkan preset lain (Balanced, UltraLow, Stable)
             // tetap kena override Extreme saat Roblox di-launch ulang — lihat
             // AutoOptimizeService.DetectSystemTier() yang cek ForceExtremeMode duluan.
-            DisableRobloxAnimations = true;
-            EnableLowMemoryMode = true;
+            // Manual flags ditulis langsung (bukan via toggle property) supaya preset
+            // TIDAK membalik state manual user di Settings — flag manual & preset
+            // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
+            Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            Integrations.AutoOptimizeService.ApplyLowMemoryMode();
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
 
@@ -853,6 +883,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
             // Agar value "ExtremePerformance" tertulis ke disk. Lihat komentar di ApplyUltraLowSpecPreset.

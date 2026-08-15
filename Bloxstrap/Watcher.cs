@@ -1,4 +1,6 @@
 using Bloxstrap.AppData;
+using Bloxstrap.GameSession;
+using Bloxstrap.GameSession.Models;
 using Bloxstrap.Integrations;
 using System.Web;
 using System.Windows;
@@ -345,6 +347,56 @@ namespace Bloxstrap
         public void KillRobloxProcess() => CloseProcess(_watcherData!.ProcessId, true);
 
         /// <summary>
+        /// Escape hatch manual dari system tray / halaman settings: pulihkan semua
+        /// proses yang sedang disuspend SEKARANG, tanpa menunggu proses Roblox mati.
+        ///
+        /// Dua jalur, keduanya dijalankan:
+        /// 1. Record sesi aktif (active.json) — EndSession normal.
+        /// 2. Rescue scan — kalau ada proses beku yang TIDAK tercatat (record hilang,
+        ///    restore lama "berhasil" tapi thread tertinggal), cari via probe
+        ///    per-thread di seluruh sistem dan resume.
+        /// </summary>
+        public void RestoreGameSessionNow()
+        {
+            const string LOG_IDENT = "Watcher::RestoreGameSessionNow";
+
+            try
+            {
+                SessionSummary? summary = null;
+                if (App.GameSession.Store.ReadActive() is { } session)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Manually restoring session (suspended={session.SuspendedProcesses.Count})");
+                    summary = App.GameSession.EndSession();
+                }
+
+                IReadOnlyList<RescuedProcess> rescued = App.GameSession.RescueSuspendedProcesses();
+                if (rescued.Count > 0)
+                {
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Rescue scan: {rescued.Count} proses beku di-resume: " +
+                        String.Join(", ", rescued.Select(process => $"{process.ProcessName}({process.ProcessId}) x{process.ThreadCount}")));
+                }
+
+                string? message = null;
+                if (summary is { TotalSuspended: > 0 })
+                    message = App.GameSession.FormatSummary(summary);
+
+                if (rescued.Count > 0)
+                {
+                    string rescueMessage = String.Format(Strings.GameSession_RestoreNow_Rescued, rescued.Count);
+                    message = message is null ? rescueMessage : $"{message}\n{rescueMessage}";
+                }
+
+                _notifyIcon?.ShowAlert("BoneFish", message ?? Strings.GameSession_RestoreNow_None, 10, null);
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Manual restore failed: {ex.Message}");
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+        }
+
+        /// <summary>
         /// Sambung ulang ke game Roblox terakhir menggunakan PlaceId + JobId yang tersimpan.
         /// Kalau JobId sudah tidak valid (server penuh/tutup), fallback ke PlaceId saja
         /// (server mana pun yang tersedia) — Bootstrapper akan menangani ini secara otomatis.
@@ -431,6 +483,22 @@ namespace Bloxstrap
 
             if (!_lock.IsAcquired || _watcherData is null)
                 return;
+
+            // ── Deteksi keluar/masuk game (bukan cuma proses mati) ────────────────
+            // RobloxPlayerBeta bisa tetap hidup di system tray setelah user keluar
+            // dari game — menunggu proses mati saja tidak cukup (app yang disuspend
+            // akan beku selamanya). Log aktivitas Roblox memberi sinyal yang lebih
+            // cepat dan akurat:
+            //   - OnGameLeave  → user keluar game  → restore SEKARANG (fallback
+            //     proses-mati tetap ada di bawah untuk crash/force-close).
+            //   - OnGameJoin   → user masuk game baru dalam proses yang sama →
+            //     suspend ulang agar proteksi tetap aktif di sesi berikutnya.
+            if (ActivityWatcher is not null)
+            {
+                ActivityWatcher.OnGameLeave += OnGameLeaveHandler;
+                ActivityWatcher.OnGameJoin += OnGameJoinHandler;
+                App.Logger.WriteLine(LOG_IDENT, "Game Session tied to game leave/join events (restore saat keluar game, re-suspend saat masuk)");
+            }
 
             ActivityWatcher?.Start();
             WindowManipulation?.ApplyWindowModifications();
@@ -652,6 +720,68 @@ namespace Bloxstrap
             catch (Exception ex)
             {
                 App.Logger.WriteLine(LOG_IDENT, $"Gagal menulis diagnostik stall: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Dipanggil saat user KELUAR dari game (log "Time to disconnect replication
+        /// data"), meskipun proses Roblox masih hidup di system tray. Restore segera —
+        /// inilah yang menjawab bug "Roblox di tray tapi aplikasi tetap beku".
+        /// Idempotent: kalau session sudah di-end (store kosong), jadi no-op.
+        /// </summary>
+        private void OnGameLeaveHandler(object? sender, EventArgs e)
+        {
+            const string LOG_IDENT = "Watcher::OnGameLeave";
+
+            try
+            {
+                if (App.GameSession.Store.ReadActive() is not { SuspendedProcesses.Count: > 0 } session)
+                    return;
+
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"User keluar dari game (proses Roblox mungkin masih di tray) — restore {session.SuspendedProcesses.Count} proses");
+
+                SessionSummary summary = App.GameSession.EndSession(_watcherData!.ProcessId);
+                if (summary.TotalSuspended > 0)
+                    _notifyIcon?.ShowAlert("BoneFish", App.GameSession.FormatSummary(summary), 10, null);
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Restore on game leave failed (non-fatal): {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Dipanggil saat user MASUK game baru dalam proses Roblox yang sama
+        /// (sesi sebelumnya sudah di-end saat leave). Suspend ulang supaya
+        /// proteksi tetap jalan untuk sesi berikutnya.
+        /// </summary>
+        private async void OnGameJoinHandler(object? sender, EventArgs e)
+        {
+            const string LOG_IDENT = "Watcher::OnGameJoin";
+
+            try
+            {
+                if (!App.Settings.Prop.GameSessionEnabled)
+                    return;
+
+                if (App.GameSession.Store.ReadActive() is not null)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Session masih aktif — tidak perlu re-suspend");
+                    return;
+                }
+
+                App.Logger.WriteLine(LOG_IDENT, "User masuk game baru — re-suspend background apps");
+                await App.GameSession.BeginSessionAsync();
+                App.GameSession.AttachGameProcess(_watcherData!.ProcessId);
+            }
+            catch (OperationCanceledException)
+            {
+                // watcher dimatikan — tidak masalah
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Re-suspend on game join failed (non-fatal): {ex.Message}");
             }
         }
 

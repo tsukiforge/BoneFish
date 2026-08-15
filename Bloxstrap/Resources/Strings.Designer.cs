@@ -1068,6 +1068,24 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Restore Suspended Apps.
+        /// </summary>
+        public static string ContextMenu_RestoreGameSession {
+            get {
+                return ResourceManager.GetString("ContextMenu.RestoreGameSession", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Game Session Settings.
+        /// </summary>
+        public static string ContextMenu_OpenGameSessionSettings {
+            get {
+                return ResourceManager.GetString("ContextMenu.OpenGameSessionSettings", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Game history is only recorded for your current Roblox session. Games will appear here as you leave them or teleport within them. Not all servers will be rejoinable..
         /// </summary>
         public static string ContextMenu_GameHistory_Description {
@@ -5152,9 +5170,21 @@ namespace Bloxstrap.Resources {
             }
         }
 
-        public static string Menu_GameSession_Description {
+public static string Menu_GameSession_Description {
             get {
                 return ResourceManager.GetString("Menu.GameSession.Description", resourceCulture);
+            }
+        }
+
+        public static string GameSession_EnabledTitle {
+            get {
+                return ResourceManager.GetString("GameSession.EnabledTitle", resourceCulture);
+            }
+        }
+
+        public static string GameSession_EnabledDescription {
+            get {
+                return ResourceManager.GetString("GameSession.EnabledDescription", resourceCulture);
             }
         }
 
@@ -5182,9 +5212,33 @@ namespace Bloxstrap.Resources {
             }
         }
 
-        public static string GameSession_ScanNow {
+public static string GameSession_ScanNow {
             get {
                 return ResourceManager.GetString("GameSession.ScanNow", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoreNow {
+            get {
+                return ResourceManager.GetString("GameSession.RestoreNow", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoreNow_None {
+            get {
+                return ResourceManager.GetString("GameSession.RestoreNow.None", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoreNow_Rescued {
+            get {
+                return ResourceManager.GetString("GameSession.RestoreNow.Rescued", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoreNow_Done {
+            get {
+                return ResourceManager.GetString("GameSession.RestoreNow.Done", resourceCulture);
             }
         }
 
