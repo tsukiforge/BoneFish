@@ -1,5 +1,28 @@
 # BoneFish Changelog
 
+## v7.2.5 - Game Session: Opt-in Zero Overhead, Manual Flags Persisten, Escape Hatch Tray
+
+Release date: 2026-08-15
+
+### 🔌 Game Session Manager kini opt-in (zero overhead default)
+
+- Master toggle `GameSessionEnabled` (default **OFF**) di paling atas halaman Game Session; seluruh halaman greyed-out saat mati.
+- Saat OFF, `BeginSessionAsync()` tidak pernah dipanggil — tidak ada WMI query, tidak ada process scan, tidak ada file write. Launch path identik dengan sebelum v7.2.0 (benchmark: gate boolean ≈ 64 ns/call).
+- Rules lama tetap tersimpan dan tidak dieksekusi sampai toggle dinyalakan kembali.
+
+### 🔧 Fix: toggle manual FastFlags hilang setiap kali Play
+
+- `DisableRobloxAnimations` dan `EnableLowMemoryMode` kini berbasis Settings (persisten) dan **re-applied di `finally` `CheckAndApply()`** setelah purge `PurgeAllKnownFlags()` — tidak lagi terhapus tiap klik Play.
+- Preset (AutoOptimize/Stable/UltraLow/Balanced/Extreme) menulis flag langsung via AutoOptimizeService, tidak membalik state manual user; purge tetap membersihkan stale flag antar preset (tanpa regresi fix v4.4.0).
+
+### 🛟 Escape hatch manual: tombol "Pulihkan Sekarang" di tray + di dalam app
+
+- Bug yang ditemukan: jika RobloxPlayerBeta tetap hidup di system tray setelah keluar game, proses Roblox tidak pernah mati → `EndSession()` tidak pernah dipanggil → aplikasi yang disuspend beku selamanya.
+- Tombol tray "Pulihkan Aplikasi yang Disuspend" (selalu tampil) + tombol "Pulihkan Sekarang" di halaman Game Session → restore manual kapan pun.
+- **Rescue scan**: jika catatan sesi (`active.json`) hilang tapi proses masih beku (kasus record hilang), tombol memindai seluruh sistem, probe setiap thread, dan me-resume yang tersuspend.
+- Restore kini terikat pada **deteksi keluar-masuk game** (log aktivitas Roblox), bukan hanya kematian proses: keluar game → restore langsung meski proses di tray; masuk game baru dalam proses yang sama → re-suspend otomatis. Proses-mati tetap fallback untuk crash/force-close.
+- Resources baru EN + ID; test rescue scan (19 test, semua hijau).
+
 ## v7.2.0 - Game Session Manager: Pengganti Optimization Sandbox yang Fail-Safe
 
 Release date: 2026-08-13

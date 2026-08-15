@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Bloxstrap.GameSession.Models;
 
 namespace Bloxstrap.GameSession
@@ -11,16 +12,54 @@ namespace Bloxstrap.GameSession
         public int SweepPasses { get; init; }
     }
 
+    public sealed class RescuedProcess
+    {
+        public int ProcessId { get; init; }
+        public string ProcessName { get; init; } = "";
+        public int ThreadCount { get; init; }
+    }
+
     public sealed class ProcessSuspensionService
     {
         public const int MaxSweepPasses = 5;
         public static readonly TimeSpan SweepTimeoutPerProcess = TimeSpan.FromSeconds(2);
 
         private readonly Func<int, IProcessAccessor> _accessorFactory;
+        private readonly Func<IEnumerable<ProcessSnapshot>> _processSource;
 
-        public ProcessSuspensionService(Func<int, IProcessAccessor>? accessorFactory = null)
+        public ProcessSuspensionService(
+            Func<int, IProcessAccessor>? accessorFactory = null,
+            Func<IEnumerable<ProcessSnapshot>>? processSource = null)
         {
             _accessorFactory = accessorFactory ?? (processId => new Win32ProcessAccessor(processId));
+            _processSource = processSource ?? DefaultProcessSource;
+        }
+
+        private static IEnumerable<ProcessSnapshot> DefaultProcessSource()
+        {
+            var snapshots = new List<ProcessSnapshot>();
+
+            foreach (Process process in Utilities.GetProcessesSafe())
+            {
+                try
+                {
+                    snapshots.Add(new ProcessSnapshot
+                    {
+                        ProcessId = process.Id,
+                        ProcessName = process.ProcessName
+                    });
+                }
+                catch
+                {
+                    // Proses berubah di antara enumerasi — skip.
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+
+            return snapshots;
         }
 
         public ProcessSuspendResult SuspendProcess(int processId, CancellationToken cancellationToken = default)
@@ -114,6 +153,59 @@ namespace Bloxstrap.GameSession
             }
 
             return result.Build();
+        }
+
+        /// <summary>
+        /// Rescue scan: pindai SEMUA proses untuk thread yang masih tersuspend dan
+        /// resume yang ketemu. Dipakai sebagai jaring pengaman manual saat catatan
+        /// sesi (active.json) sudah hilang — misalnya restore lama menganggap sukses
+        /// tapi sebagian thread tertinggal tersuspend, atau session di-end tanpa
+        /// pernah me-restore. Hanya dipanggil atas inisiatif user (tombol tray/page),
+        /// bukan otomatis, karena probe per-thread memakan waktu.
+        /// </summary>
+        public IReadOnlyList<RescuedProcess> RescueSuspendedProcesses()
+        {
+            const string LOG_IDENT = "GameSession::RescueSuspendedProcesses";
+
+            var rescued = new List<RescuedProcess>();
+
+            foreach (ProcessSnapshot process in _processSource())
+            {
+                if (process.ProcessId == Environment.ProcessId)
+                    continue;
+
+                try
+                {
+                    using IProcessAccessor accessor = _accessorFactory(process.ProcessId);
+                    int threadCount = 0;
+
+                    foreach (int threadId in accessor.GetThreadIds())
+                    {
+                        // IsThreadSuspended mem-probe lalu mengembalikan state;
+                        // kalau thread benar-benar tersuspend, resume untuk selamanya.
+                        if (accessor.IsThreadSuspended(threadId) && accessor.TryResumeThread(threadId))
+                            threadCount++;
+                    }
+
+                    if (threadCount > 0)
+                    {
+                        rescued.Add(new RescuedProcess
+                        {
+                            ProcessId = process.ProcessId,
+                            ProcessName = process.ProcessName,
+                            ThreadCount = threadCount
+                        });
+                        App.Logger.WriteLine(LOG_IDENT,
+                            $"PID={process.ProcessId} ({process.ProcessName}): {threadCount} thread di-resume (rescue scan)");
+                    }
+                }
+                catch
+                {
+                    // Proses protected/berubah di antara enumerasi — skip, bukan error.
+                }
+            }
+
+            return rescued;
         }
 
         public RestoreResult RestoreProcess(SuspendedProcessRecord record)

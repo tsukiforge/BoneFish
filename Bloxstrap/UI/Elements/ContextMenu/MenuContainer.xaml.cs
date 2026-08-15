@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -7,6 +8,7 @@ using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 using Bloxstrap.Integrations;
+using Bloxstrap.UI.Elements.Settings.Pages;
 
 namespace Bloxstrap.UI.Elements.ContextMenu
 {
@@ -128,6 +130,21 @@ namespace Bloxstrap.UI.Elements.ContextMenu
                 return;
 
             _watcher.KillRobloxProcess();
+        }
+
+        private void GameSessionRestoreMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            _watcher.RestoreGameSessionNow();
+        }
+
+        private void GameSessionSettingsMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            // Arahkan settings window langsung ke halaman Game Session pada
+            // peluncuran berikutnya, lalu buka settings window-nya.
+            App.State.Prop.LastPage = typeof(GameSessionPage).FullName!;
+            try { App.State.Save(); } catch { }
+
+            Process.Start(Paths.Process, "-settings");
         }
 
         private void JoinLastServerMenuItem_Click(object sender, RoutedEventArgs e)

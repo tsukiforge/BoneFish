@@ -891,8 +891,17 @@ namespace Bloxstrap
 
             var autoclosePids = new List<int>();
 
+            // Game Session Manager is opt-in. Unless the user explicitly enabled it
+            // AND actually has something to suspend (a checked rule or auto-select),
+            // skip BeginSessionAsync() entirely — no WMI query, no process scan,
+            // no file write. Zero overhead for users who don't use this feature.
+            bool gameSessionShouldRun = _launchMode == LaunchMode.Player
+                && App.Settings.Prop.GameSessionEnabled
+                && (App.Settings.Prop.GameSessionAutoSelectSafeApps
+                    || App.Settings.Prop.GameSessionRules.Any(rule => rule.SuspendDuringGame));
+
             GameSessionRecord? gameSession = null;
-            if (_launchMode == LaunchMode.Player)
+            if (gameSessionShouldRun)
             {
                 try
                 {

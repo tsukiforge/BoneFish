@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
@@ -67,6 +68,23 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ObservableCollection<SuspendedApplicationViewModel> ActiveSuspendedApplications { get; } = new();
 
         public ICommand ScanCommand { get; }
+        public ICommand RestoreCommand { get; }
+
+        // Master toggle — default OFF (opt-in). Saat false, seluruh fitur di-skip
+        // (tidak ada BeginSessionAsync di bootstrapper) dan halaman ini digreyed-out.
+        public bool GameSessionEnabled
+        {
+            get => App.Settings.Prop.GameSessionEnabled;
+            set
+            {
+                if (App.Settings.Prop.GameSessionEnabled == value)
+                    return;
+
+                App.Settings.Prop.GameSessionEnabled = value;
+                OnPropertyChanged(nameof(GameSessionEnabled));
+                try { App.Settings.Save(); } catch { }
+            }
+        }
 
         public bool AutoSelectSafeApps
         {
@@ -137,6 +155,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public GameSessionViewModel()
         {
             ScanCommand = new AsyncRelayCommand(ScanAsync);
+            RestoreCommand = new AsyncRelayCommand(RestoreNowAsync);
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _refreshTimer.Tick += (_, _) => RefreshSessionState();
         }
@@ -171,6 +190,60 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.Logger.WriteLine("GameSessionViewModel::Scan", ex.Message);
                 DetectorNotice = ex.Message;
                 HasDetectorNotice = true;
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        /// <summary>
+        /// Tombol "Pulihkan Sekarang": restore record sesi aktif, lalu rescue scan
+        /// seluruh sistem untuk proses beku yang TIDAK tercatat (kasus record hilang).
+        /// </summary>
+        private async Task RestoreNowAsync()
+        {
+            if (IsBusy)
+                return;
+
+            IsBusy = true;
+            try
+            {
+                int restoredFromRecord = 0;
+                if (App.GameSession.Store.ReadActive() is { } session)
+                    restoredFromRecord = App.GameSession.EndSession().TotalSuspended;
+
+                IReadOnlyList<RescuedProcess> rescued = await Task.Run(() => App.GameSession.RescueSuspendedProcesses());
+
+                RefreshSessionState();
+
+                string message;
+                if (restoredFromRecord > 0 && rescued.Count > 0)
+                {
+                    message = App.GameSession.Store.ReadHistory().LastOrDefault() is { } last
+                        ? $"{App.GameSession.FormatSummary(last)}\n{String.Format(Strings.GameSession_RestoreNow_Rescued, rescued.Count)}"
+                        : String.Format(Strings.GameSession_RestoreNow_Rescued, rescued.Count);
+                }
+                else if (restoredFromRecord > 0)
+                {
+                    message = App.GameSession.Store.ReadHistory().LastOrDefault() is { } last
+                        ? App.GameSession.FormatSummary(last)
+                        : Strings.GameSession_RestoreNow_Done;
+                }
+                else if (rescued.Count > 0)
+                {
+                    message = String.Format(Strings.GameSession_RestoreNow_Rescued, rescued.Count);
+                }
+                else
+                {
+                    message = Strings.GameSession_RestoreNow_None;
+                }
+
+                Frontend.ShowMessageBox(message, MessageBoxImage.Information, MessageBoxButton.OK);
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine("GameSessionViewModel::RestoreNow", ex.Message);
             }
             finally
             {

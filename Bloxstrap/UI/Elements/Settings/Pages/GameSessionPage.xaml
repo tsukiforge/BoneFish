@@ -24,10 +24,27 @@
                   PanningMode="VerticalOnly"
                   Focusable="True">
       <StackPanel Margin="0,0,14,14">
-        <TextBlock Text="{x:Static resources:Strings.Menu_GameSession_Description}"
+        <ui:Card Margin="0,0,0,0" Padding="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="{x:Static resources:Strings.GameSession_EnabledTitle}" FontSize="16" FontWeight="Medium" />
+                    <TextBlock Margin="0,3,0,0" Text="{x:Static resources:Strings.GameSession_EnabledDescription}"
+                               TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+                <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
+                                 IsChecked="{Binding GameSessionEnabled, Mode=TwoWay}" />
+            </Grid>
+        </ui:Card>
+
+        <TextBlock Margin="0,10,0,0" Text="{x:Static resources:Strings.Menu_GameSession_Description}"
                    TextWrapping="Wrap" FontSize="14"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
+        <StackPanel IsEnabled="{Binding GameSessionEnabled}">
         <Border Margin="0,10,0,0" Padding="10" CornerRadius="4"
                 BorderThickness="1" BorderBrush="#41F2290A" Background="#F2290A">
             <TextBlock Text="{x:Static resources:Strings.GameSession_RiskNotice}"
@@ -64,8 +81,12 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock Text="{x:Static resources:Strings.GameSession_RulesTitle}" FontSize="20" FontWeight="Medium" />
-            <ui:Button Grid.Column="1" Content="{x:Static resources:Strings.GameSession_ScanNow}"
-                       Icon="ArrowSync20" Command="{Binding ScanCommand}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <ui:Button Content="{x:Static resources:Strings.GameSession_RestoreNow}"
+                           Icon="ArrowSync24" Command="{Binding RestoreCommand}" Margin="0,0,8,0" />
+                <ui:Button Content="{x:Static resources:Strings.GameSession_ScanNow}"
+                           Icon="ArrowSync20" Command="{Binding ScanCommand}" />
+            </StackPanel>
         </Grid>
 
         <ItemsControl ItemsSource="{Binding Applications}">
@@ -126,6 +147,7 @@
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </StackPanel>
         </ui:Card>
+        </StackPanel>
       </StackPanel>
     </ScrollViewer>
 </ui:UiPage>
