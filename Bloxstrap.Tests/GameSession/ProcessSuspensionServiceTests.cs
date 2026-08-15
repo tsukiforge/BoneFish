@@ -86,6 +86,43 @@ public class ProcessSuspensionServiceTests
         Assert.Equal(RestoreStatus.NotFound, result.Status);
     }
 
+    [Fact]
+    public void Rescue_scan_resumes_orphaned_suspended_threads_across_processes()
+    {
+        var chrome = new FakeAccessor(new[] { new[] { 1, 2, 3 } });
+        chrome.SuspendedThreads.UnionWith(new[] { 1, 2 });
+
+        var explorer = new FakeAccessor(new[] { new[] { 4, 5 } });
+        explorer.SuspendedThreads.UnionWith(new[] { 5 });
+
+        var healthy = new FakeAccessor(new[] { new[] { 6 } });
+        var accessors = new Dictionary<int, FakeAccessor>
+        {
+            [1] = chrome,
+            [2] = explorer,
+            [3] = healthy
+        };
+
+        var service = new ProcessSuspensionService(
+            accessorFactory: processId => accessors[processId],
+            processSource: () => new[]
+            {
+                new ProcessSnapshot { ProcessId = 1, ProcessName = "chrome" },
+                new ProcessSnapshot { ProcessId = 2, ProcessName = "explorer" },
+                new ProcessSnapshot { ProcessId = 3, ProcessName = "healthy" }
+            });
+
+        IReadOnlyList<RescuedProcess> rescued = service.RescueSuspendedProcesses();
+
+        Assert.Equal(2, rescued.Count);
+        Assert.Contains(rescued, item => item.ProcessId == 1 && item.ThreadCount == 2);
+        Assert.Contains(rescued, item => item.ProcessId == 2 && item.ThreadCount == 1);
+        Assert.Empty(chrome.SuspendedThreads);
+        Assert.Empty(explorer.SuspendedThreads);
+        Assert.Empty(healthy.SuspendedThreads);
+        Assert.False(rescued.Any(item => item.ProcessId == 3));
+    }
+
     private static SuspendedProcessRecord Record(params int[] threads) => new()
     {
         ProcessId = 42,

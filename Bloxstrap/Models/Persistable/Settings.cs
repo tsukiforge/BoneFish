@@ -54,6 +54,12 @@ namespace Bloxstrap.Models.Persistable
         public ObservableCollection<GameSessionRule> GameSessionRules { get; set; } = new();
         public bool GameSessionAutoSelectSafeApps { get; set; } = false;
 
+        // Master toggle Game Session Manager — default OFF (opt-in).
+        // Saat false, BeginSessionAsync() tidak pernah dipanggil di bootstrapper,
+        // jadi nol overhead WMI/process-scan/file-write untuk user yang tidak memakai
+        // fitur ini. Rules yang sudah dicentang TETAP tersimpan, hanya tidak dieksekusi.
+        public bool GameSessionEnabled { get; set; } = false;
+
         // mod preset configuration
         public bool UseDisableAppPatch { get; set; } = false;
 
@@ -126,6 +132,14 @@ namespace Bloxstrap.Models.Persistable
         // Backup nilai Flag sebelum ditimpa toggle TDR — dipakai saat toggle
         // dimatikan agar nilai user/preset sebelum toggle bisa dikembalikan.
         public Dictionary<string, string> TdrMitigationBackup { get; set; } = new();
+
+        // Manual FastFlag toggles — disimpan sebagai preferensi TERPISAH agar state-nya
+        // survive PurgeAllKnownFlags()/RemoveOptimizations() di setiap Play.
+        // Sebelumnya state dibaca langsung dari FastFlags yang di-purge tiap launch
+        // → toggle "hilang" setiap kali main walau sudah Save. Pola: sama seperti
+        // TDR Mitigation (Settings bool + re-apply di akhir CheckAndApply()).
+        public bool DisableRobloxAnimations { get; set; } = false;
+        public bool EnableLowMemoryMode { get; set; } = false;
 
         // Auto-Reconnect — tawarkan sambung ulang setelah Roblox crash
         public bool EnableAutoReconnectPrompt { get; set; } = true;

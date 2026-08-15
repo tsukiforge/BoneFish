@@ -173,6 +173,11 @@ namespace Bloxstrap.GameSession
             return session;
         }
 
+        public IReadOnlyList<RescuedProcess> RescueSuspendedProcesses()
+        {
+            return Suspension.RescueSuspendedProcesses();
+        }
+
         public void AttachGameProcess(int processId)
         {
             if (ActiveSession is null)

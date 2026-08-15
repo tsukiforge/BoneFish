@@ -244,6 +244,12 @@
   <data name="ContextMenu.CopyDeeplinkInvite" xml:space="preserve">
     <value>Salin undangan deeplink</value>
   </data>
+  <data name="ContextMenu.RestoreGameSession" xml:space="preserve">
+    <value>Pulihkan Aplikasi yang Disuspend</value>
+  </data>
+  <data name="ContextMenu.OpenGameSessionSettings" xml:space="preserve">
+    <value>Pengaturan Game Session</value>
+  </data>
   <data name="ContextMenu.ServerInformation.CopyInstanceId" xml:space="preserve">
     <value>Salin Instansi ID</value>
   </data>
@@ -1596,6 +1602,12 @@ Apakah Anda ingin melanjutkan?</value>
   <data name="Menu.GameSession.Description" xml:space="preserve">
     <value>Kelola aplikasi background yang disetujui selama Roblox berjalan. Fitur ini independen dari preset FastFlag.</value>
   </data>
+  <data name="GameSession.EnabledTitle" xml:space="preserve">
+    <value>Aktifkan Game Session Manager</value>
+  </data>
+  <data name="GameSession.EnabledDescription" xml:space="preserve">
+    <value>Kelola aplikasi background otomatis selama bermain. Nonaktif secara default.</value>
+  </data>
   <data name="GameSession.SuspendLabel" xml:space="preserve">
     <value>Suspend saat bermain</value>
   </data>
@@ -1608,8 +1620,20 @@ Apakah Anda ingin melanjutkan?</value>
   <data name="GameSession.AutoCandidateCount" xml:space="preserve">
     <value>{0} kandidat aplikasi aman terdeteksi</value>
   </data>
-  <data name="GameSession.ScanNow" xml:space="preserve">
+<data name="GameSession.ScanNow" xml:space="preserve">
     <value>Scan Sekarang</value>
+  </data>
+  <data name="GameSession.RestoreNow" xml:space="preserve">
+    <value>Pulihkan Sekarang</value>
+  </data>
+  <data name="GameSession.RestoreNow.None" xml:space="preserve">
+    <value>Tidak ada aplikasi yang disuspend.</value>
+  </data>
+  <data name="GameSession.RestoreNow.Rescued" xml:space="preserve">
+    <value>Juga memulihkan {0} aplikasi beku yang tidak tercatat sesi.</value>
+  </data>
+  <data name="GameSession.RestoreNow.Done" xml:space="preserve">
+    <value>Semua aplikasi yang disuspend telah dipulihkan.</value>
   </data>
   <data name="GameSession.RulesTitle" xml:space="preserve">
     <value>Aturan Game Session</value>

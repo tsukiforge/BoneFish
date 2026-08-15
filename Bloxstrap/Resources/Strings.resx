@@ -247,6 +247,12 @@
   <data name="ContextMenu.CopyDeeplinkInvite" xml:space="preserve">
     <value>Copy invite deeplink</value>
   </data>
+  <data name="ContextMenu.RestoreGameSession" xml:space="preserve">
+    <value>Restore Suspended Apps</value>
+  </data>
+  <data name="ContextMenu.OpenGameSessionSettings" xml:space="preserve">
+    <value>Game Session Settings</value>
+  </data>
   <data name="ContextMenu.ServerInformation.CopyInstanceId" xml:space="preserve">
     <value>Copy Instance ID</value>
   </data>
@@ -1925,6 +1931,12 @@ Do you want to continue?</value>
   <data name="Menu.GameSession.Description" xml:space="preserve">
     <value>Manage approved background applications while Roblox is running. This feature is independent of FastFlag presets.</value>
   </data>
+  <data name="GameSession.EnabledTitle" xml:space="preserve">
+    <value>Enable Game Session Manager</value>
+  </data>
+  <data name="GameSession.EnabledDescription" xml:space="preserve">
+    <value>Automatically manage background applications while gaming. Disabled by default.</value>
+  </data>
   <data name="GameSession.SuspendLabel" xml:space="preserve">
     <value>Suspend during game</value>
   </data>
@@ -1939,6 +1951,18 @@ Do you want to continue?</value>
   </data>
   <data name="GameSession.ScanNow" xml:space="preserve">
     <value>Scan Now</value>
+  </data>
+  <data name="GameSession.RestoreNow" xml:space="preserve">
+    <value>Restore Now</value>
+  </data>
+  <data name="GameSession.RestoreNow.None" xml:space="preserve">
+    <value>No suspended apps were found.</value>
+  </data>
+  <data name="GameSession.RestoreNow.Rescued" xml:space="preserve">
+    <value>Additionally rescued {0} frozen app(s) not tracked by a session.</value>
+  </data>
+  <data name="GameSession.RestoreNow.Done" xml:space="preserve">
+    <value>All suspended apps have been restored.</value>
   </data>
   <data name="GameSession.RulesTitle" xml:space="preserve">
     <value>Game Session Rules</value>

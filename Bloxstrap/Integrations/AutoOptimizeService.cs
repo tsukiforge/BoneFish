@@ -349,6 +349,25 @@ namespace Bloxstrap.Integrations
                     try { ApplyTdrMitigationFlags(); } catch { }
                     App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation re-applied after CheckAndApply (priority: HIGHEST)");
                 }
+
+                // ── Manual FastFlag toggles — chokepoint boot ─────────────────────
+                // ★ FIX: DisableRobloxAnimations/EnableLowMemoryMode disimpan sebagai
+                // bool terpisah di Settings (bukan dibaca dari FastFlags saat itu).
+                // Setiap Play, PurgeAllKnownFlags()/RemoveOptimizations() menghapus
+                // keempat flag-nya dari AllKnownManagedFlags dan tidak ada yang
+                // me-re-apply → toggle manual "hilang" tiap main. Re-apply di sini
+                // (pola SAMA dengan TDR Mitigation di atas) supaya manual flags
+                // survive apa pun path yang dijalankan.
+                if (App.Settings.Prop.DisableRobloxAnimations)
+                {
+                    try { ApplyDisableRobloxAnimations(); } catch { }
+                    App.Logger.WriteLine(LOG_IDENT, "DisableRobloxAnimations re-applied after CheckAndApply (priority: HIGHEST)");
+                }
+                if (App.Settings.Prop.EnableLowMemoryMode)
+                {
+                    try { ApplyLowMemoryMode(); } catch { }
+                    App.Logger.WriteLine(LOG_IDENT, "EnableLowMemoryMode re-applied after CheckAndApply (priority: HIGHEST)");
+                }
             }
         }
 
@@ -992,6 +1011,41 @@ tier ??= DetectSystemTier();
             try { App.Settings.Save(); } catch { }
 
             App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation flags removed (previous values restored)");
+        }
+
+        // ── Manual FastFlag Toggles (DisableRobloxAnimations / EnableLowMemoryMode) ─────
+        // ★ FIX (v7.2.x, Opsi A — preset-aware purge): Dua toggle manual ini
+        // sebelumnya state-nya dibaca langsung dari App.FastFlags. Setiap Play,
+        // CheckAndApply() → PurgeAllKnownFlags() menghapus flag-nya (keempat flag
+        // ada di AllKnownManagedFlags) dan TIDAK ada yang me-re-apply → toggle
+        // "hilang" tiap launch walau sudah disimpan dengan benar.
+        // Solusi: state toggle dipindah ke Settings (bool terpisah), lalu keempat
+        // flag di-RE-APPLY di akhir CheckAndApply() — pola SAMA dengan TDR Mitigation
+        // (priority: HIGHEST). Purge tetap membersihkan stale values dari preset
+        // sebelumnya, jadi fix v4.4.0 (flag tidak terhapus saat pindah preset)
+        // TIDAK ter-regresi.
+        public static void ApplyDisableRobloxAnimations()
+        {
+            App.FastFlags.SetValue("FFlagRenderUIAnimations", "False");
+            App.FastFlags.SetValue("FFlagRenderMenuTransitions", "False");
+            App.FastFlags.SetValue("FFlagRenderInventoryEffects", "False");
+        }
+
+        public static void RemoveDisableRobloxAnimations()
+        {
+            App.FastFlags.SetValue("FFlagRenderUIAnimations", null);
+            App.FastFlags.SetValue("FFlagRenderMenuTransitions", null);
+            App.FastFlags.SetValue("FFlagRenderInventoryEffects", null);
+        }
+
+        public static void ApplyLowMemoryMode()
+        {
+            App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", "True");
+        }
+
+        public static void RemoveLowMemoryMode()
+        {
+            App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", null);
         }
     }
 }
