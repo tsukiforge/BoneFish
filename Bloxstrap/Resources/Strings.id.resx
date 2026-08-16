@@ -1635,6 +1635,9 @@ Apakah Anda ingin melanjutkan?</value>
   <data name="GameSession.RestoreNow.Done" xml:space="preserve">
     <value>Semua aplikasi yang disuspend telah dipulihkan.</value>
   </data>
+  <data name="GameSession.SuspendNotification" xml:space="preserve">
+    <value>{0} aplikasi latar di-suspend selama game: {1}</value>
+  </data>
   <data name="GameSession.RulesTitle" xml:space="preserve">
     <value>Aturan Game Session</value>
   </data>

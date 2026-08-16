@@ -1,5 +1,35 @@
 # BoneFish Changelog
 
+## v7.2.6 - Fix Proteksi Mati Setelah Launch + Notifikasi Suspend
+
+Release date: 2026-08-16
+
+### 🐛 Fix: Game Session "mati" setiap kali launch (proteksi tidak jalan saat main)
+
+Bug ini ditemukan dari analisis log mesin pengguna: setiap kali launch Roblox,
+watcher yang baru start langsung meng-END sesi yang baru saja di-handoff
+launcher — aplikasi ter-suspend saat launch, tapi langsung dipulihkan lagi
+sebelum user masuk game. Akibatnya tidak ada proteksi sama sekali saat main.
+
+Akar masalah: `ShouldRestoreStale()` mengecek `Watcher.pid` untuk deteksi watcher
+zombie. File itu masih berisi PID watcher lama yang mati saat watcher baru
+menjalankan cek — jadi sesi yang valid dianggap stale dan di-restore.
+
+- **App.OnStartup**: recovery stale kini dilewati pada mode watcher (launcher
+  baru saja hand-off sesi; watcher yang mengadopsi, bukan restore).
+- **Watcher.Run**: `AdoptPendingGameSession()` — sesi hand-off diadopsi:
+  `HandedOffToWatcher` di-persist, log sesi, dan aplikasi tetap ter-suspend.
+- Alur sekarang: launch → suspend → watcher adopsi → proteksi jalan selama game
+  → keluar game (OnGameLeave) → restore + balloon.
+
+### 🔔 Notifikasi status sesi (balloon tray)
+
+- Saat game dimulai: "**N aplikasi latar di-suspend selama game: daftar**" —
+  tampil dari launcher handoff (adopsi watcher) dan saat re-suspend masuk game
+  kedua dalam proses yang sama.
+- Saat keluar game: balloon ringkasan restore (sudah ada sejak v7.2.5).
+- Resources EN + ID; 19 test, semua hijau.
+
 ## v7.2.5 - Game Session: Opt-in Zero Overhead, Manual Flags Persisten, Escape Hatch Tray
 
 Release date: 2026-08-15

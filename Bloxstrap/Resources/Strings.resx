@@ -1964,6 +1964,9 @@ Do you want to continue?</value>
   <data name="GameSession.RestoreNow.Done" xml:space="preserve">
     <value>All suspended apps have been restored.</value>
   </data>
+  <data name="GameSession.SuspendNotification" xml:space="preserve">
+    <value>{0} background apps are suspended during the game: {1}</value>
+  </data>
   <data name="GameSession.RulesTitle" xml:space="preserve">
     <value>Game Session Rules</value>
   </data>
