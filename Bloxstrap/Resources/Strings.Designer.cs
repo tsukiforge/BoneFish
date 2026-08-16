@@ -5242,6 +5242,12 @@ public static string GameSession_ScanNow {
             }
         }
 
+        public static string GameSession_SuspendNotification {
+            get {
+                return ResourceManager.GetString("GameSession.SuspendNotification", resourceCulture);
+            }
+        }
+
         public static string GameSession_RulesTitle {
             get {
                 return ResourceManager.GetString("GameSession.RulesTitle", resourceCulture);

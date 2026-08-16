@@ -393,7 +393,13 @@ namespace Bloxstrap
 
                 try
                 {
-                    if (App.GameSession.Store.ReadActive() is { } stale
+                    // Watcher mode = launcher baru saja hand-off sesi aktif (proses tetap
+                    // ter-suspend). JANGAN restore di sini — Watcher.Run yang mengadopsi
+                    // sesi itu. Restore di titik ini justru membunuh proteksi: watcher lama
+                    // yang mati meninggalkan Watcher.pid, dan ShouldRestoreStale akan
+                    // menganggap sesi valid sebagai stale (bug v7.2.5).
+                    if (!App.LaunchSettings.WatcherFlag.Active
+                        && App.GameSession.Store.ReadActive() is { } stale
                         && App.GameSession.ShouldRestoreStale(stale))
                     {
                         Logger.WriteLine(LOG_IDENT, "Recovering a stale Game Session before continuing startup.");
