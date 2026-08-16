@@ -248,6 +248,46 @@ namespace Bloxstrap
                 App.Logger.WriteLine(LOG_IDENT, "Failed to initialize system tray icon");
                 App.Logger.WriteException(LOG_IDENT, ex);
             }
+
+            AdoptPendingGameSession();
+        }
+
+        /// <summary>
+        /// Mengambil alih sesi Game Session yang ditinggalkan launcher (handoff).
+        /// Launcher sudah men-suspend aplikasi lalu exit; watcher melanjutkan sesi
+        /// dan memberi tahu user berapa aplikasi yang kini dikelola.
+        /// </summary>
+        private void AdoptPendingGameSession()
+        {
+            const string LOG_IDENT = "Watcher::AdoptGameSession";
+
+            try
+            {
+                if (App.GameSession.Store.ReadActive() is not { } session
+                    || session.SuspendedProcesses.Count == 0)
+                    return;
+
+                // Pastikan sesi tercatat sebagai milik watcher agar proses BoneFish
+                // berikutnya tidak menganggapnya stale (Watcher.pid lama yang mati
+                // seharusnya tidak memicu restore sesi yang masih valid).
+                if (!session.HandedOffToWatcher)
+                {
+                    session.HandedOffToWatcher = true;
+                    App.GameSession.Store.WriteActive(session);
+                }
+
+                string names = String.Join(", ", session.SuspendedProcesses.Select(process => process.ProcessName));
+
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"Sesi {session.SessionId} diadopsi: {session.SuspendedProcesses.Count} aplikasi tetap ter-suspend selama game.");
+
+                _notifyIcon?.ShowAlert("BoneFish",
+                    String.Format(Strings.GameSession_SuspendNotification, session.SuspendedProcesses.Count, names), 10, null);
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Adopt session failed (non-fatal): {ex.Message}");
+            }
         }
 
         #region Watcher PID tracking
@@ -772,8 +812,15 @@ namespace Bloxstrap
                 }
 
                 App.Logger.WriteLine(LOG_IDENT, "User masuk game baru — re-suspend background apps");
-                await App.GameSession.BeginSessionAsync();
+                GameSessionRecord record = await App.GameSession.BeginSessionAsync();
                 App.GameSession.AttachGameProcess(_watcherData!.ProcessId);
+
+                if (record.SuspendedProcesses.Count > 0)
+                {
+                    string names = String.Join(", ", record.SuspendedProcesses.Select(process => process.ProcessName));
+                    _notifyIcon?.ShowAlert("BoneFish",
+                        String.Format(Strings.GameSession_SuspendNotification, record.SuspendedProcesses.Count, names), 10, null);
+                }
             }
             catch (OperationCanceledException)
             {
