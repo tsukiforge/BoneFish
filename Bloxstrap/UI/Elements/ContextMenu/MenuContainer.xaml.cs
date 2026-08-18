@@ -166,6 +166,21 @@ namespace Bloxstrap.UI.Elements.ContextMenu
 
         private void ExitBoneFishMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            // Pulihkan sesi Game Session apa pun yang masih aktif SEBELUM BoneFish
+            // mati — termasuk sesi game eksternal (diluncurkan di luar BoneFish)
+            // yang dipantau watcher dari system tray (v7.2.7). Tanpa ini, proses
+            // yang disuspend tetap beku setelah app ditutup.
+            try
+            {
+                var summary = App.GameSession.EndSession();
+                if (summary.TotalSuspended > 0)
+                    App.Logger.WriteLine("Menu::Exit", $"{summary.TotalSuspended} proses di-restore sebelum exit");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine("Menu::Exit", $"Restore sebelum exit gagal (non-fatal): {ex.Message}");
+            }
+
             _watcher.SystemTrayExitSignal.TrySetResult(true);
             App.Terminate();
         }
