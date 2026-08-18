@@ -1,5 +1,53 @@
 # BoneFish Changelog
 
+## v7.2.7 - Rombak Flag Berbahaya + Tray Watcher Selalu Aktif
+
+Release date: 2026-08-18
+
+### 🗑️ Rombak FastFlags: penyebab layar putih tidak pernah ditulis lagi
+
+Audit layar-putih 8/18/2026 (Intel HD 1GB, driver 20.19.15.5126): kombinasi
+`DFIntDebugFRMQualityLevelOverride=3` + texture paksa 0 + `DFIntMaxFrameBufferSize=4`
+terbukti merusak render di iGPU tua (ClientMemStatus Error, white screen). Flag ini
+ditulis ulang setiap launch oleh preset — sekarang DIBUANG dari kode:
+
+- **Dihapus dari aggressive path & preset manual (UltraLow/Extreme/HDD):**
+  `DFIntDebugFRMQualityLevelOverride`, `DFFlagTextureQualityOverrideEnabled` +
+  `DFIntTextureQualityOverride` (preset kini memakai Texture Level1, bukan 0),
+  `FIntTextureCompositorLowResFactor`, `DFIntMaxFrameBufferSize`, `FIntRuntimeMaxNumOfThreads`.
+- **Flag yang tidak bekerja lagi di client modern:**
+  `DFIntTaskSchedulerTargetFps` (tidak di allowlist sejak 2025-09-29) — UI slider
+  "Target FPS Extreme" + property `ExtremeModeFpsTarget` dihapus; FPS cap di-set di
+  pengaturan Roblox (FramerateCap). `FIntRenderLocalLightUpdatesMax/Min` dan
+  `FIntRenderGrainScale` di-deny client 0.734 ("Denied local configuration").
+- **TDR Mitigation dirombak:** hanya menurunkan MSAA (aman, terbukti) — FRM/texture
+  paksa/FPS cap dibuang. Deskripsi toggle diperbarui (EN + ID).
+- Purge list (`AllKnownManagedFlags`) dipertahankan utuh — nilai lama dari versi
+  terpasang tetap dibersihkan saat launch (tidak ada migrasi khusus).
+
+### 🖥️ Tray watcher selalu aktif — Game Session tetap jalan walau game diluncurkan di luar BoneFish
+
+Sebelumnya: game yang diluncurkan lewat official Roblox app / website (bukan
+`roblox-player:` protocol) tidak pernah terpantau — tidak ada suspend sama sekali.
+Sekarang watcher yang menetap di system tray:
+
+- **Memantau proses RobloxPlayerBeta baru** (`MonitorExternalGameSessions`): begitu
+  proses eksternal terdeteksi dengan log aktivitas yang sesuai, watcher mengambil alih.
+- **Join game → suspend otomatis** (BeginSession + balloon "N aplikasi di-suspend");
+  **leave game / proses mati → restore otomatis** (balloon ringkasan).
+- Takeover watcher baru → sesi diserahkan (diadopsi, tidak di-end); klik Exit di tray
+  → sesi di-restore dulu sebelum BoneFish mati (fix: proses tidak lagi beku saat
+  game eksternal masih berjalan dan user menutup BoneFish).
+- Hanya aktif saat toggle Game Session menyala; idempotent terhadap sesi yang sudah
+  aktif (launcher BoneFish menang duluan).
+
+### 🔧 Fix lain
+
+- Exit dari tray kini memanggil `EndSession()` sebelum `Terminate()` — mencegah
+  aplikasi latar yang disuspend tetap beku setelah BoneFish ditutup.
+
+Build 0 warning/error; 19 test, semua hijau.
+
 ## v7.2.6 - Fix Proteksi Mati Setelah Launch + Notifikasi Suspend
 
 Release date: 2026-08-16

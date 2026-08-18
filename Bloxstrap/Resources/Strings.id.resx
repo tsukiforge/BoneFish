@@ -1543,7 +1543,7 @@ Beralih ke {1}.</value>
     <value>TDR Mitigation (Kurangi Freeze / Layar Putih)</value>
   </data>
   <data name="Menu.FastFlags.TdrMitigation.Description" xml:space="preserve">
-    <value>Aktifkan jika sering freeze/layar putih saat bermain, terutama di laptop lama. Mengurangi beban GPU (MSAA off, render quality &amp; texture minimum, FPS cap konsisten) untuk memperkecil kemungkinan TDR (Event 4101) terpicu — MENGURANGI frekuensi, bukan menghilangkan total (akar masalah di driver GPU legacy). Berlaku penuh saat Roblox launch berikutnya. Validasi: bandingkan frekuensi "RENDER STALL TERDETEKSI" di log sebelum vs sesudah toggle ini aktif.</value>
+    <value>Aktifkan jika sering freeze/layar putih saat bermain, terutama di laptop lama. Sejak v7.2.7 mode ini hanya menurunkan MSAA (anti-aliasing off) — komponen lain (render quality paksa, texture minimum, FPS cap) dibuang karena terbukti memicu layar putih di iGPU tua. TDR (Event 4101) tetap bisa muncul: akar masalah ada di driver GPU legacy, mitigasi ini hanya mengurangi frekuensinya. Berlaku penuh saat Roblox launch berikutnya. Validasi: bandingkan frekuensi "RENDER STALL TERDETEKSI" di log sebelum vs sesudah toggle ini aktif.</value>
   </data>
   <data name="Watcher.CrashDetected.Balloon" xml:space="preserve">
     <value>Roblox crash terdeteksi! Klik notifikasi ini untuk menyambung ulang ke game terakhir.</value>

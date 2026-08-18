@@ -432,19 +432,21 @@ tier ??= DetectSystemTier();
 
             PurgeAllKnownFlags();
 
-                App.FastFlags.SetValue("DFFlagTextureQualityOverrideEnabled", "True");
-                App.FastFlags.SetValue("DFIntTextureQualityOverride", "0");
-                App.FastFlags.SetValue("FIntTextureCompositorLowResFactor", "1");
-
-                App.FastFlags.SetValue("DFIntDebugFRMQualityLevelOverride", "3");
+                // ── Rombak v7.2.7: flag render paksa DIBUANG ───────────────────────
+                // ★ Audit layar-putih 8/18/2026 (Intel HD 1GB, driver 20.19.15.5126):
+                //   DFIntDebugFRMQualityLevelOverride=3 + DFIntTextureQualityOverride=0
+                //   (dengan FFlagTextureQualityOverrideEnabled) + FIntTextureCompositorLowResFactor=1
+                //   terbukti merusak render di iGPU tua (ClientMemStatus Error, white screen).
+                //   Selain itu DFIntTaskSchedulerTargetFps TIDAK di allowlist sejak 2025-09-29
+                //   (client mengabaikannya) dan FIntRenderGrainScale di-deny client 0.734.
+                //   Keempatnya TIDAK PERNAH ditulis lagi; nilai lama tetap dibersihkan
+                //   oleh PurgeAllKnownFlags() via AllKnownManagedFlags.
                 App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
 
                 App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
 
                 App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
                 App.FastFlags.SetValue("FIntSSAOMipLevels", "0");
-
-                App.FastFlags.SetValue("FIntRenderGrainScale", "0");
 
                 App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
                 App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
@@ -464,19 +466,17 @@ tier ??= DetectSystemTier();
 
                 App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
 
-                App.FastFlags.SetValue("DFIntMaxFrameBufferSize", "4");
-                App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", "4");
+                // DFIntMaxFrameBufferSize=4 (frame buffer terlalu kecil → artefak render/
+                // layar putih di iGPU tua) dan FIntRuntimeMaxNumOfThreads=4 (thread render
+                // dibatasi tanpa manfaat terukur) DIBUANG di rombak v7.2.7 — tidak pernah
+                // ditulis lagi. FIntRuntimeMaxNumOfThreads hanya ditulis oleh toggle Fast
+                // Loading (6 jika cpuCores >= 8).
                 App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
 
-                if (isExtreme)
-                {
-                    int fpsCap = Math.Clamp(App.Settings.Prop.ExtremeModeFpsTarget, 24, 60);
-                    App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", fpsCap.ToString());
-                }
-                else
-                {
-                    App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
-                }
+                // DFIntTaskSchedulerTargetFps: TIDAK ditulis lagi sejak rombak v7.2.7 —
+                // tidak ada di allowlist sejak 2025-09-29 (client modern mengabaikannya;
+                // pengganti: GlobalBasicSettings_13.xml FramerateCap). FPS cap manual
+                // tetap bisa di-set user lewat pengaturan FramerateCap di Roblox.
 
                 // ── ANR audit (v7.x) ❌ DIPERTAHANKAN ───────────────────────────────
                 // DFIntMaxActiveAnimationTracks, FIntRenderLocalLightFadeInMs, dan 7 flag
@@ -488,9 +488,9 @@ tier ??= DetectSystemTier();
 
                 if (isUltraOrExtreme)
                 {
-                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
-                    // Extreme+HDD → jobs=2 (selaras HDD Balanced); Extreme murni → 1
+                    // FIntRenderLocalLightUpdatesMax/Min: DIBUANG di rombak v7.2.7 —
+                    // di-deny client 0.734 ("Denied local configuration"), menulisnya
+                    // sia-sia. Extreme+HDD → jobs=2 (selaras HDD Balanced); Extreme murni → 1
                     App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", isHDD ? "2" : "1");
 
                     App.Settings.Prop.EnableFpsMonitor = false;
@@ -505,8 +505,6 @@ tier ??= DetectSystemTier();
                 else if (hddIoTweaks)
                 {
                     // HDD-specific I/O tweaks (only applied on top of LowEnd base, never Ultra/Extreme)
-                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-                    App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
                     App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "2");
 
                     App.Logger.WriteLine(LOG_IDENT, "Rendering optimizations applied for low-end (with HDD I/O tweaks)");
@@ -531,8 +529,9 @@ tier ??= DetectSystemTier();
                 // ── Konflik urutan / Fast Loading (toggle) ──────────────────────────
                 // ★ FIX: ApplyFastLoadingFlags() hanya dipanggil dari toggle UI, TIDAK
                 // pernah dari boot. Di relaunch, PurgeAllKnownFlags() + nilai di atas
-                // menghapus/menimpa 2 flag-nya (DFIntTextureCompositorActiveJobs dan
-                // FIntRuntimeMaxNumOfThreads) — toggle Fast Loading mati diam-diam.
+                // menghapus/menimpa flag-nya (DFIntTextureCompositorActiveJobs — dan
+                // FIntRuntimeMaxNumOfThreads sebelum rombak v7.2.7) — toggle Fast
+                // Loading mati diam-diam.
                 // Re-apply PALING AKHIR agar kombinasi ini menang apa pun preset lain.
                 if (App.Settings.Prop.EnableFastLoadingFlags)
                 {
@@ -885,9 +884,9 @@ tier ??= DetectSystemTier();
         //   FIntRenderShadowIntensity           — Flag visual
         //   DFFlagDisablePostProcessing         — Flag visual
         //
-        // DFIntTaskSchedulerTargetFps: SUDAH ADA di ApplyAggressiveOptimizations()
-        // sebagai base flag kondisional — tidak ditambahkan di sini untuk
-        // menghindari duplikasi/konflik nilai.
+        // Catatan rombak v7.2.7: DFIntTaskSchedulerTargetFps tidak lagi ditulis
+        // oleh ApplyAggressiveOptimizations() (dead flag, di luar allowlist sejak
+        // 2025-09-29) — tidak ada konflik nilai yang perlu dijaga di sini.
         public static void ApplyFastLoadingFlags()
         {
             int cpuCores = Environment.ProcessorCount;
@@ -931,44 +930,31 @@ tier ??= DetectSystemTier();
         // BEBAN RENDER GPU agar TDR lebih jarang terpicu — BUKAN menghilangkan total
         // (akar masalah di driver, di luar kendali FastFlag apa pun).
         //
-        // Flag dipakai (SEMUA diverifikasi ADA di Fast Flag Allowlist resmi Roblox,
-        // aktif sejak 2025-09-29; sumber: devforum 3966569 + repo LeventGameing/allowlist):
+        // ★ ROMBAK v7.2.7 (audit layar-putih 8/18/2026, Intel HD 1GB driver
+        // 20.19.15.5126): kombinasi lama "MSAA=1 + FRM=3 + Texture=0 + FPS cap=30"
+        // TERBUKTI MENYEBABKAN layar putih di iGPU tua (ClientMemStatus Error,
+        // artefak render). Rombak: TDR Mitigation sekarang HANYA menurunkan MSAA —
+        // satu-satunya komponen yang menurunkan beban per-pixel tanpa merusak render:
         //   FIntDebugForceMSAASamples=1              — MSAA off → beban per-pixel GPU turun
         //                                              drastis (MSAA = beban render per-frame
         //                                              paling signifikan yang bisa diatur).
-        //   DFIntDebugFRMQualityLevelOverride=3      — render quality terendah yang AMAN.
-        //                                              FRM=1 dulu dipakai versi lama BERSAMA
-        //                                              shadow/voxelizer dan terbukti bikin game
-        //                                              GELAP (audit Extreme v7.x) → sengaja
-        //                                              tidak dipakai; FRM=3 sudah teruji di
-        //                                              preset Extreme (ringan, lighting utuh).
-        //   DFFlagTextureQualityOverrideEnabled=True + DFIntTextureQualityOverride=0
-        //                                             — texture terendah → bandwidth VRAM &
-        //                                              pemakaian RAM bersama iGPU turun.
         //
-        // Flag yang DITOLAK setelah riset (bukan karena malas riset, tapi karena
-        // client modern mengabaikannya):
-        //   DFIntDebugDynamicRenderKiloPixels        — satu-satunya flag yang menurunkan
-        //                                              RESOLUSI RENDER internal (pixel yang
-        //                                              di-render GPU). ❌ TIDAK di allowlist,
-        //                                              di-veto tim engineering Roblox:
-        //                                              "It was vetoed internally, as the aim
-        //                                              is to remove FFlags, not add more"
-        //                                              (Bitdancer, devforum 3966569 page 20,
-        //                                              2026-04-17). Menulisnya = dead code.
-        //   DFIntTaskSchedulerTargetFps              — ❌ TIDAK di allowlist sejak 2025-09-29
+        // Flag yang DIBUANG dari TDR (tidak pernah ditulis lagi):
+        //   DFIntDebugFRMQualityLevelOverride=3      — render quality paksa; kombinasi
+        //                                              dengan texture override terbukti
+        //                                              merusak render di iGPU tua.
+        //   DFFlagTextureQualityOverrideEnabled=True + DFIntTextureQualityOverride=0
+        //                                              — texture paksa 0; bagian dari
+        //                                              kombinasi layar-putih di atas.
+        //   DFIntTaskSchedulerTargetFps=30           — ❌ TIDAK di allowlist sejak 2025-09-29
         //                                              (client modern mengabaikannya; pengganti:
         //                                              GlobalBasicSettings_13.xml FramerateCap).
-        //                                              Tetap ditulis di sini HANYA demi
-        //                                              konsistensi nilai dengan preset yang
-        //                                              sudah ada — bukan klaim efektif.
+        //
+        // Nilai lama dari versi terpasang tetap dibersihkan oleh PurgeAllKnownFlags()
+        // via AllKnownManagedFlags — tidak ada migrasi khusus yang dibutuhkan.
         private static readonly string[] TdrMitigationFlags =
         {
             "FIntDebugForceMSAASamples",
-            "DFIntDebugFRMQualityLevelOverride",
-            "DFFlagTextureQualityOverrideEnabled",
-            "DFIntTextureQualityOverride",
-            "DFIntTaskSchedulerTargetFps",
         };
 
         public static void ApplyTdrMitigationFlags()
@@ -987,16 +973,8 @@ tier ??= DetectSystemTier();
             }
 
             App.FastFlags.SetValue("FIntDebugForceMSAASamples", "1");
-            App.FastFlags.SetValue("DFIntDebugFRMQualityLevelOverride", "3");
-            App.FastFlags.SetValue("DFFlagTextureQualityOverrideEnabled", "True");
-            App.FastFlags.SetValue("DFIntTextureQualityOverride", "0");
 
-            // FPS cap konsisten 30 — dicegah "gap" antar preset: re-apply TDR selalu
-            // berjalan PALING AKHIR di tiap alur preset, jadi tidak ada kondisi
-            // transisi yang membiarkan FPS uncapped saat toggle ini aktif.
-            App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
-
-            App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation applied: MSAA=1, FRM=3, Texture=0, FPS cap=30 (allowlist-verified)");
+            App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation applied: MSAA=1 only (FRM/texture/FPS-cap overrides removed in v7.2.7 overhaul)");
         }
 
         public static void RemoveTdrMitigationFlags()
