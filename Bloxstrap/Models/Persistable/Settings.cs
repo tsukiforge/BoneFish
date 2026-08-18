@@ -83,9 +83,10 @@ namespace Bloxstrap.Models.Persistable
         // walau auto-detect tidak mendeteksi perangkat sebagai UltraLow
         public bool ForceExtremeMode { get; set; } = false;
 
-        // Target FPS untuk TaskScheduler pada Extreme/UltraLow mode.
-        // Default 30fps; bisa diturunkan ke 24 untuk perangkat paling lemah.
-        public int ExtremeModeFpsTarget { get; set; } = 30;
+        // ── FPS Target Extreme DIBUANG di rombak v7.2.7 ─────────────────────────
+        // DFIntTaskSchedulerTargetFps TIDAK ada di allowlist sejak 2025-09-29 — client
+        // modern mengabaikannya. Property ExtremeModeFpsTarget dihapus; FPS cap manual
+        // di-set user langsung di pengaturan Roblox (GlobalBasicSettings FramerateCap).
 
         // ★ GAP 4: Night Vision DIHAPUS (FFlagFastGPULightCulling3 + FFlagNewLightAttenuation
         // sudah deprecated sejak September 2025 karena Roblox Allowlist system — keduanya

@@ -3835,7 +3835,7 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Aktifkan jika sering freeze/layar putih saat bermain, terutama di laptop lama. Mengurangi beban GPU (MSAA off, render quality &amp; texture minimum, FPS cap konsisten) untuk memperkecil kemungkinan TDR (Event 4101) terpicu — MENGURANGI frekuensi, bukan menghilangkan total (akar masalah di driver GPU legacy). Berlaku penuh saat Roblox launch berikutnya. Validasi: bandingkan frekuensi &quot;RENDER STALL TERDETEKSI&quot; di log sebelum vs sesudah toggle ini aktif..
+        ///   Looks up a localized string similar to Aktifkan jika sering freeze/layar putih saat bermain, terutama di laptop lama. Sejak v7.2.7 mode ini hanya menurunkan MSAA (anti-aliasing off) — komponen lain (render quality paksa, texture minimum, FPS cap) dibuang karena terbukti memicu layar putih di iGPU tua. TDR (Event 4101) tetap bisa muncul: akar masalah ada di driver GPU legacy, mitigasi ini hanya mengurangi frekuensinya. Berlaku penuh saat Roblox launch berikutnya. Validasi: bandingkan frekuensi &quot;RENDER STALL TERDETEKSI&quot; di log sebelum vs sesudah toggle ini aktif..
         /// </summary>
         public static string Menu_FastFlags_TdrMitigation_Description {
             get {
