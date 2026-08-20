@@ -7,8 +7,8 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
     <ApplicationIcon>Bloxstrap.ico</ApplicationIcon>
-    <Version>7.2.7</Version>
-    <FileVersion>7.2.7</FileVersion>
+    <Version>7.2.8</Version>
+    <FileVersion>7.2.8</FileVersion>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>

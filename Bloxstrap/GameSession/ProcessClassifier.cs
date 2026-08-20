@@ -19,7 +19,29 @@ namespace Bloxstrap.GameSession
             "fontdrvhost", "spoolsv", "SearchIndexer", "SearchHost", "WmiPrvSE", "WmiApSrv",
             "RuntimeBroker", "sihost", "ctfmon", "conhost", "dllhost", "sppsvc", "MsMpEng",
             "MsSense", "NisSrv", "SecurityHealthService", "SecurityHealthSystray",
-            "RobloxPlayerBeta", "RobloxStudioBeta", "RobloxCrashHandler"
+            "RobloxPlayerBeta", "RobloxStudioBeta", "RobloxCrashHandler",
+
+            // ── Audio/hardware vendor service (v7.2.8) ─────────────────────────────
+            // Bug nyata 8/19: headset mati suara selama Game Session aktif karena
+            // RAVBg64/RAVCpl64 (Realtek Audio Background/Control Panel) ikut
+            // ter-suspend — keduanya jalan di session user dan bukan Windows path,
+            // jadi lolos guard lama (audiodg dilindungi, vendor service tidak).
+            // Service sejati (mis. RtkAudioService64) memang berjalan di session 0
+            // dan sudah aman via guard SessionId==0 — daftar ini menutup PROSES
+            // PENDAMPING audio vendor yang hidup di session user:
+            "RAVBg64", "RAVCpl64", "RAVCpl",                    // Realtek Audio Background / Control Panel
+            "RtkAudioService64", "RtkAudUService64", "RtkAudUService", "RtkAudioService", // Realtek Audio Service
+            "cxaudsvc",                                          // Conexant / Synaptics audio
+            "NahimicSvc32", "NahimicSvc64", "NahimicSvc",         // Nahimic (MSI / HP / gaming laptop audio)
+
+            // ── Per-user service umum (v7.2.8) ─────────────────────────────────
+            // Windows 10+ service yang jalan DI SESSION USER (bukan session 0)
+            // sehingga tidak tertangkap guard SessionId==0, dan TIDAK terdaftar di
+            // SCM klasik (Win32_Service) sehingga lolos service-PID check. Keduanya
+            // terbukti ter-suspend di semua sesi nyata dan berdampak buruk:
+            //   - GameInputRedistService → controller game mati saat dimainkan
+            //   - OneDrive.Sync.Service  → sinkronisasi OneDrive terganggu
+            "GameInputRedistService", "OneDrive.Sync.Service"
         };
 
         public static ProcessClassification Classify(
@@ -27,9 +49,10 @@ namespace Bloxstrap.GameSession
             SecuritySoftwareDetector detector,
             int selfProcessId,
             int gameProcessId,
-            GameSessionRule? rule)
+            GameSessionRule? rule,
+            IReadOnlySet<int>? serviceProcessIds = null)
         {
-            if (IsCritical(snapshot, detector, selfProcessId, gameProcessId))
+            if (IsCritical(snapshot, detector, selfProcessId, gameProcessId, serviceProcessIds))
                 return ProcessClassification.Critical;
 
             // Unapproved applications are visible to the UI but must remain untouched.
@@ -56,9 +79,10 @@ namespace Bloxstrap.GameSession
             ProcessSnapshot snapshot,
             SecuritySoftwareDetector detector,
             int selfProcessId,
-            int gameProcessId)
+            int gameProcessId,
+            IReadOnlySet<int>? serviceProcessIds = null)
         {
-            if (IsAlwaysProtected(snapshot, detector, selfProcessId, gameProcessId))
+            if (IsAlwaysProtected(snapshot, detector, selfProcessId, gameProcessId, serviceProcessIds))
                 return true;
 
             // Unknown identity is never safe to touch.
@@ -71,12 +95,21 @@ namespace Bloxstrap.GameSession
             ProcessSnapshot snapshot,
             SecuritySoftwareDetector detector,
             int selfProcessId,
-            int gameProcessId)
+            int gameProcessId,
+            IReadOnlySet<int>? serviceProcessIds = null)
         {
             if (snapshot.ProcessId == selfProcessId || snapshot.ProcessId == gameProcessId)
                 return true;
 
             if (CriticalProcessNames.Contains(snapshot.ProcessName))
+                return true;
+
+            // Windows service (managed by SCM): system/vendor component, never safe
+            // to suspend — even when the service runs in the user's session
+            // (e.g. OneDrive.Sync.Service). Detected once per BeginSession via
+            // ServiceProcessDetector (WMI Win32_Service) so any vendor is covered
+            // without a static name list.
+            if (serviceProcessIds is not null && serviceProcessIds.Contains(snapshot.ProcessId))
                 return true;
 
             // Session 0 is reserved for services. An unavailable session ID is not
@@ -113,9 +146,10 @@ namespace Bloxstrap.GameSession
             ProcessSnapshot snapshot,
             SecuritySoftwareDetector detector,
             int selfProcessId,
-            int gameProcessId)
+            int gameProcessId,
+            IReadOnlySet<int>? serviceProcessIds = null)
         {
-            if (IsCritical(snapshot, detector, selfProcessId, gameProcessId))
+            if (IsCritical(snapshot, detector, selfProcessId, gameProcessId, serviceProcessIds))
                 return false;
 
             if (snapshot.SessionId < 0 || snapshot.SessionId != Process.GetCurrentProcess().SessionId)

@@ -46,6 +46,15 @@ namespace Bloxstrap.GameSession
 
             SecurityDetectionState detectorState = await Detector.RefreshAsync(cancellationToken);
             List<ProcessSnapshot> processes = _processSource().ToList();
+
+            // PID semua Windows service (SCM). Service = komponen sistem/vendor —
+            // sinyal CRITICAL tambahan di classifier supaya audio stack, driver
+            // companion, dan sync service (bahkan yang jalan di session user,
+            // mis. OneDrive.Sync.Service) tidak pernah ter-suspend.
+            IReadOnlySet<int> serviceProcessIds = ServiceProcessDetector.GetServiceProcessIds(cancellationToken);
+            if (serviceProcessIds.Count > 0)
+                App.Logger.WriteLine(LOG_IDENT_LOCAL, $"{serviceProcessIds.Count} Windows service PID terdaftar sebagai protected");
+
             var session = new GameSessionRecord
             {
                 CoordinatorProcessId = Environment.ProcessId,
@@ -64,7 +73,7 @@ namespace Bloxstrap.GameSession
             {
                 foreach (ProcessSnapshot process in processes)
                 {
-                    if (!ProcessClassifier.IsAutomaticCandidate(process, Detector, Environment.ProcessId, 0))
+                    if (!ProcessClassifier.IsAutomaticCandidate(process, Detector, Environment.ProcessId, 0, serviceProcessIds))
                         continue;
 
                     GameSessionRule? existingRule = FindRule(process, storedRules
@@ -115,7 +124,8 @@ namespace Bloxstrap.GameSession
                         Detector,
                         Environment.ProcessId,
                         0,
-                        rule);
+                        rule,
+                        serviceProcessIds);
 
                     if (classification != ProcessClassification.Safe)
                     {
