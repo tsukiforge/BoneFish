@@ -1,5 +1,58 @@
 # BoneFish Changelog
 
+## v7.2.8 - Fix Headset Mati Suara + Lindungi Service dari Suspend
+
+Release date: 2026-08-19
+
+### 🎧 Fix: headset tidak bersuara selama Game Session aktif
+
+Bug nyata dilaporkan: setelah Game Session men-suspend aplikasi latar, headset
+diam sampai di-resume manual. Audit log sesi 8/19 membuktikan penyebabnya:
+
+```
+2026-08-19T09:45:47Z [GameSession::SuspendProcess] PID=5704: 6/6 threads suspended; failed=0; passes=2; partial=False
+2026-08-19T09:45:47Z [GameSession::BeginSession] RAVBg64 ter-suspend 6/6 thread
+2026-08-19T09:45:48Z [GameSession::SuspendProcess] PID=3356: 10/10 threads suspended; failed=0; passes=2; partial=False
+2026-08-19T09:45:48Z [GameSession::BeginSession] RAVCpl64 ter-suspend 10/10 thread
+```
+
+- **RAVBg64** (Realtek Audio Background — menangani audio device/jack switching)
+  dan **RAVCpl64** (Realtek HD Audio Control Panel) ikut ter-suspend. Keduanya
+  jalan di session user dan berada di `Program Files` (bukan Windows path),
+  sehingga lolos perlindungan lama yang hanya mengecualikan `audiodg`.
+- Dugaan awal "RtkAudUService64" TIDAK terbukti: proses sebenarnya bernama
+  `RtkAudioService64`, berjalan sebagai Windows service di **session 0** dan
+  sudah aman sejak awal lewat guard `SessionId == 0`. Pelaku sebenarnya adalah
+  RAVBg64/RAVCpl64.
+
+### 🛡️ Klasifikasi proses diperkuat (fail-safe, bukan tambal satu nama)
+
+- **Kategori "audio/hardware vendor service"** ditambahkan ke `CriticalProcessNames`:
+  Realtek (`RAVBg64`, `RAVCpl64`, `RAVCpl`, `RtkAudioService64`,
+  `RtkAudUService64`, `RtkAudUService`, `RtkAudioService`), Conexant/Synaptics
+  (`cxaudsvc`), dan Nahimic (`NahimicSvc32/64`, `NahimicSvc`) — device lain
+  (laptop MSI/HP/Conexant) terlindungi juga, bukan cuma Realtek.
+- **Sinyal baru: "proses ini Windows Service" → CRITICAL** — `ServiceProcessDetector`
+  query WMI `Win32_Service` sekali per `BeginSessionAsync` dan mengumpulkan PID
+  semua service SCM. PID mana pun yang terdaftar tidak pernah disuspend, apa pun
+  namanya (menutup service yang ganti nama executable). Gagal query → set kosong
+  (non-fatal; daftar nama statis tetap berlaku — tidak ada proses yang jadi
+  berisiko karena detektor down).
+- **Kategori "per-user service umum"**: Windows 10+ service yang jalan di session
+  user tidak tertangkap guard session-0 maupun SCM klasik. `GameInputRedistService`
+  (controller game mati saat dimainkan) dan `OneDrive.Sync.Service` (sync
+  terganggu) — keduanya terbukti ter-suspend di semua sesi nyata — kini dilindungi.
+- Prinsip "ragu → CRITICAL" tetap: identitas tidak dikenal (nama/path/start time
+  tidak terbaca) selalu ditolak, tidak pernah disuspend.
+
+### 🔧 Lainnya
+
+- Tidak ada perubahan logika `SecuritySoftwareDetector` — kategori baru ini
+  terpisah dari deteksi antivirus (WMI Win32_Service ≠ SecurityCenter2).
+- Tidak ada pesan UI baru; tidak ada perubahan Strings.
+
+Build 0 warning/error; 27 test, semua hijau (16 kasus klasifikasi baru).
+
 ## v7.2.7 - Rombak Flag Berbahaya + Tray Watcher Selalu Aktif
 
 Release date: 2026-08-18
