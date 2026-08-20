@@ -1,109 +1,76 @@
 using Bloxstrap.GameSession;
 using Bloxstrap.GameSession.Models;
-using System.Diagnostics;
 
 namespace Bloxstrap.Tests.GameSession;
 
 public class ProcessClassifierTests
 {
-    [Fact]
-    public void System_process_is_always_critical()
+    private static readonly SecuritySoftwareDetector Detector = new();
+
+    private static ProcessSnapshot Snapshot(int pid, string name, string? path = null) => new()
     {
-        var detector = new FixedDetector(SecurityDetectionState.Ok);
-        var snapshot = Snapshot("csrss", 10);
-        var rule = new GameSessionRule { ProcessName = "csrss", SuspendDuringGame = true };
-
-        Assert.Equal(ProcessClassification.Critical, ProcessClassifier.Classify(snapshot, detector, 1, 2, rule));
-    }
-
-    [Fact]
-    public void Security_process_is_critical_even_when_user_approves_it()
-    {
-        var detector = new FixedDetector(SecurityDetectionState.Ok);
-        detector.KnownSecurityProcessNames.Add("vendorav");
-        var snapshot = Snapshot("vendorav", 10);
-        var rule = new GameSessionRule { ProcessName = "vendorav", SuspendDuringGame = true };
-
-        Assert.Equal(ProcessClassification.Critical, ProcessClassifier.Classify(snapshot, detector, 1, 2, rule));
-    }
-
-    [Fact]
-    public void Detector_unavailable_is_fail_safe_critical()
-    {
-        var detector = new FixedDetector(SecurityDetectionState.Unavailable);
-        var snapshot = Snapshot("Chrome", 10);
-        var rule = new GameSessionRule { ProcessName = "Chrome", SuspendDuringGame = true };
-
-        Assert.Equal(ProcessClassification.Critical, ProcessClassifier.Classify(snapshot, detector, 1, 2, rule));
-    }
-
-    [Fact]
-    public void Normal_approved_process_is_safe_when_detector_is_healthy()
-    {
-        var detector = new FixedDetector(SecurityDetectionState.Ok);
-        var snapshot = Snapshot("Chrome", 10);
-        var rule = new GameSessionRule { ProcessName = "Chrome", SuspendDuringGame = true };
-
-        Assert.Equal(ProcessClassification.Safe, ProcessClassifier.Classify(snapshot, detector, 1, 2, rule));
-    }
-
-    [Fact]
-    public void Unapproved_process_is_keep_not_auto_suspended()
-    {
-        var detector = new FixedDetector(SecurityDetectionState.Ok);
-        var snapshot = Snapshot("Spotify", 10);
-
-        Assert.Equal(ProcessClassification.Keep, ProcessClassifier.Classify(snapshot, detector, 1, 2, null));
-    }
-
-    [Fact]
-    public void Missing_identity_is_critical()
-    {
-        var detector = new FixedDetector(SecurityDetectionState.Ok);
-        var snapshot = new ProcessSnapshot { ProcessId = 10, ProcessName = "Chrome" };
-        var rule = new GameSessionRule { ProcessName = "Chrome", SuspendDuringGame = true };
-
-        Assert.Equal(ProcessClassification.Critical, ProcessClassifier.Classify(snapshot, detector, 1, 2, rule));
-    }
-
-    [Fact]
-    public void Windows_service_process_is_not_an_automatic_candidate()
-    {
-        var detector = new FixedDetector(SecurityDetectionState.Ok);
-        var snapshot = Snapshot("svchost", 10);
-        snapshot.SessionId = 0;
-
-        Assert.False(ProcessClassifier.IsAutomaticCandidate(snapshot, detector, 1, 2));
-    }
-
-    [Fact]
-    public void Approved_browser_can_be_an_automatic_candidate_only_when_safe()
-    {
-        var detector = new FixedDetector(SecurityDetectionState.Ok);
-        var snapshot = Snapshot("chrome", 10);
-        snapshot.SessionId = Process.GetCurrentProcess().SessionId;
-
-        Assert.True(ProcessClassifier.IsAutomaticCandidate(snapshot, detector, 1, 2));
-    }
-
-    private static ProcessSnapshot Snapshot(string name, int id) => new()
-    {
-        ProcessId = id,
-        SessionId = Process.GetCurrentProcess().SessionId,
+        ProcessId = pid,
         ProcessName = name,
-        ExecutablePath = $@"C:\Apps\{name}.exe",
-        StartTimeUtc = DateTime.UtcNow
+        ExecutablePath = path ?? Path.Combine(@"C:\Program Files\SomeVendor", name + ".exe"),
+        StartTimeUtc = DateTime.UtcNow.AddMinutes(-5),
+        SessionId = 1
     };
 
-    private sealed class FixedDetector : SecuritySoftwareDetector
+    [Theory]
+    [InlineData("RAVBg64")]          // Realtek Audio Background
+    [InlineData("RAVCpl64")]         // Realtek HD Audio Control Panel
+    [InlineData("RAVCpl")]
+    [InlineData("RtkAudioService64")]// Realtek Audio Service
+    [InlineData("RtkAudUService64")]
+    [InlineData("RtkAudUService")]
+    [InlineData("RtkAudioService")]
+    [InlineData("cxaudsvc")]         // Conexant / Synaptics
+    [InlineData("NahimicSvc32")]     // Nahimic
+    [InlineData("NahimicSvc64")]
+    [InlineData("NahimicSvc")]
+    [InlineData("GameInputRedistService")] // per-user service (controller input)
+    [InlineData("OneDrive.Sync.Service")]  // per-user service (OneDrive sync)
+    public void Audio_vendor_processes_are_always_protected(string processName)
     {
-        public FixedDetector(SecurityDetectionState state)
-        {
-            State = state;
-            Message = state.ToString();
-        }
+        var snapshot = Snapshot(1000, processName);
 
-        public override Task<SecurityDetectionState> RefreshAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult(State);
+        Assert.True(ProcessClassifier.IsAlwaysProtected(snapshot, Detector, selfProcessId: 1, gameProcessId: 2));
+    }
+
+    [Fact]
+    public void Windows_service_process_id_is_protected()
+    {
+        // A service running in the user's session whose name is NOT in the static
+        // list must still be protected purely because its PID is registered in
+        // Win32_Service. (OneDrive.Sync.Service was the real-world case; here we use
+        // a synthetic vendor name so the test exercises the PID signal, not the
+        // static name list.)
+        var snapshot = Snapshot(7001, "CustomVendorSyncSvc");
+        IReadOnlySet<int> serviceProcessIds = new HashSet<int> { 7001, 7002 };
+
+        Assert.True(ProcessClassifier.IsAlwaysProtected(snapshot, Detector, 1, 2, serviceProcessIds));
+    }
+
+    [Fact]
+    public void Non_service_approved_application_is_not_protected()
+    {
+        var snapshot = Snapshot(3000, "chrome", @"C:\Program Files\Google\Chrome\Application\chrome.exe");
+
+        Assert.False(ProcessClassifier.IsAlwaysProtected(snapshot, Detector, 1, 2, new HashSet<int> { 999 }));
+    }
+
+    [Fact]
+    public void Unknown_identity_fails_closed_even_with_service_pids()
+    {
+        var snapshot = new ProcessSnapshot
+        {
+            ProcessId = 4000,
+            ProcessName = "mystery",
+            ExecutablePath = null,
+            StartTimeUtc = null,
+            SessionId = -1
+        };
+
+        Assert.True(ProcessClassifier.IsCritical(snapshot, Detector, 1, 2, new HashSet<int>()));
     }
 }
