@@ -1,5 +1,55 @@
 # BoneFish Changelog
 
+## v7.2.9 - Fix Mic Roblox Tidak Berfungsi Setelah Game Session
+
+Release date: 2026-08-23
+
+### 🎤 Fix: microphone tidak berfungsi di Roblox voice chat SETELAH sesi
+
+Bug baru dilaporkan: microphone berfungsi normal sebelum sesi, tapi berhenti
+kerja di Roblox voice chat SETELAH Game Session Manager selesai suspend/resume.
+Speaker output tetap OK (fix v7.2.8 sudah benar untuk speaker).
+
+**Root cause:** `RtkNGUI64.exe` (Realtek HD Audio Manager) — proses yang handle
+**mic settings** (noise cancellation, echo cancellation, boost) — **TIDAK ada di
+CRITICAL list**. Proses ini:
+- Jalan di **user session** (bukan session 0) → lolos guard `SessionId==0`
+- Bukan Windows path → lolos guard `IsWindowsPath()`
+- Maintain **active connections** ke Realtek audio driver
+- Ketika di-suspend → audio driver timeout connection
+- Ketika di-resume → proses lanjut jalan tapi connection udah putus → mic broken
+
+**Kenapa speaker OK tapi mic rusak?** Speaker output ditangani oleh `RAVBg64` +
+`RtkAudioService64` (udah protected sejak v7.2.8). Mic input ditangani oleh
+`RtkNGUI64` + audio driver connection (BELUM protected).
+
+### 🛡️ 5 proses audio vendor tambahan dilindungi
+
+| Proses | Fungsi | Alasan |
+|--------|--------|--------|
+| `RtkNGUI64` | Realtek HD Audio Manager (64-bit) | Handle mic settings: noise cancel, echo cancel, boost |
+| `RtkNGUI` | Realtek HD Audio Manager (32-bit) | Versi 32-bit dari yang sama |
+| `RtkBtManServ` | Realtek Bluetooth Manager | Handle Bluetooth headset audio |
+| `BthAudioAgent` | Bluetooth Audio Agent | Handle Bluetooth audio input/output |
+| `WsaAudioService` | Windows Sonic spatial audio | Handle spatial audio processing |
+
+### 🔬 Resume Logic Audit
+
+Resume logic di `RestoreProcess()` cuma resume threads — **TIDAK reinitialize
+audio connections**. Untuk kebanyakan proses ini cukup, tapi untuk audio services
+yang maintain active connections ke driver, resume thread saja **tidak cukup**.
+
+**Solusi paling aman:** Jangan biarkan proses audio di-suspend sama sekali →
+tambah ke CRITICAL list. Lebih aman dari pada coba "perbaiki" setelah rusak.
+
+### ✅ Verifikasi
+
+- Build 0 error, 0 warning
+- Semua 21 ProcessClassifierTests passed (termasuk 5 test baru)
+- Semua proses audio vendor terlindungi dari suspend
+
+---
+
 ## v7.2.8 - Fix Headset Mati Suara + Lindungi Service dari Suspend
 
 Release date: 2026-08-19
