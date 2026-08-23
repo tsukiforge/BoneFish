@@ -24,10 +24,15 @@ public class ProcessClassifierTests
     [InlineData("RtkAudUService64")]
     [InlineData("RtkAudUService")]
     [InlineData("RtkAudioService")]
+    [InlineData("RtkNGUI64")]        // Realtek HD Audio Manager (mic settings)
+    [InlineData("RtkNGUI")]          // Realtek HD Audio Manager (32-bit)
+    [InlineData("RtkBtManServ")]     // Realtek Bluetooth Manager
     [InlineData("cxaudsvc")]         // Conexant / Synaptics
     [InlineData("NahimicSvc32")]     // Nahimic
     [InlineData("NahimicSvc64")]
     [InlineData("NahimicSvc")]
+    [InlineData("BthAudioAgent")]    // Bluetooth Audio Agent
+    [InlineData("WsaAudioService")]  // Windows Sonic spatial audio
     [InlineData("GameInputRedistService")] // per-user service (controller input)
     [InlineData("OneDrive.Sync.Service")]  // per-user service (OneDrive sync)
     public void Audio_vendor_processes_are_always_protected(string processName)

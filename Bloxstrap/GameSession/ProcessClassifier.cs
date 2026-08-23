@@ -31,8 +31,20 @@ namespace Bloxstrap.GameSession
             // PENDAMPING audio vendor yang hidup di session user:
             "RAVBg64", "RAVCpl64", "RAVCpl",                    // Realtek Audio Background / Control Panel
             "RtkAudioService64", "RtkAudUService64", "RtkAudUService", "RtkAudioService", // Realtek Audio Service
+            "RtkNGUI64", "RtkNGUI",                             // Realtek HD Audio Manager (mic settings: noise cancel, echo cancel, boost)
+            "RtkBtManServ",                                      // Realtek Bluetooth Manager Service
             "cxaudsvc",                                          // Conexant / Synaptics audio
             "NahimicSvc32", "NahimicSvc64", "NahimicSvc",         // Nahimic (MSI / HP / gaming laptop audio)
+
+            // ── Bluetooth / USB audio agent (v7.3.0) ────────────────────────────────
+            // Bug 8/23: mic tidak berfungsi di Roblox voice chat SETELAH sesi.
+            // RtkNGUI64 (Realtek HD Audio Manager) jalan di session user dan handle
+            // mic settings (noise cancellation, echo cancellation, boost). Ketika
+            // di-suspend, audio driver timeout connection; ketika di-resume, proses
+            // lanjut jalan tapi connection udah putus → mic pipeline broken.
+            // Bluetooth/USB audio agent juga perlu dilindungi untuk headset wireless:
+            "BthAudioAgent",                                     // Bluetooth Audio Agent
+            "WsaAudioService",                                   // Windows Sonic / spatial audio
 
             // ── Per-user service umum (v7.2.8) ─────────────────────────────────
             // Windows 10+ service yang jalan DI SESSION USER (bukan session 0)
