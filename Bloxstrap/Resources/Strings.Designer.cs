@@ -1068,6 +1068,24 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Restore Suspended Apps.
+        /// </summary>
+        public static string ContextMenu_RestoreGameSession {
+            get {
+                return ResourceManager.GetString("ContextMenu.RestoreGameSession", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Game Session Settings.
+        /// </summary>
+        public static string ContextMenu_OpenGameSessionSettings {
+            get {
+                return ResourceManager.GetString("ContextMenu.OpenGameSessionSettings", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Game history is only recorded for your current Roblox session. Games will appear here as you leave them or teleport within them. Not all servers will be rejoinable..
         /// </summary>
         public static string ContextMenu_GameHistory_Description {
@@ -3817,7 +3835,7 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Aktifkan jika sering freeze/layar putih saat bermain, terutama di laptop lama. Mengurangi beban GPU (MSAA off, render quality &amp; texture minimum, FPS cap konsisten) untuk memperkecil kemungkinan TDR (Event 4101) terpicu — MENGURANGI frekuensi, bukan menghilangkan total (akar masalah di driver GPU legacy). Berlaku penuh saat Roblox launch berikutnya. Validasi: bandingkan frekuensi &quot;RENDER STALL TERDETEKSI&quot; di log sebelum vs sesudah toggle ini aktif..
+        ///   Looks up a localized string similar to Aktifkan jika sering freeze/layar putih saat bermain, terutama di laptop lama. Sejak v7.2.7 mode ini hanya menurunkan MSAA (anti-aliasing off) — komponen lain (render quality paksa, texture minimum, FPS cap) dibuang karena terbukti memicu layar putih di iGPU tua. TDR (Event 4101) tetap bisa muncul: akar masalah ada di driver GPU legacy, mitigasi ini hanya mengurangi frekuensinya. Berlaku penuh saat Roblox launch berikutnya. Validasi: bandingkan frekuensi &quot;RENDER STALL TERDETEKSI&quot; di log sebelum vs sesudah toggle ini aktif..
         /// </summary>
         public static string Menu_FastFlags_TdrMitigation_Description {
             get {
@@ -5143,6 +5161,192 @@ namespace Bloxstrap.Resources {
         public static string Menu_Mods_ImportMod_Success {
             get {
                 return ResourceManager.GetString("Menu.Mods.ImportMod.Success", resourceCulture);
+            }
+        }
+
+        public static string Menu_GameSession_Title {
+            get {
+                return ResourceManager.GetString("Menu.GameSession.Title", resourceCulture);
+            }
+        }
+
+public static string Menu_GameSession_Description {
+            get {
+                return ResourceManager.GetString("Menu.GameSession.Description", resourceCulture);
+            }
+        }
+
+        public static string GameSession_EnabledTitle {
+            get {
+                return ResourceManager.GetString("GameSession.EnabledTitle", resourceCulture);
+            }
+        }
+
+        public static string GameSession_EnabledDescription {
+            get {
+                return ResourceManager.GetString("GameSession.EnabledDescription", resourceCulture);
+            }
+        }
+
+        public static string GameSession_SuspendLabel {
+            get {
+                return ResourceManager.GetString("GameSession.SuspendLabel", resourceCulture);
+            }
+        }
+
+        public static string GameSession_AutoSelectTitle {
+            get {
+                return ResourceManager.GetString("GameSession.AutoSelectTitle", resourceCulture);
+            }
+        }
+
+        public static string GameSession_AutoSelectDescription {
+            get {
+                return ResourceManager.GetString("GameSession.AutoSelectDescription", resourceCulture);
+            }
+        }
+
+        public static string GameSession_AutoCandidateCount {
+            get {
+                return ResourceManager.GetString("GameSession.AutoCandidateCount", resourceCulture);
+            }
+        }
+
+public static string GameSession_ScanNow {
+            get {
+                return ResourceManager.GetString("GameSession.ScanNow", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoreNow {
+            get {
+                return ResourceManager.GetString("GameSession.RestoreNow", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoreNow_None {
+            get {
+                return ResourceManager.GetString("GameSession.RestoreNow.None", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoreNow_Rescued {
+            get {
+                return ResourceManager.GetString("GameSession.RestoreNow.Rescued", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoreNow_Done {
+            get {
+                return ResourceManager.GetString("GameSession.RestoreNow.Done", resourceCulture);
+            }
+        }
+
+        public static string GameSession_SuspendNotification {
+            get {
+                return ResourceManager.GetString("GameSession.SuspendNotification", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RulesTitle {
+            get {
+                return ResourceManager.GetString("GameSession.RulesTitle", resourceCulture);
+            }
+        }
+
+        public static string GameSession_NoAppsDetected {
+            get {
+                return ResourceManager.GetString("GameSession.NoAppsDetected", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RiskNotice {
+            get {
+                return ResourceManager.GetString("GameSession.RiskNotice", resourceCulture);
+            }
+        }
+
+        public static string GameSession_DetectorUnavailable {
+            get {
+                return ResourceManager.GetString("GameSession.DetectorUnavailable", resourceCulture);
+            }
+        }
+
+        public static string GameSession_DetectorDegraded {
+            get {
+                return ResourceManager.GetString("GameSession.DetectorDegraded", resourceCulture);
+            }
+        }
+
+        public static string GameSession_ZeroSuspended {
+            get {
+                return ResourceManager.GetString("GameSession.ZeroSuspended", resourceCulture);
+            }
+        }
+
+        public static string GameSession_ProtectedSkipped {
+            get {
+                return ResourceManager.GetString("GameSession.ProtectedSkipped", resourceCulture);
+            }
+        }
+
+        public static string GameSession_SessionActive {
+            get {
+                return ResourceManager.GetString("GameSession.SessionActive", resourceCulture);
+            }
+        }
+
+        public static string GameSession_SuspendedAppsHeader {
+            get {
+                return ResourceManager.GetString("GameSession.SuspendedAppsHeader", resourceCulture);
+            }
+        }
+
+        public static string GameSession_SuspendedLabel {
+            get {
+                return ResourceManager.GetString("GameSession.SuspendedLabel", resourceCulture);
+            }
+        }
+
+        public static string GameSession_PartialSuspended {
+            get {
+                return ResourceManager.GetString("GameSession.PartialSuspended", resourceCulture);
+            }
+        }
+
+        public static string GameSession_LastSessionTitle {
+            get {
+                return ResourceManager.GetString("GameSession.LastSessionTitle", resourceCulture);
+            }
+        }
+
+        public static string GameSession_NoHistory {
+            get {
+                return ResourceManager.GetString("GameSession.NoHistory", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoredAll {
+            get {
+                return ResourceManager.GetString("GameSession.RestoredAll", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoredPartial {
+            get {
+                return ResourceManager.GetString("GameSession.RestoredPartial", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoredFailedEntry {
+            get {
+                return ResourceManager.GetString("GameSession.RestoredFailedEntry", resourceCulture);
+            }
+        }
+
+        public static string GameSession_RestoredFailedGeneric {
+            get {
+                return ResourceManager.GetString("GameSession.RestoredFailedGeneric", resourceCulture);
             }
         }
     }

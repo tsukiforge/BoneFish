@@ -49,7 +49,7 @@
 - **Global Hotkeys** — Keyboard shortcuts for instant feature toggles: `Ctrl+Shift+C` (Crosshair), `Ctrl+Shift+F` (FPS Monitor)
 - **FPS Monitor Overlay** — Real-time FPS display via ETW with color coding (green/yellow/red), draggable positioning, and persistent mode (stays active after game exit)
 - **Modern UI** — Clean, minimal design with JetBrains Mono (monospace) font, Lucide-style outline icons, 2-column responsive layout, and dark/light theme support
-- **Custom Font, Cursor & Emoji** — Upload custom fonts, choose between classic 2006/2013 cursors, and pick emoji styles (Twemoji, Windows 10/11, Catmoji)
+- **Custom Font, Cursor & Emoji** — Upload custom fonts, choose between classic 2006/2013 cursors, and pick emoji styles (Windows 8.1, Windows 10/11, Catmoji)
 - **Bootstrapper Customization** — Multiple bootstrapper styles (Legacy 2008/2011, Vista, Classic, Glass, Fake Byfron), custom icons, and custom title
 
 ### ⚡ **Performance & Optimization**
@@ -70,6 +70,7 @@
 - **Detailed Server Information** — Powered by [RoValra][rovalra]'s API: server region, player list, ping, uptime, and location
 - **Server History Tracking** — Keep track of servers you've joined during the session, with one-click rejoin
 - **Auto-Reconnect After Crash** — Detects Roblox crashes via exit code (NTSTATUS: negative = crash, 0 = normal exit), and offers a "Sambung Ulang" button to rejoin the exact same server (PlaceId + JobId), with automatic fallback to a new server if the old one is full
+- **Game Session Manager** — Approve individual background applications for per-session suspension while Roblox runs (Settings → Game Session Manager). New rules are disabled by default, critical/security processes are never touched, suspension is fail-safe when security detection is unavailable, and restore verifies process identity before resuming threads
 - **Auto-Cache Cleaner** — Automatic Roblox cache cleanup at startup (configurable max age, max size, with safety check for active Roblox processes)
 - **Quick Repair Shortcuts** — One-click verification and repair of Desktop & Start Menu shortcuts
 - **Battery Saver Mode** — Skips auto-wallpaper refresh when laptop is on battery (PC desktops without battery auto-hide the toggle)
@@ -96,28 +97,28 @@
 <div align="center">
 
 ### Default Interface
-<img src="showcase/showcaseDefault.png" alt="BoneFish Default Interface" width="800"/>
+<img src="showcase/13_final.png" alt="BoneFish Default Interface" width="800"/>
 
 *Clean, modern settings panel with organized navigation*
 
 ---
 
 ### Mods & Customization
-<img src="showcase/showcase2.png" alt="Mods Page" width="800"/>
+<img src="showcase/11_mods_full.png" alt="Mods Page" width="800"/>
 
 *Custom fonts, emojis, cursors, and loading screens*
 
 ---
 
 ### Visual Themes
-<img src="showcase/showcase3.png" alt="Theme Options" width="800"/>
+<img src="showcase/03_appearance_top.png" alt="Theme Options" width="800"/>
 
 *Multiple appearance options and bootstrapper styles*
 
 ---
 
 ### Experimental Features
-<img src="showcase/showcase4.png" alt="Experimental Page" width="800"/>
+<img src="showcase/05_fastflags_top.png" alt="Experimental Page" width="800"/>
 
 *Advanced features: Wallpaper Launcher, FPS Monitor, Notifications*
 
@@ -172,23 +173,11 @@ Enable in **Experimental** page:
 
 ## 📋 Changelog
 
-**v7.1.2** *(2026-08-12)* — Toggle persistence fix + automatic device-based recommendations
+**v7.1.2** *(2026-08-12)* — Toggle persistence fix + Game Session Manager
 - **Fix: toggles no longer reset on reload** — manual FastFlags toggles (MSAA, Rendering Mode, Display Scaling, Texture Quality, FRM, Mesh LOD, Animations, Low Memory Mode) now save immediately, and the settings window saves FastFlags on close, so your choices survive a restart
-- **Recommend from Device** in Optimization Sandbox: reads your hardware (true system tier, HDD/SSD, cores) and suggests matching FastFlags — pure suggestion, nothing is applied without your review
-- **Review dialog with checkboxes**: each recommendation shows current → new value plus a one-line reason, with a selection counter and empty-selection validation; chosen flags enter the experiment through the same upsert path as Add Change
-- Recommended values match the existing presets (no second source of truth); 4 new tests (107 total)
-
-**v7.1.1** *(2026-08-12)* — Guided experiment flow + full telemetry
-- Clear **5-step experiment flow** (Configure → Snapshot → Apply → Test → Result) with a step indicator that always shows where you are; only valid actions are shown/enabled per state
-- **Add Configuration Change dialog**: search FastFlags, see the current value, preview the change, with validation (duplicate → updated in place, no-op → removed)
-- **Measurements now include 1% Low FPS, RAM, and CPU** (sampled from existing telemetry sources; RAM/CPU work without admin, GPU honestly stays N/A)
-- Honest result classification: Potential Improvement / Similar / Degraded / Not Enough Data
-
-**v7.1.0** *(2026-08-11)* — Optimization Sandbox
-- New **Optimization Sandbox** page: safely experiment with performance FastFlags — every experiment is snapshot-based, fully reversible and verified
-- Full flow: Apply (validate + snapshot + write + verify) → Test with real FPS measurement (ETW telemetry) → Commit to your active profile or Rollback
-- Crash recovery: interrupted experiments are detected on startup with one-click restore
-- Experiment history with results and measurements; 73 automated tests added (xUnit)
+- **Game Session Manager**: approve individual background applications for per-session suspension while Roblox runs. New applications are unchecked by default, critical/security processes are never touched, and restore is verified with a visible summary.
+- **Security fail-safe**: unavailable or incomplete security detection suspends zero processes.
+- **Session visibility**: the active page lists suspended application names and reports partial suspension/restore failures with exact counts.
 
 **v7.0.6** *(2026-08-10)* — TDR Mitigation Mode for legacy iGPUs
 - New toggle reduces freezes/white screens on Intel HD 4000-series: MSAA off, lowest-safe render quality, lowest textures, consistent 30 FPS cap
@@ -345,4 +334,4 @@ Use at your own risk. We are not responsible for any account actions taken by Ro
 [appleblox]:  https://github.com/AppleBlox/appleblox
 [sober]:      https://sober.vinegarhq.org
 [rovalra]:    https://www.rovalra.com
-[website]:    https://bonefishstudioo.vercel.app
+[website]:    https://bonefishstudio.vercel.app
