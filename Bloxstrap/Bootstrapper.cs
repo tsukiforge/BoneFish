@@ -891,6 +891,33 @@ namespace Bloxstrap
 
             var autoclosePids = new List<int>();
 
+            // Game Session Manager is opt-in. Unless the user explicitly enabled it
+            // AND actually has something to suspend (a checked rule or auto-select),
+            // skip BeginSessionAsync() entirely — no WMI query, no process scan,
+            // no file write. Zero overhead for users who don't use this feature.
+            bool gameSessionShouldRun = _launchMode == LaunchMode.Player
+                && App.Settings.Prop.GameSessionEnabled
+                && (App.Settings.Prop.GameSessionAutoSelectSafeApps
+                    || App.Settings.Prop.GameSessionRules.Any(rule => rule.SuspendDuringGame));
+
+            GameSessionRecord? gameSession = null;
+            if (gameSessionShouldRun)
+            {
+                try
+                {
+                    gameSession = await App.GameSession.BeginSessionAsync(_cancelTokenSource.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // Session management must never prevent Roblox from launching.
+                    App.Logger.WriteLine(LOG_IDENT, $"Game Session start failed (non-fatal): {ex.Message}");
+                }
+            }
+
             // the code you're gonna read ahead is horrible. sorry for the hack, but it works ¯\_(ツ)_/¯
             // check if prelaunch is checked
             foreach (var integration in App.Settings.Prop.CustomIntegrations)
@@ -935,6 +962,18 @@ namespace Bloxstrap
                 _appPid = process.Id;
                 _appWindowHandle = process.MainWindowHandle;
 
+                if (gameSession is not null)
+                {
+                    try
+                    {
+                        App.GameSession.AttachGameProcess(_appPid);
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, $"Game Session PID attach failed (non-fatal): {ex.Message}");
+                    }
+                }
+
                 // Anti not-responding: set priority + trim RAM background processes.
                 // Dilakukan masih dalam blok `using` agar handle process masih valid
                 // untuk GetProcessById (walaupun kita buka ulang di dalam method-nya).
@@ -950,12 +989,19 @@ namespace Bloxstrap
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
                 // 1223 = ERROR_CANCELLED, gets thrown if a UAC prompt is cancelled
+                if (gameSession is not null)
+                    App.GameSession.EndSession();
+
                 return;
             }
             catch (Exception)
             {
                 // attempt a reinstall on next launch
                 File.Delete(AppData.ExecutablePath);
+
+                if (gameSession is not null)
+                    App.GameSession.EndSession();
+
                 throw;
             }
 
@@ -1018,7 +1064,10 @@ namespace Bloxstrap
                     autoclosePids.Add(pid);
             }
 
-            if (App.Settings.Prop.EnableActivityTracking || App.LaunchSettings.TestModeFlag.Active || autoclosePids.Any())
+            if (App.Settings.Prop.EnableActivityTracking
+                || App.LaunchSettings.TestModeFlag.Active
+                || autoclosePids.Any()
+                || gameSession is { SuspendedProcesses.Count: > 0 })
             {
                 var watcherData = new WatcherData
                 {
@@ -1042,6 +1091,9 @@ namespace Bloxstrap
                 // for stale instances). Holding it from the bootstrapper made the freshly
                 // spawned watcher fail to acquire the lock and abort before creating the tray icon.
                 Process.Start(Paths.Process, args);
+
+                if (gameSession is { SuspendedProcesses.Count: > 0 })
+                    App.GameSession.MarkHandedOffToWatcher();
             }
 
             // allow for window to show, since the log is created pretty far beforehand

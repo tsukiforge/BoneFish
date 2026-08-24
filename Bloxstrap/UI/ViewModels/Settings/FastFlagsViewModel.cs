@@ -262,42 +262,36 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public bool DisableRobloxAnimations
         {
-            get => App.FastFlags.GetValue("FFlagRenderUIAnimations") == "False";
+            get => App.Settings.Prop.DisableRobloxAnimations;
             set
             {
+                App.Settings.Prop.DisableRobloxAnimations = value;
                 if (value)
-                {
-                    App.FastFlags.SetValue("FFlagRenderUIAnimations", "False");
-                    App.FastFlags.SetValue("FFlagRenderMenuTransitions", "False");
-                    App.FastFlags.SetValue("FFlagRenderInventoryEffects", "False");
-                }
+                    Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
                 else
-                {
-                    App.FastFlags.SetValue("FFlagRenderUIAnimations", null);
-                    App.FastFlags.SetValue("FFlagRenderMenuTransitions", null);
-                    App.FastFlags.SetValue("FFlagRenderInventoryEffects", null);
-                }
+                    Integrations.AutoOptimizeService.RemoveDisableRobloxAnimations();
                 OnPropertyChanged(nameof(DisableRobloxAnimations));
-                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
+                // ★ FIX: simpan seketika — state toggle disimpan TERPISAH di Settings
+                // (bukan cuma dibaca dari FastFlags) supaya survive PurgeAllKnownFlags
+                // yang jalan setiap Play. FastFlags tetap ditulis untuk efek langsung.
+                try { App.Settings.Save(); } catch { }
                 try { App.FastFlags.Save(); } catch { }
             }
         }
 
         public bool EnableLowMemoryMode
         {
-            get => App.FastFlags.GetValue("FFlagLuaAppEnableLowMemoryMode") == "True";
+            get => App.Settings.Prop.EnableLowMemoryMode;
             set
             {
+                App.Settings.Prop.EnableLowMemoryMode = value;
                 if (value)
-                {
-                    App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", "True");
-                }
+                    Integrations.AutoOptimizeService.ApplyLowMemoryMode();
                 else
-                {
-                    App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", null);
-                }
+                    Integrations.AutoOptimizeService.RemoveLowMemoryMode();
                 OnPropertyChanged(nameof(EnableLowMemoryMode));
-                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
+                // ★ FIX: simpan seketika — state toggle disimpan TERPISAH di Settings.
+                try { App.Settings.Save(); } catch { }
                 try { App.FastFlags.Save(); } catch { }
             }
         }
@@ -363,20 +357,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        /// <summary>
-        /// Target FPS untuk TaskScheduler pada Extreme/UltraLow mode.
-        /// Default 30; minimum 24 untuk perangkat paling lemah.
-        /// </summary>
-        public int ExtremeModeFpsTarget
-        {
-            get => App.Settings.Prop.ExtremeModeFpsTarget;
-            set
-            {
-                App.Settings.Prop.ExtremeModeFpsTarget = Math.Clamp(value, 24, 60);
-                OnPropertyChanged(nameof(ExtremeModeFpsTarget));
-                try { App.Settings.Save(); } catch { }
-            }
-        }
+        // ── FPS Target Extreme DIBUANG di rombak v7.2.7 ─────────────────────────
+        // DFIntTaskSchedulerTargetFps TIDAK ada di allowlist sejak 2025-09-29 — client
+        // modern mengabaikannya (pengganti: GlobalBasicSettings_13.xml FramerateCap).
+        // Property ExtremeModeFpsTarget + UI slider dihapus; FPS cap manual di-set user
+        // langsung di pengaturan Roblox (FramerateCap).
 
         /// <summary>
         /// Fast Loading — toggle independen untuk percepat loading aset.
@@ -457,12 +442,21 @@ namespace Bloxstrap.UI.ViewModels.Settings
             MeshQuality = 0;
             FRMQualityOverrideEnabled = true;
             FRMQualityOverride = 21;
-            DisableRobloxAnimations = true;
-            EnableLowMemoryMode = true;
+            // Manual flags ditulis langsung (bukan via toggle property) supaya preset
+            // TIDAK membalik state manual user di Settings — flag manual & preset
+            // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
+            Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             SelectedPreset = "AutoOptimize";
             try { App.FastFlags.Save(); } catch { }
@@ -515,8 +509,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             MeshQuality = 0;
             FRMQualityOverrideEnabled = true;
             FRMQualityOverride = 21;
-            DisableRobloxAnimations = true;
-            EnableLowMemoryMode = true;
+            // Manual flags ditulis langsung (bukan via toggle property) supaya preset
+            // TIDAK membalik state manual user di Settings — flag manual & preset
+            // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
+            Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // ── Network ────────────────────────────────────────────────────────────────
             Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
@@ -524,6 +521,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // ── Fast Loading: re-apply jika toggle aktif (stack dengan preset) ─────────
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
+
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // ── Stability-specific ──────────────────────────────────────────────────
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
@@ -564,11 +567,17 @@ namespace Bloxstrap.UI.ViewModels.Settings
             FixDisplayScaling = true;
             SelectedRenderingMode = RenderingMode.D3D11;
             SelectedMSAALevel = MSAAMode.x1;
-            SelectedTextureQuality = TextureQuality.Level0;
+            // Texture Level1 (bukan Level0) sejak rombak v7.2.7: texture paksa 0
+            // (DFIntTextureQualityOverride=0) terbukti merusak render di iGPU tua
+            // (audit layar-putih 8/18/2026). Level1 tetap rendah tapi aman.
+            SelectedTextureQuality = TextureQuality.Level1;
             MeshQualityEnabled = true;
             MeshQuality = 0;
-            FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 5;
+            // FRMQualityOverride TIDAK dipaksa di preset sejak rombak v7.2.7 —
+            // render quality override (DFIntDebugFRMQualityLevelOverride) adalah
+            // komponen kombinasi layar-putih; user bisa set manual di dropdown Rendering.
+            FRMQualityOverrideEnabled = false;
+            FRMQualityOverride = 1;
 
             // LOD — semua level 250 sesuai ultra low-spec.json
             App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
@@ -577,15 +586,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "250");
             App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
 
-            // Anti-crash: batasi FPS, light updates (Max=4 bukan 1 — nilai 1 bug gelap),
-            // dan texture compositor jobs.
-            App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", "30");
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
+            // Anti-crash: batasi texture compositor jobs.
+            // (DFIntTaskSchedulerTargetFps & FIntRenderLocalLightUpdatesMax/Min
+            // DIBUANG di rombak v7.2.7 — tidak di allowlist / di-deny client 0.734.)
             App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
 
-            DisableRobloxAnimations = true;
-            EnableLowMemoryMode = true;
+            // Manual flags ditulis langsung (bukan via toggle property) supaya preset
+            // TIDAK membalik state manual user di Settings — flag manual & preset
+            // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
+            Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // Network flags langsung — panggil method reusable
             Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
@@ -599,6 +609,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
@@ -668,6 +684,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
 
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
+
             SelectedPreset = "Balanced";
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
@@ -708,12 +730,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
         ///    - FFlagDebugSSAOForce=False   — SSAO dimatikan
         ///    - FIntSSAOMipLevels=0         — SSAO kualitas 0
         ///    - FIntRobloxGuiBlurIntensity=0 — Blur UI mati
-        ///    - FIntRenderGrainScale=0      — Grain mati
         ///    Alasan: Preset ini didesain untuk device dual-core, RAM <4GB,
         ///    di mana SEMUA post-processing ringan pun membebani CPU/GPU.
         ///    Label "PALING AGRESIF" sudah memperingatkan user.
-        ///    Visual yang dimatikan hanya efek kosmetik (blur, grain, SSAO)
+        ///    Visual yang dimatikan hanya efek kosmetik (blur, SSAO)
         ///    — TIDAK memengaruhi gameplay, lighting, atau shadow.
+        ///    (FIntRenderGrainScale dihapus dari preset di rombak v7.2.7 —
+        ///    di-deny client Roblox 0.734.)
         ///
         /// 3. FLAG ANTI-FREEZE/STABILITY:
         ///    ★ AUDIT v7.x: DFIntMaxActiveAnimationTracks, FIntRenderLocalLightFadeInMs
@@ -749,11 +772,17 @@ namespace Bloxstrap.UI.ViewModels.Settings
             FixDisplayScaling = true;
             SelectedRenderingMode = RenderingMode.D3D11;
             SelectedMSAALevel = MSAAMode.x1;
-            SelectedTextureQuality = TextureQuality.Level0;
+            // Texture Level1 (bukan Level0) sejak rombak v7.2.7: texture paksa 0
+            // (DFIntTextureQualityOverride=0) terbukti merusak render di iGPU tua
+            // (audit layar-putih 8/18/2026). Level1 tetap rendah tapi aman.
+            SelectedTextureQuality = TextureQuality.Level1;
             MeshQualityEnabled = true;
             MeshQuality = 0;
-            FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 3;
+            // FRMQualityOverride TIDAK dipaksa di preset sejak rombak v7.2.7 —
+            // DFIntDebugFRMQualityLevelOverride adalah komponen kombinasi layar-putih
+            // di iGPU tua; user bisa set manual di dropdown Rendering.
+            FRMQualityOverrideEnabled = false;
+            FRMQualityOverride = 1;
 
             // ── Shadow: TIDAK dimatikan sepenuhnya ──────────────────────────────────────
             // CATATAN SEBELUMNYA (PENYEBAB GAME GELAP):
@@ -761,20 +790,17 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // menghapus SEMUA bayangan dan lighting baked → game jadi HITAM.
             // Terutama parah di game ShadowMap/Future (Phasmophobia, horror games).
             //
-            // FIX: FRM=3 masih sangat ringan tapi preserve basic lighting pipeline.
+            // FIX: FRM override dihapus (rombak v7.2.7) — lighting pipeline default.
             // Shadow intensity DIHAPUS (biarkan default Roblox), voxelizer TIDAK dipause.
             //
-            // Light updates Max=4 agar senter/torch tidak bug gelap.
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMax", "4");
-            App.FastFlags.SetValue("FIntRenderLocalLightUpdatesMin", "2");
-            // FIntRenderLocalLightFadeInMs tidak lagi ditulis (audit v7.x): tidak ada di
-            // allowlist resmi Roblox (Sep 2025+, thread devforum 3966569) → diabaikan client.
+            // Light updates Max/Min (FIntRenderLocalLightUpdates*) DIBUANG — di-deny
+            // client 0.734 ("Denied local configuration"), menulisnya sia-sia.
 
             // ── Post-processing ringan: hanya yang tidak merusak visual game ────────────
             App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
             App.FastFlags.SetValue("FIntSSAOMipLevels", "0");
             App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
-            App.FastFlags.SetValue("FIntRenderGrainScale", "0");
+            // FIntRenderGrainScale DIBUANG di rombak v7.2.7 — di-deny client 0.734.
 
             // ── Grass & wind: dibiarkan default — tidak memengaruhi rendering speed ──────
 
@@ -791,7 +817,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             // ── Texture & terrain ────────────────────────────────────────────────────────
             App.FastFlags.SetValue("FIntTerrainArraySliceSize", "0");
-            App.FastFlags.SetValue("FIntTextureCompositorLowResFactor", "1");
+            // FIntTextureCompositorLowResFactor DIBUANG di rombak v7.2.7 — komponen
+            // kombinasi layar-putih di iGPU tua.
             App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
 
             // ── Render batch: kurangi draw-call overhead ─────────────────────────────────
@@ -799,18 +826,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
 
             // ── Rendering speed: percepat render aset ────────────────────────────────────
-            // DFIntMaxFrameBufferSize=4: kurangi frame buffer queue dari default (~10) ke 4.
-            // Makin kecil buffer = frame lebih cepat ditampilkan, input lag berkurang.
-            // Nilai 0-3 bikin gerakan player lain laggy. 4 adalah sweet spot paling stabil.
-            // Sumber: Dantezz025/Roblox-Fast-Flags (confirmed 2026).
-            App.FastFlags.SetValue("DFIntMaxFrameBufferSize", "4");
-
-            // FIntRuntimeMaxNumOfThreads=4: batasi max thread yang di-spawn Roblox.
-            // Di dual-core, default Roblox spawn terlalu banyak thread → context switching
-            // overhead → tiap thread dapat lebih sedikit waktu CPU → render jadi lambat.
-            // Nilai 4 lebih terkontrol untuk dual/quad core.
-            // Sumber: Dantezz025/Roblox-Fast-Flags (confirmed 2026).
-            App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", "4");
+            // DFIntMaxFrameBufferSize & FIntRuntimeMaxNumOfThreads DIBUANG di rombak
+            // v7.2.7 — frame buffer 4 + thread render dibatasi terbukti memicu artefak/
+            // layar putih di iGPU tua; manfaatnya tidak terukur pada dual/quad core.
 
             // DFFlagEnableRequestAsyncCompression=True: aktifkan kompresi async untuk
             // request aset ke server Roblox — aset lebih cepat di-download saat join game,
@@ -824,9 +842,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // yang aktif sejak 29 Sep 2025 → client mengabaikannya. Tidak ditulis lagi;
             // nilai lama tetap dihapus lewat purge (AllKnownManagedFlags).
 
-            // ── FPS Cap ───────────────────────────────────────────────────────────────────
-            int fpsCap = Math.Clamp(App.Settings.Prop.ExtremeModeFpsTarget, 24, 60);
-            App.FastFlags.SetValue("DFIntTaskSchedulerTargetFps", fpsCap.ToString());
+            // ── FPS Cap DIBUANG di rombak v7.2.7 ─────────────────────────────────────────
+            // DFIntTaskSchedulerTargetFps TIDAK ada di allowlist sejak 2025-09-29 — client
+            // mengabaikannya. FPS cap manual di-set user di pengaturan Roblox
+            // (GlobalBasicSettings FramerateCap), bukan lewat FastFlag.
 
             // ── BoneFish settings ────────────────────────────────────────────────────────
             // CATATAN: ForceExtremeMode TIDAK di-hardcode true di sini.
@@ -836,8 +855,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // Extreme dipilih, menyebabkan preset lain (Balanced, UltraLow, Stable)
             // tetap kena override Extreme saat Roblox di-launch ulang — lihat
             // AutoOptimizeService.DetectSystemTier() yang cek ForceExtremeMode duluan.
-            DisableRobloxAnimations = true;
-            EnableLowMemoryMode = true;
+            // Manual flags ditulis langsung (bukan via toggle property) supaya preset
+            // TIDAK membalik state manual user di Settings — flag manual & preset
+            // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
+            Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            Integrations.AutoOptimizeService.ApplyLowMemoryMode();
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
 
@@ -853,6 +875,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
+
+            // Manual toggles: re-apply setelah purge agar survive (pola TDR/FastLoading)
+            if (App.Settings.Prop.DisableRobloxAnimations)
+                Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
+            if (App.Settings.Prop.EnableLowMemoryMode)
+                Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
             // Agar value "ExtremePerformance" tertulis ke disk. Lihat komentar di ApplyUltraLowSpecPreset.

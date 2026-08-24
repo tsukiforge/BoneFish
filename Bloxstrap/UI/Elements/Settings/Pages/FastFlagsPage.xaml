@@ -198,38 +198,6 @@
                     <ui:ToggleSwitch IsChecked="{Binding EnableTdrMitigation, Mode=TwoWay}" />
                 </controls:OptionControl>
 
-                <!-- FPS TARGET -->
-                <ui:CardExpander Margin="0,4,0,0" IsExpanded="False">
-                    <ui:CardExpander.Header>
-                        <StackPanel>
-                            <TextBlock FontSize="14" Text="Target FPS — Extreme / Potato Mode" />
-                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       Text="Batasi FPS internal Roblox untuk kurangi CPU load. Default 30fps." />
-                        </StackPanel>
-                    </ui:CardExpander.Header>
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="24 fps" Grid.Column="0" VerticalAlignment="Center" />
-                        <Slider Grid.Column="1" Margin="8,0,8,0" Minimum="24" Maximum="60"
-                                TickFrequency="1" IsSnapToTickEnabled="True"
-                                Value="{Binding ExtremeModeFpsTarget, Mode=TwoWay}" />
-                        <TextBlock Text="60 fps" Grid.Column="2" VerticalAlignment="Center" />
-                        <Border Margin="8,-4,0,0" Grid.Column="3" Width="36"
-                                BorderBrush="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}"
-                                Background="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}"
-                                BorderThickness="1" CornerRadius="4">
-                            <TextBlock HorizontalAlignment="Center" Padding="4" VerticalAlignment="Center"
-                                       TextAlignment="Center"
-                                       Text="{Binding ExtremeModeFpsTarget, Mode=TwoWay}" />
-                        </Border>
-                    </Grid>
-                </ui:CardExpander>
-
                 <!-- MANUAL OVERRIDES -->
                 <TextBlock Text="Manual FastFlag Overrides" FontSize="20" FontWeight="Medium" Margin="0,16,0,4" />
 

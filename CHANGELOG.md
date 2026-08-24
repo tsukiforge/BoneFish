@@ -1,5 +1,236 @@
 # BoneFish Changelog
 
+## v7.2.9 - Fix Mic Roblox Tidak Berfungsi Setelah Game Session
+
+Release date: 2026-08-23
+
+### 🎤 Fix: microphone tidak berfungsi di Roblox voice chat SETELAH sesi
+
+Bug baru dilaporkan: microphone berfungsi normal sebelum sesi, tapi berhenti
+kerja di Roblox voice chat SETELAH Game Session Manager selesai suspend/resume.
+Speaker output tetap OK (fix v7.2.8 sudah benar untuk speaker).
+
+**Root cause:** `RtkNGUI64.exe` (Realtek HD Audio Manager) — proses yang handle
+**mic settings** (noise cancellation, echo cancellation, boost) — **TIDAK ada di
+CRITICAL list**. Proses ini:
+- Jalan di **user session** (bukan session 0) → lolos guard `SessionId==0`
+- Bukan Windows path → lolos guard `IsWindowsPath()`
+- Maintain **active connections** ke Realtek audio driver
+- Ketika di-suspend → audio driver timeout connection
+- Ketika di-resume → proses lanjut jalan tapi connection udah putus → mic broken
+
+**Kenapa speaker OK tapi mic rusak?** Speaker output ditangani oleh `RAVBg64` +
+`RtkAudioService64` (udah protected sejak v7.2.8). Mic input ditangani oleh
+`RtkNGUI64` + audio driver connection (BELUM protected).
+
+### 🛡️ 5 proses audio vendor tambahan dilindungi
+
+| Proses | Fungsi | Alasan |
+|--------|--------|--------|
+| `RtkNGUI64` | Realtek HD Audio Manager (64-bit) | Handle mic settings: noise cancel, echo cancel, boost |
+| `RtkNGUI` | Realtek HD Audio Manager (32-bit) | Versi 32-bit dari yang sama |
+| `RtkBtManServ` | Realtek Bluetooth Manager | Handle Bluetooth headset audio |
+| `BthAudioAgent` | Bluetooth Audio Agent | Handle Bluetooth audio input/output |
+| `WsaAudioService` | Windows Sonic spatial audio | Handle spatial audio processing |
+
+### 🔬 Resume Logic Audit
+
+Resume logic di `RestoreProcess()` cuma resume threads — **TIDAK reinitialize
+audio connections**. Untuk kebanyakan proses ini cukup, tapi untuk audio services
+yang maintain active connections ke driver, resume thread saja **tidak cukup**.
+
+**Solusi paling aman:** Jangan biarkan proses audio di-suspend sama sekali →
+tambah ke CRITICAL list. Lebih aman dari pada coba "perbaiki" setelah rusak.
+
+### ✅ Verifikasi
+
+- Build 0 error, 0 warning
+- Semua 21 ProcessClassifierTests passed (termasuk 5 test baru)
+- Semua proses audio vendor terlindungi dari suspend
+
+---
+
+## v7.2.8 - Fix Headset Mati Suara + Lindungi Service dari Suspend
+
+Release date: 2026-08-19
+
+### 🎧 Fix: headset tidak bersuara selama Game Session aktif
+
+Bug nyata dilaporkan: setelah Game Session men-suspend aplikasi latar, headset
+diam sampai di-resume manual. Audit log sesi 8/19 membuktikan penyebabnya:
+
+```
+2026-08-19T09:45:47Z [GameSession::SuspendProcess] PID=5704: 6/6 threads suspended; failed=0; passes=2; partial=False
+2026-08-19T09:45:47Z [GameSession::BeginSession] RAVBg64 ter-suspend 6/6 thread
+2026-08-19T09:45:48Z [GameSession::SuspendProcess] PID=3356: 10/10 threads suspended; failed=0; passes=2; partial=False
+2026-08-19T09:45:48Z [GameSession::BeginSession] RAVCpl64 ter-suspend 10/10 thread
+```
+
+- **RAVBg64** (Realtek Audio Background — menangani audio device/jack switching)
+  dan **RAVCpl64** (Realtek HD Audio Control Panel) ikut ter-suspend. Keduanya
+  jalan di session user dan berada di `Program Files` (bukan Windows path),
+  sehingga lolos perlindungan lama yang hanya mengecualikan `audiodg`.
+- Dugaan awal "RtkAudUService64" TIDAK terbukti: proses sebenarnya bernama
+  `RtkAudioService64`, berjalan sebagai Windows service di **session 0** dan
+  sudah aman sejak awal lewat guard `SessionId == 0`. Pelaku sebenarnya adalah
+  RAVBg64/RAVCpl64.
+
+### 🛡️ Klasifikasi proses diperkuat (fail-safe, bukan tambal satu nama)
+
+- **Kategori "audio/hardware vendor service"** ditambahkan ke `CriticalProcessNames`:
+  Realtek (`RAVBg64`, `RAVCpl64`, `RAVCpl`, `RtkAudioService64`,
+  `RtkAudUService64`, `RtkAudUService`, `RtkAudioService`), Conexant/Synaptics
+  (`cxaudsvc`), dan Nahimic (`NahimicSvc32/64`, `NahimicSvc`) — device lain
+  (laptop MSI/HP/Conexant) terlindungi juga, bukan cuma Realtek.
+- **Sinyal baru: "proses ini Windows Service" → CRITICAL** — `ServiceProcessDetector`
+  query WMI `Win32_Service` sekali per `BeginSessionAsync` dan mengumpulkan PID
+  semua service SCM. PID mana pun yang terdaftar tidak pernah disuspend, apa pun
+  namanya (menutup service yang ganti nama executable). Gagal query → set kosong
+  (non-fatal; daftar nama statis tetap berlaku — tidak ada proses yang jadi
+  berisiko karena detektor down).
+- **Kategori "per-user service umum"**: Windows 10+ service yang jalan di session
+  user tidak tertangkap guard session-0 maupun SCM klasik. `GameInputRedistService`
+  (controller game mati saat dimainkan) dan `OneDrive.Sync.Service` (sync
+  terganggu) — keduanya terbukti ter-suspend di semua sesi nyata — kini dilindungi.
+- Prinsip "ragu → CRITICAL" tetap: identitas tidak dikenal (nama/path/start time
+  tidak terbaca) selalu ditolak, tidak pernah disuspend.
+
+### 🔧 Lainnya
+
+- Tidak ada perubahan logika `SecuritySoftwareDetector` — kategori baru ini
+  terpisah dari deteksi antivirus (WMI Win32_Service ≠ SecurityCenter2).
+- Tidak ada pesan UI baru; tidak ada perubahan Strings.
+
+Build 0 warning/error; 27 test, semua hijau (16 kasus klasifikasi baru).
+
+## v7.2.7 - Rombak Flag Berbahaya + Tray Watcher Selalu Aktif
+
+Release date: 2026-08-18
+
+### 🗑️ Rombak FastFlags: penyebab layar putih tidak pernah ditulis lagi
+
+Audit layar-putih 8/18/2026 (Intel HD 1GB, driver 20.19.15.5126): kombinasi
+`DFIntDebugFRMQualityLevelOverride=3` + texture paksa 0 + `DFIntMaxFrameBufferSize=4`
+terbukti merusak render di iGPU tua (ClientMemStatus Error, white screen). Flag ini
+ditulis ulang setiap launch oleh preset — sekarang DIBUANG dari kode:
+
+- **Dihapus dari aggressive path & preset manual (UltraLow/Extreme/HDD):**
+  `DFIntDebugFRMQualityLevelOverride`, `DFFlagTextureQualityOverrideEnabled` +
+  `DFIntTextureQualityOverride` (preset kini memakai Texture Level1, bukan 0),
+  `FIntTextureCompositorLowResFactor`, `DFIntMaxFrameBufferSize`, `FIntRuntimeMaxNumOfThreads`.
+- **Flag yang tidak bekerja lagi di client modern:**
+  `DFIntTaskSchedulerTargetFps` (tidak di allowlist sejak 2025-09-29) — UI slider
+  "Target FPS Extreme" + property `ExtremeModeFpsTarget` dihapus; FPS cap di-set di
+  pengaturan Roblox (FramerateCap). `FIntRenderLocalLightUpdatesMax/Min` dan
+  `FIntRenderGrainScale` di-deny client 0.734 ("Denied local configuration").
+- **TDR Mitigation dirombak:** hanya menurunkan MSAA (aman, terbukti) — FRM/texture
+  paksa/FPS cap dibuang. Deskripsi toggle diperbarui (EN + ID).
+- Purge list (`AllKnownManagedFlags`) dipertahankan utuh — nilai lama dari versi
+  terpasang tetap dibersihkan saat launch (tidak ada migrasi khusus).
+
+### 🖥️ Tray watcher selalu aktif — Game Session tetap jalan walau game diluncurkan di luar BoneFish
+
+Sebelumnya: game yang diluncurkan lewat official Roblox app / website (bukan
+`roblox-player:` protocol) tidak pernah terpantau — tidak ada suspend sama sekali.
+Sekarang watcher yang menetap di system tray:
+
+- **Memantau proses RobloxPlayerBeta baru** (`MonitorExternalGameSessions`): begitu
+  proses eksternal terdeteksi dengan log aktivitas yang sesuai, watcher mengambil alih.
+- **Join game → suspend otomatis** (BeginSession + balloon "N aplikasi di-suspend");
+  **leave game / proses mati → restore otomatis** (balloon ringkasan).
+- Takeover watcher baru → sesi diserahkan (diadopsi, tidak di-end); klik Exit di tray
+  → sesi di-restore dulu sebelum BoneFish mati (fix: proses tidak lagi beku saat
+  game eksternal masih berjalan dan user menutup BoneFish).
+- Hanya aktif saat toggle Game Session menyala; idempotent terhadap sesi yang sudah
+  aktif (launcher BoneFish menang duluan).
+
+### 🔧 Fix lain
+
+- Exit dari tray kini memanggil `EndSession()` sebelum `Terminate()` — mencegah
+  aplikasi latar yang disuspend tetap beku setelah BoneFish ditutup.
+
+Build 0 warning/error; 19 test, semua hijau.
+
+## v7.2.6 - Fix Proteksi Mati Setelah Launch + Notifikasi Suspend
+
+Release date: 2026-08-16
+
+### 🐛 Fix: Game Session "mati" setiap kali launch (proteksi tidak jalan saat main)
+
+Bug ini ditemukan dari analisis log mesin pengguna: setiap kali launch Roblox,
+watcher yang baru start langsung meng-END sesi yang baru saja di-handoff
+launcher — aplikasi ter-suspend saat launch, tapi langsung dipulihkan lagi
+sebelum user masuk game. Akibatnya tidak ada proteksi sama sekali saat main.
+
+Akar masalah: `ShouldRestoreStale()` mengecek `Watcher.pid` untuk deteksi watcher
+zombie. File itu masih berisi PID watcher lama yang mati saat watcher baru
+menjalankan cek — jadi sesi yang valid dianggap stale dan di-restore.
+
+- **App.OnStartup**: recovery stale kini dilewati pada mode watcher (launcher
+  baru saja hand-off sesi; watcher yang mengadopsi, bukan restore).
+- **Watcher.Run**: `AdoptPendingGameSession()` — sesi hand-off diadopsi:
+  `HandedOffToWatcher` di-persist, log sesi, dan aplikasi tetap ter-suspend.
+- Alur sekarang: launch → suspend → watcher adopsi → proteksi jalan selama game
+  → keluar game (OnGameLeave) → restore + balloon.
+
+### 🔔 Notifikasi status sesi (balloon tray)
+
+- Saat game dimulai: "**N aplikasi latar di-suspend selama game: daftar**" —
+  tampil dari launcher handoff (adopsi watcher) dan saat re-suspend masuk game
+  kedua dalam proses yang sama.
+- Saat keluar game: balloon ringkasan restore (sudah ada sejak v7.2.5).
+- Resources EN + ID; 19 test, semua hijau.
+
+## v7.2.5 - Game Session: Opt-in Zero Overhead, Manual Flags Persisten, Escape Hatch Tray
+
+Release date: 2026-08-15
+
+### 🔌 Game Session Manager kini opt-in (zero overhead default)
+
+- Master toggle `GameSessionEnabled` (default **OFF**) di paling atas halaman Game Session; seluruh halaman greyed-out saat mati.
+- Saat OFF, `BeginSessionAsync()` tidak pernah dipanggil — tidak ada WMI query, tidak ada process scan, tidak ada file write. Launch path identik dengan sebelum v7.2.0 (benchmark: gate boolean ≈ 64 ns/call).
+- Rules lama tetap tersimpan dan tidak dieksekusi sampai toggle dinyalakan kembali.
+
+### 🔧 Fix: toggle manual FastFlags hilang setiap kali Play
+
+- `DisableRobloxAnimations` dan `EnableLowMemoryMode` kini berbasis Settings (persisten) dan **re-applied di `finally` `CheckAndApply()`** setelah purge `PurgeAllKnownFlags()` — tidak lagi terhapus tiap klik Play.
+- Preset (AutoOptimize/Stable/UltraLow/Balanced/Extreme) menulis flag langsung via AutoOptimizeService, tidak membalik state manual user; purge tetap membersihkan stale flag antar preset (tanpa regresi fix v4.4.0).
+
+### 🛟 Escape hatch manual: tombol "Pulihkan Sekarang" di tray + di dalam app
+
+- Bug yang ditemukan: jika RobloxPlayerBeta tetap hidup di system tray setelah keluar game, proses Roblox tidak pernah mati → `EndSession()` tidak pernah dipanggil → aplikasi yang disuspend beku selamanya.
+- Tombol tray "Pulihkan Aplikasi yang Disuspend" (selalu tampil) + tombol "Pulihkan Sekarang" di halaman Game Session → restore manual kapan pun.
+- **Rescue scan**: jika catatan sesi (`active.json`) hilang tapi proses masih beku (kasus record hilang), tombol memindai seluruh sistem, probe setiap thread, dan me-resume yang tersuspend.
+- Restore kini terikat pada **deteksi keluar-masuk game** (log aktivitas Roblox), bukan hanya kematian proses: keluar game → restore langsung meski proses di tray; masuk game baru dalam proses yang sama → re-suspend otomatis. Proses-mati tetap fallback untuk crash/force-close.
+- Resources baru EN + ID; test rescue scan (19 test, semua hijau).
+
+## v7.2.0 - Game Session Manager: Pengganti Optimization Sandbox yang Fail-Safe
+
+Release date: 2026-08-13
+
+### 🗑️ Optimization Sandbox dihapus total
+
+Konsep auto-experiment 5 langkah (Snapshot → Experiment → Classifier → Result →
+Apply) dihapus seluruhnya — tidak pernah dirilis karena alur optimasi otomatis
+yang menyuspend proses nyata berisiko tinggi untuk perangkat pengguna, dan
+hasilnya tidak bisa dipertanggungjawabkan tanpa persetujuan.
+
+### 🎮 Game Session Manager (penggantinya)
+
+- Menyediakan approval per aplikasi untuk proses background selama sesi Roblox.
+- Semua rule baru default tidak aktif; tidak ada auto-suspend tanpa persetujuan user.
+- Windows, Roblox, BoneFish, dan proses security selalu dilindungi di level kode.
+- Detector security yang unavailable/degraded mengaktifkan safe mode dan men-suspend 0 proses.
+- Snapshot session menyimpan PID, path, waktu mulai, thread yang diubah, dan rule.
+- Restore memvalidasi identitas proses, memeriksa thread state, menyimpan ringkasan, dan melaporkan kegagalan dengan nama aplikasi.
+- Sweep suspend memiliki batas keras 5 pass dan timeout 2 detik per proses.
+- Tests: classifier, fail-safe detector, suspend cap, restore verification, service, dan atomic store (18 test, semuanya hijau).
+
+### 🧹 Kebersihan repo & website
+
+- README showcase diperbaiki — gambar yang direferensikan (`showcaseDefault.png`, `showcase2/3/4.png`) tidak pernah ada; kini memakai file screenshot asli di `showcase/`.
+- Screenshot nyasar `Screenshot_TDR_Mitigation_Toggle.png` di root repo dihapus dari git.
+
 ## v7.1.2 - Fix Toggle Hilang Saat Reload + Rekomendasi FastFlag Otomatis
 
 Release date: 2026-08-12
@@ -17,145 +248,6 @@ Akibatnya setelah BoneFish di-restart, toggle tampak mati padahal tadi aktif.
   tetap aman walau gagal tulis.
 - **Jaring pengaman saat window ditutup** — `WpfUiWindow_Closing` kini juga
   menyimpan `App.FastFlags.Save()`, jadi tidak ada perubahan yang hilang lagi.
-
-### 🤖 Rekomendasi FastFlag otomatis dari spesifikasi perangkat
-
-Fitur automation baru di **Optimization Sandbox**: BoneFish membaca perangkat
-kamu (tier hardware asli, HDD/SSD, jumlah core, target FPS) lalu menyarankan
-FastFlag yang cocok — tanpa menerapkan apa pun tanpa persetujuanmu.
-
-- **Tombol "Recommend from Device"** di samping *Add change* — satu klik untuk
-  membuka dialog review rekomendasi.
-- **Dialog review dengan checkbox** — setiap rekomendasi menampilkan nama flag,
-  nilai saat ini → nilai baru, dan alasan singkat; pilih/deselect bebas, ada
-  penghitung pilihan, dan pilihan kosong ditolak dengan pesan jelas.
-- **Nilai selaras dengan preset yang sudah ada** — rekomendasi untuk tier
-  UltraLow/LowEnd/Extreme/Balanced memakai nilai yang sama dengan preset
-  applier (LOD 250, FRM, MSAA, FPS cap, network) — tidak ada sumber nilai kedua.
-- **Murni baca, tanpa efek samping** — `GetRecommendedFastFlags()` tidak
-  menulis apa pun; flag yang dipilih masuk eksperimen lewat jalur upsert yang
-  sama dengan dialog Add Change.
-- **4 unit test baru** — network baseline untuk semua tier, validitas semua
-  rekomendasi, upsert end-to-end, dan diff non-empty (total 107 tes).
-
-## v7.1.1 - Optimization Sandbox: Alur Eksperimen yang Jelas + Telemetri Lengkap
-
-Release date: 2026-08-12
-
-### 🧭 Alur eksperimen 5 langkah yang jelas
-
-Halaman Optimization Sandbox dirombak dari editor konfigurasi yang membingungkan
-menjadi **laboratorium optimasi yang aman dan terpandu** — alur
-**Configure → Snapshot → Apply → Test → Result** sekarang terlihat eksplisit:
-
-- **Indikator langkah** di bagian atas halaman (`✓ Configure → ○ Snapshot → …`)
-  — langkah aktif selalu jelas, langkah selesai dicentang, dan status terminal
-  (Committed/Rolled Back) menampilkan seluruh perjalanan sebagai selesai.
-- **Tombol aksi kontekstual** — hanya aksi yang valid untuk state saat ini yang
-  tampil (mis. tombol *Apply* baru muncul setelah backup dibuat), aksi tidak valid
-  dinonaktifkan, bukan disembunyikan diam-diam.
-- **Base Profile** kini dijelaskan: titik awal eksperimen, bukan optimasi yang
-  langsung diterapkan — profil tersimpan tidak berubah sampai eksperimen di-commit.
-- **Diff perubahan yang manusiawi** — tabel `Flag | Current → New` sebagai area
-  review pusat, dengan keterangan "Only these values will be changed".
-
-### ➕ Dialog "Add Configuration Change"
-
-Tombol *+ Add Change* kini membuka dialog khusus:
-
-- Pencarian FastFlag (reuse basis data flag yang sudah ada, tidak ada basis data
-  kedua).
-- Nilai saat ini terdeteksi/dibaca (read-only) + pratinjau perubahan sebelum
-  ditambahkan.
-- **Validasi**: nama flag valid, nilai valid, duplikat di-*upsert* (bukan baris
-  ganda), dan perubahan yang menghasilkan no-op (`false → false`) otomatis
-  dihapus dari diff.
-- Eksperimen tanpa perubahan sama sekali tidak bisa di-apply/snapshot.
-
-### 📊 Telemetri pengukuran: 1% Low, RAM, CPU
-
-Bagian Measurements kini menampilkan lebih dari sekadar FPS rata-rata, semua
-berasal dari sumber telemetri yang **sudah ada** (tanpa sistem duplikat):
-
-- **1% Low FPS** diturunkan dari sampel FPS yang sama dengan median (gaya
-  PresentMon) — tidak ada sumber FPS kedua.
-- **RAM** (WorkingSet64) dan **CPU%** (delta TotalProcessorTime ternormalisasi
-  wall-clock & core) disampling di loop per-detik yang sama — **tetap berfungsi
-  tanpa hak admin** (hanya FPS yang butuh ETW).
-- **GPU jujur "N/A"** — BoneFish tidak punya sumber telemetri GPU; tidak ada
-  pengukuran yang diarang.
-- Nilai yang benar-benar terukur (termasuk 0%) ditampilkan apa adanya — tidak
-  pernah diganti "N/A" palsu.
-
-### 🎯 Klasifikasi hasil yang jujur
-
-Hasil eksperimen diklasifikasikan dengan ambang batas nyata, bukan asumsi:
-🟢 Potential Improvement / 🟡 Similar / 🔴 Degraded / ⚪ Not Enough Data —
-keputusan akhir (Commit/Rollback) tetap di tangan user.
-
-### 🛡️ Perbaikan & pemeliharaan
-
-- **Recovery crash** dipertahankan: eksperimen yang belum selesai terdeteksi
-  saat start dengan opsi Restore / Review / Ignore.
-- Perbaikan runtime XAML: `InfoBarSeverity` yang tidak valid di halaman Sandbox
-  (menyebabkan parse error saat membuka halaman) diganti `Error`.
-
-### Pengujian
-
-- **103 test lulus** (xUnit) — bertambah 13 tes baru: persentil FPS, normalisasi
-  CPU (termasuk penjagaan bagi-nol), round-trip JSON, kompatibilitas journal
-  lama, dan pembeda "terukur-nol vs tidak terukur".
-- Build: 0 warning, 0 error.
-
-## v7.1.0 - Optimization Sandbox: Eksperimen FastFlag yang Aman & Reversibel
-
-Release date: 2026-08-11
-
-### Fitur baru - Optimization Sandbox (halaman Settings baru)
-
-Halaman **Optimization Sandbox** memungkinkan kamu menguji perubahan FastFlag
-kinerja secara **terisolasi dan 100% reversibel** sebelum menguncinya ke profil
-aktif:
-
-- **Snapshot sebelum menerapkan** - setiap eksperimen memotret nilai flag yang
-  disentuh + hash konten file konfigurasi. Rollback mengembalikan nilai persis
-  seperti sebelum eksperimen, lalu **memverifikasi** hasilnya sebelum mengklaim
-  sukses.
-- **Alur lengkap**: Apply (validasi + snapshot + tulis + verifikasi) → Test →
-  Commit (integrasi ke profil aktif) atau Rollback (kembali ke keadaan awal).
-- **Pengukuran FPS nyata** - sampling median FPS via telemetri ETW (sumber yang
-  sama dengan FPS Monitor). Perubahan FPS di bawah ambang 5% dianggap *Similar*
-  (kinerja berisik), bukan hasil yang mengada-ada. Tanpa hak admin ETW atau data
-  cukup → jujur dilaporkan *Insufficient data*.
-- **Keamanan bawaan**:
-  - Jika Roblox berjalan, eksperimen butuh konfirmasi eksplisit (BoneFish tidak
-    pernah menutup Roblox).
-  - Nama flag divalidasi ketat (mencegah path traversal); nilai hanya primitif
-    (bool/int/desimal/string polos).
-  - Kegagalan tulis/verifikasi saat apply → **rollback otomatis seketika**, tidak
-    ada perubahan parsial yang tertinggal.
-  - File snapshot & journal ditulis atomik - crash/power loss tidak pernah
-    merusak data.
-- **Recovery crash**: jika BoneFish berhenti di tengah eksperimen (crash,
-  restart, mati listrik), pada start berikutnya muncul prompt: Restore
-  konfigurasi sebelumnya / Lanjutkan eksperimen / Abaikan.
-- **Riwayat eksperimen** - setiap eksperimen tercatat dengan status, snapshot,
-  hasil pengukuran dan error.
-
-### Pengujian
-
-- Proyek test baru `Bloxstrap.Tests` (xUnit) ditambahkan ke solution: **73 test
-  lulus** mencakup state machine, snapshot/integritas, diff & validasi,
-  auto-rollback, recovery, dan klasifikasi hasil.
-- Build: 0 warning, 0 error (Debug & Release).
-
-### Catatan
-
-- Pengukuran FPS butuh Roblox berjalan; baseline diukur dengan mengembalikan
-  konfigurasi lama sementara, lalu eksperimen di-apply ulang otomatis.
-- Halaman ini tidak menggantikan preset - eksperimen yang dikomit menjadi
-  permanen dan melindungi nilai-nilainya dari overwrite preset (guard preset
-  manual).
 
 ## v7.0.6 - TDR Mitigation Mode: Kurangi Freeze/Layar Putih (iGPU Legacy)
 
@@ -528,7 +620,7 @@ Semua link `faizinuha/BoneFish` → **BoneFishStudio/BoneFish** di README.md dan
 
 #### 🌐 Website Link
 
-Tombol "Visit Website" → [https://bonefishstudioo.vercel.app](https://bonefishstudioo.vercel.app) di header README.
+Tombol "Visit Website" → [https://bonefishstudio.vercel.app](https://bonefishstudio.vercel.app) di header README.
 
 #### ✨ Key Features — Sinkron dengan Kode Terkini
 

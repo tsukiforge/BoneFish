@@ -85,6 +85,30 @@
                     </Grid>
                 </MenuItem.Header>
             </MenuItem>
+            <MenuItem x:Name="GameSessionRestoreMenuItem" Click="GameSessionRestoreMenuItem_Click">
+                <MenuItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon Grid.Column="0" Symbol="ArrowSync24"/>
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0" Text="{x:Static resources:Strings.ContextMenu_RestoreGameSession}" />
+                    </Grid>
+                </MenuItem.Header>
+            </MenuItem>
+            <MenuItem Click="GameSessionSettingsMenuItem_Click">
+                <MenuItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon Grid.Column="0" Symbol="Games24"/>
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0" Text="{x:Static resources:Strings.ContextMenu_OpenGameSessionSettings}" />
+                    </Grid>
+                </MenuItem.Header>
+            </MenuItem>
             <MenuItem x:Name="LogTracerMenuItem" Visibility="Collapsed" Click="LogTracerMenuItem_Click">
                 <MenuItem.Header>
                     <Grid>
