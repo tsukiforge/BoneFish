@@ -1724,6 +1724,12 @@ Defaulting to {1}.</value>
   <data name="Menu.FastFlags.EditorInfo" xml:space="preserve">
     <value>Roblox only applies whitelisted FFlags. Double click to learn more.</value>
   </data>
+  <data name="FastFlags.SystemInfo.RedetectHardware" xml:space="preserve">
+    <value>Re-detect Hardware</value>
+  </data>
+  <data name="FastFlags.SystemInfo.HardwareRedetected" xml:space="preserve">
+    <value>Hardware detection refreshed and cache updated.</value>
+  </data>
   <data name="Common.Geometry" xml:space="preserve">
     <value>Geometry</value>
   </data>
