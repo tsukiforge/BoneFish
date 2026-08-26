@@ -1689,4 +1689,10 @@ Apakah Anda ingin melanjutkan?</value>
   <data name="GameSession.RestoredFailedGeneric" xml:space="preserve">
     <value>{0} gagal dipulihkan: {1}</value>
   </data>
+  <data name="FastFlags.SystemInfo.RedetectHardware" xml:space="preserve">
+    <value>Deteksi Ulang Hardware</value>
+  </data>
+  <data name="FastFlags.SystemInfo.HardwareRedetected" xml:space="preserve">
+    <value>Deteksi hardware selesai — cache diperbarui.</value>
+  </data>
 </root>

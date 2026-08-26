@@ -3772,6 +3772,24 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Re-detect Hardware.
+        /// </summary>
+        public static string FastFlags_SystemInfo_RedetectHardware {
+            get {
+                return ResourceManager.GetString("FastFlags.SystemInfo.RedetectHardware", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hardware detection refreshed and cache updated..
+        /// </summary>
+        public static string FastFlags_SystemInfo_HardwareRedetected {
+            get {
+                return ResourceManager.GetString("FastFlags.SystemInfo.HardwareRedetected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Choose the FRM quality that Roblox should use..
         /// </summary>
         public static string Menu_FastFlags_FRMQualityOverride_Description {

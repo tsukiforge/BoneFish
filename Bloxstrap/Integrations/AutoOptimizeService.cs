@@ -117,8 +117,125 @@ namespace Bloxstrap.Integrations
         // Ini LEBIH RELIABLE daripada vendor-name heuristic karena langsung nanya ke driver
         // storage — HDD selalu punya seek penalty, SSD tidak pernah.
         // Tidak perlu admin rights karena pake volume handle (bukan physical drive handle).
+        //
+        // ── Persistent cache (v7.3.0) ────────────────────────────────────────────
+        // Sebelumnya hasil hanya di-cache in-memory (static field) yang reset tiap
+        // Play karena bootstrapper selalu spawn proses baru → query IOCTL jalan
+        // ULANG di SETIAP launch padahal hardware laptop tidak berubah.
+        // Sekarang hasil + timestamp disimpan ke %LocalAppData%\BoneFish\HardwareCache.json.
+        // IsSSD() memakai cache bila < 30 hari DAN drive sistem tidak berubah
+        // (root path + volume serial). Tombol "Deteksi Ulang Hardware" di panel
+        // System Info memanggil ForceRefreshHardwareCache() untuk refresh paksa
+        // (misal user upgrade HDD → SSD tanpa mau nunggu cache kedaluwarsa).
+        //
+        // AUDIT CheckAndApply() untuk kandidat cache serupa: DetectSystemTier()
+        // (Environment.ProcessorCount + GlobalMemoryStatusEx) dan GetTotalPhysicalMemory()
+        // adalah syscall kernel super ringan (±µs) — membaca cache dari disk justru
+        // lebih lambat, jadi TIDAK ikut di-persist. Query IOCTL volume handle
+        // satu-satunya yang worth di-cache lintas sesi.
+        private const int HardwareCacheMaxAgeDays = 30;
+        private static readonly string HardwareCachePath = Path.Combine(Paths.LocalAppData, App.ProjectName, "HardwareCache.json");
+
+        public sealed class HardwareCacheEntry
+        {
+            public bool IsSSD { get; set; }
+            public string SystemDriveRoot { get; set; } = "";
+            public uint VolumeSerial { get; set; }
+            public DateTime DetectedAtUtc { get; set; }
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern bool GetVolumeInformation(
+            string lpRootPathName,
+            StringBuilder? lpVolumeNameBuffer,
+            int nVolumeNameSize,
+            out uint lpVolumeSerialNumber,
+            out uint lpMaximumComponentLength,
+            out uint lpFileSystemFlags,
+            StringBuilder? lpFileSystemNameBuffer,
+            int nFileSystemNameSize);
+
         private static bool? _isSSDCached = null;
         private static readonly object _storageLock = new();
+
+        private static string GetSystemDriveRoot() =>
+            Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
+
+        private static uint GetSystemVolumeSerial()
+        {
+            try
+            {
+                var nameBuffer = new StringBuilder(256);
+                if (GetVolumeInformation(GetSystemDriveRoot(), nameBuffer, nameBuffer.Capacity,
+                        out uint serial, out _, out _, null, 0))
+                    return serial;
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"GetVolumeInformation failed: {ex.Message}");
+            }
+            return 0;
+        }
+
+        private static bool? TryLoadStorageTypeFromCache()
+        {
+            try
+            {
+                if (!File.Exists(HardwareCachePath))
+                    return null;
+
+                var entry = JsonSerializer.Deserialize<HardwareCacheEntry>(File.ReadAllText(HardwareCachePath));
+                if (entry is null)
+                    return null;
+
+                if ((DateTime.UtcNow - entry.DetectedAtUtc).TotalDays > HardwareCacheMaxAgeDays)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Persistent storage cache expired (>{HardwareCacheMaxAgeDays} days) — re-detecting");
+                    return null;
+                }
+
+                if (!string.Equals(entry.SystemDriveRoot, GetSystemDriveRoot(), StringComparison.OrdinalIgnoreCase))
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "System drive root changed since cache write — re-detecting");
+                    return null;
+                }
+
+                uint currentSerial = GetSystemVolumeSerial();
+                if (currentSerial != 0 && entry.VolumeSerial != 0 && currentSerial != entry.VolumeSerial)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "System volume serial changed since cache write — re-detecting");
+                    return null;
+                }
+
+                return entry.IsSSD;
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Could not read persistent storage cache: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static void SaveStorageTypeToCache(bool isSSD)
+        {
+            try
+            {
+                var entry = new HardwareCacheEntry
+                {
+                    IsSSD = isSSD,
+                    SystemDriveRoot = GetSystemDriveRoot(),
+                    VolumeSerial = GetSystemVolumeSerial(),
+                    DetectedAtUtc = DateTime.UtcNow
+                };
+
+                Directory.CreateDirectory(Path.GetDirectoryName(HardwareCachePath)!);
+                File.WriteAllText(HardwareCachePath, JsonSerializer.Serialize(entry, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Could not save persistent storage cache: {ex.Message}");
+            }
+        }
 
         private static bool IsSSD()
         {
@@ -130,97 +247,129 @@ namespace Bloxstrap.Integrations
                 if (_isSSDCached.HasValue)
                     return _isSSDCached.Value;
 
+                bool? cachedSSD = TryLoadStorageTypeFromCache();
+                if (cachedSSD.HasValue)
+                {
+                    _isSSDCached = cachedSSD.Value;
+                    App.Logger.WriteLine(LOG_IDENT, $"Storage type from persistent cache: {(cachedSSD.Value ? "SSD" : "HDD")} (IOCTL skipped)");
+                    return cachedSSD.Value;
+                }
+
+                var stopwatch = Stopwatch.StartNew();
+                bool isSSD = DetectStorageType();
+                stopwatch.Stop();
+
+                _isSSDCached = isSSD;
+                SaveStorageTypeToCache(isSSD);
+                App.Logger.WriteLine(LOG_IDENT, $"Storage detection via IOCTL finished in {stopwatch.ElapsedMilliseconds} ms — persistent cache updated");
+
+                return isSSD;
+            }
+        }
+
+        public static void ForceRefreshHardwareCache()
+        {
+            lock (_storageLock)
+            {
+                _isSSDCached = null;
+                try { File.Delete(HardwareCachePath); } catch { }
+            }
+
+            bool isSSD = IsSSD();
+            App.Logger.WriteLine(LOG_IDENT, $"Hardware detection manually refreshed: {(isSSD ? "SSD" : "HDD")} (persistent cache re-written)");
+        }
+
+        // Query seek-penalty IOCTL — logika deteksi ASLI (tidak diubah), hanya
+        // dipisah dari caching supaya IsSSD() bisa memotong query ini saat
+        // persistent cache masih valid.
+        private static bool DetectStorageType()
+        {
+            try
+            {
+                // Buka handle ke system volume ("\\.\C:")
+                string systemDrive = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
+                string volumePath = @"\\.\" + systemDrive.TrimEnd('\\');
+
+                IntPtr hVolume = CreateFile(
+                    volumePath,
+                    GENERIC_READ,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    IntPtr.Zero,
+                    OPEN_EXISTING,
+                    FILE_ATTRIBUTE_NORMAL,
+                    IntPtr.Zero);
+
+                if (hVolume == INVALID_HANDLE_VALUE)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Could not open volume {volumePath} for seek penalty query. Assuming HDD.");
+                    return false;
+                }
+
                 try
                 {
-                    // Buka handle ke system volume ("\\.\C:")
-                    string systemDrive = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
-                    string volumePath = @"\\.\" + systemDrive.TrimEnd('\\');
-
-                    IntPtr hVolume = CreateFile(
-                        volumePath,
-                        GENERIC_READ,
-                        FILE_SHARE_READ | FILE_SHARE_WRITE,
-                        IntPtr.Zero,
-                        OPEN_EXISTING,
-                        FILE_ATTRIBUTE_NORMAL,
-                        IntPtr.Zero);
-
-                    if (hVolume == INVALID_HANDLE_VALUE)
+                    // Prepare query struct
+                    var query = new STORAGE_PROPERTY_QUERY
                     {
-                        App.Logger.WriteLine(LOG_IDENT, $"Could not open volume {volumePath} for seek penalty query. Assuming HDD.");
-                        _isSSDCached = false;
-                        return false;
-                    }
+                        PropertyId = StorageDeviceSeekPenaltyProperty,
+                        QueryType = 0 // PropertyStandardQuery
+                    };
+
+                    int querySize = Marshal.SizeOf(typeof(STORAGE_PROPERTY_QUERY));
+                    int descSize = Marshal.SizeOf(typeof(STORAGE_SEEK_PENALTY_DESCRIPTOR));
+
+                    IntPtr queryPtr = Marshal.AllocHGlobal(querySize);
+                    IntPtr descPtr = Marshal.AllocHGlobal(descSize);
 
                     try
                     {
-                        // Prepare query struct
-                        var query = new STORAGE_PROPERTY_QUERY
-                        {
-                            PropertyId = StorageDeviceSeekPenaltyProperty,
-                            QueryType = 0 // PropertyStandardQuery
-                        };
-
-                        int querySize = Marshal.SizeOf(typeof(STORAGE_PROPERTY_QUERY));
-                        int descSize = Marshal.SizeOf(typeof(STORAGE_SEEK_PENALTY_DESCRIPTOR));
-
-                        IntPtr queryPtr = Marshal.AllocHGlobal(querySize);
-                        IntPtr descPtr = Marshal.AllocHGlobal(descSize);
-
-                        try
-                        {
-                            Marshal.StructureToPtr(query, queryPtr, false);
-                            // Zero-initialize descriptor memory
+                        Marshal.StructureToPtr(query, queryPtr, false);
+                        // Zero-initialize descriptor memory
                         var zeroBytes = new byte[descSize];
                         Marshal.Copy(zeroBytes, 0, descPtr, descSize);
 
-                            bool success = DeviceIoControl(
-                                hVolume,
-                                IOCTL_STORAGE_QUERY_PROPERTY,
-                                queryPtr,
-                                (uint)querySize,
-                                descPtr,
-                                (uint)descSize,
-                                out uint bytesReturned,
-                                IntPtr.Zero);
+                        bool success = DeviceIoControl(
+                            hVolume,
+                            IOCTL_STORAGE_QUERY_PROPERTY,
+                            queryPtr,
+                            (uint)querySize,
+                            descPtr,
+                            (uint)descSize,
+                            out uint bytesReturned,
+                            IntPtr.Zero);
 
-                            if (success && bytesReturned >= (uint)descSize)
-                            {
-                                var descriptor = Marshal.PtrToStructure<STORAGE_SEEK_PENALTY_DESCRIPTOR>(descPtr);
-                                bool isSSD = descriptor.IncursSeekPenalty == 0; // false = no seek penalty = SSD
-                                _isSSDCached = isSSD;
-
-                                App.Logger.WriteLine(LOG_IDENT,
-                                    $"Storage detected via DeviceIoControl: {(isSSD ? "SSD" : "HDD")} " +
-                                    $"(IncursSeekPenalty={descriptor.IncursSeekPenalty})");
-                                return isSSD;
-                            }
-                            else
-                            {
-                                int lastError = Marshal.GetLastWin32Error();
-                                App.Logger.WriteLine(LOG_IDENT,
-                                    $"DeviceIoControl seek penalty query failed (error={lastError}). Assuming HDD.");
-                                _isSSDCached = false;
-                                return false;
-                            }
-                        }
-                        finally
+                        if (success && bytesReturned >= (uint)descSize)
                         {
-                            Marshal.FreeHGlobal(queryPtr);
-                            Marshal.FreeHGlobal(descPtr);
+                            var descriptor = Marshal.PtrToStructure<STORAGE_SEEK_PENALTY_DESCRIPTOR>(descPtr);
+                            bool isSSD = descriptor.IncursSeekPenalty == 0; // false = no seek penalty = SSD
+
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"Storage detected via DeviceIoControl: {(isSSD ? "SSD" : "HDD")} " +
+                                $"(IncursSeekPenalty={descriptor.IncursSeekPenalty})");
+                            return isSSD;
+                        }
+                        else
+                        {
+                            int lastError = Marshal.GetLastWin32Error();
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"DeviceIoControl seek penalty query failed (error={lastError}). Assuming HDD.");
+                            return false;
                         }
                     }
                     finally
                     {
-                        CloseHandle(hVolume);
+                        Marshal.FreeHGlobal(queryPtr);
+                        Marshal.FreeHGlobal(descPtr);
                     }
                 }
-                catch (Exception ex)
+                finally
                 {
-                    App.Logger.WriteLine(LOG_IDENT, $"Storage detection via DeviceIoControl failed: {ex.Message}. Assuming HDD.");
-                    _isSSDCached = false;
-                    return false;
+                    CloseHandle(hVolume);
                 }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Storage detection via DeviceIoControl failed: {ex.Message}. Assuming HDD.");
+                return false;
             }
         }
 
