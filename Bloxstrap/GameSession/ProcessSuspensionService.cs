@@ -226,7 +226,15 @@ namespace Bloxstrap.GameSession
                     }
                 }
 
+                // ── FIX: Enhanced verification logging + retry (v7.3.1) ──────────
+                // Pola SynTPEnh: thread State masih Suspended setelah 2x resume+sleep.
+                // Root cause dugaan: Windows thread scheduler belum update state setelah
+                // resume (timing-dependent, bukan resume yang benar-benar gagal). Retry
+                // tambahan (100ms delay) sebelum VerificationFailed memberi waktu OS
+                // untuk update thread state.
                 int resumeFailures = 0;
+                int initialThreadCount = record.ThreadIds.Distinct().Count();
+
                 foreach (int threadId in record.ThreadIds.Distinct())
                 {
                     if (!accessor.IsAlive)
@@ -244,6 +252,12 @@ namespace Bloxstrap.GameSession
                     }
                 }
 
+                // Snapshot current thread count for logging (new threads spawned between
+                // suspend and restore would explain SynTPEnh's VerificationFailed pattern).
+                IReadOnlyCollection<int> currentThreadIds = accessor.GetThreadIds();
+                int currentThreadCount = currentThreadIds.Count;
+                int newThreadCount = currentThreadCount - initialThreadCount;
+
                 for (int attempt = 0; attempt < 2; attempt++)
                 {
                     if (!accessor.IsAlive)
@@ -254,9 +268,11 @@ namespace Bloxstrap.GameSession
 
                     Thread.Sleep(100);
 
+                    // Re-read thread list — threads may have appeared/disappeared.
+                    currentThreadIds = accessor.GetThreadIds();
                     bool stillSuspended = record.ThreadIds
                         .Distinct()
-                        .Any(threadId => accessor.GetThreadIds().Contains(threadId) && accessor.IsThreadSuspended(threadId));
+                        .Any(threadId => currentThreadIds.Contains(threadId) && accessor.IsThreadSuspended(threadId));
 
                     if (!stillSuspended && resumeFailures == 0)
                     {
@@ -276,10 +292,37 @@ namespace Bloxstrap.GameSession
                     }
                 }
 
+                // ── Detailed diagnostic logging for VerificationFailed ──────────
+                // Catat kondisi thread saat verifikasi gagal — membantu debug pola
+                // spesifik seperti SynTPEnh yang berulang di sesi terpisah.
+                IReadOnlyCollection<int> finalThreadIds = accessor.GetThreadIds();
+                int stillSuspendedCount = record.ThreadIds.Distinct()
+                    .Count(threadId => finalThreadIds.Contains(threadId) && accessor.IsThreadSuspended(threadId));
+                int disappearedThreads = record.ThreadIds.Distinct()
+                    .Count(threadId => !finalThreadIds.Contains(threadId));
+                int extraThreads = finalThreadIds.Count - record.ThreadIds.Distinct().Count();
+
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"PID={record.ProcessId} ({record.ProcessName}) verification detail: " +
+                    $"initialThreads={initialThreadCount}, currentThreads={currentThreadCount}, " +
+                    $"newThreadsSpawned={newThreadCount}, stillSuspended={stillSuspendedCount}, " +
+                    $"disappeared={disappearedThreads}, extraThreads={extraThreads}, " +
+                    $"resumeFailures={resumeFailures}");
+
+                if (stillSuspendedCount > 0)
+                {
+                    // Log specific thread IDs that remain suspended for diagnosability.
+                    var stuckThreadIds = record.ThreadIds.Distinct()
+                        .Where(threadId => finalThreadIds.Contains(threadId) && accessor.IsThreadSuspended(threadId))
+                        .ToList();
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"PID={record.ProcessId} ({record.ProcessName}) stuck thread IDs: [{String.Join(", ", stuckThreadIds)}]");
+                }
+
                 return Failed(record, resumeFailures > 0 ? RestoreStatus.ResumeFailed : RestoreStatus.VerificationFailed,
                     resumeFailures > 0
                         ? $"{resumeFailures} thread gagal di-resume."
-                        : "Thread masih suspended setelah verifikasi ulang.");
+                        : $"Thread masih suspended setelah verifikasi ulang (initial={initialThreadCount}, current={currentThreadCount}, newSpawned={newThreadCount}, stuck={stillSuspendedCount}).");
             }
             catch (ArgumentException)
             {
