@@ -64,16 +64,21 @@ namespace Bloxstrap
                     if (!String.IsNullOrEmpty(message))
                         Frontend.ShowMessageBox($"{message}\n\n{ex.Message}", System.Windows.MessageBoxImage.Warning);
 
-                    try
-                    {
-                        // Create a backup of loaded file
-                        File.Copy(FileLocation, FileLocation + ".bak", true);
-                    }
-                    catch (Exception copyEx)
-                    {
-                        App.Logger.WriteLine(LOG_IDENT, $"Failed to create backup file: {FileLocation}.bak");
-                        App.Logger.WriteException(LOG_IDENT, copyEx);
-                    }
+                try
+                {
+                    // Create a backup of loaded file
+                    File.Copy(FileLocation, FileLocation + ".bak", true);
+
+                    // ── Cleanup .bak menumpuk (FIX v7.3.1) ─────────────────────
+                    // Hapus .bak lebih lama dari 2 versi terakhir untuk mencegah
+                    // pembengkakan folder BoneFish (5 file @ ~20MB = ~100MB per user).
+                    CleanupOldBackups(Path.GetDirectoryName(FileLocation)!);
+                }
+                catch (Exception copyEx)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Failed to create backup file: {FileLocation}.bak");
+                    App.Logger.WriteException(LOG_IDENT, copyEx);
+                }
                 }
 
                 Save();
@@ -116,6 +121,83 @@ namespace Bloxstrap
         public bool HasFileOnDiskChanged()
         {
             return LastFileHash != MD5Hash.FromFile(FileLocation);
+        }
+
+        // ── .bak Retention Policy (FIX v7.3.1) ───────────────────────────────
+        // Simpan HANYA 2 backup terakhir per directory. Hapus .bak lebih lama
+        // untuk mencegah pembengkakan folder BoneFish (5 file @ ~20MB = ~100MB).
+        // Dipanggil dari Load() setelah backup baru dibuat, DAN saat startup retroaktif.
+        private const int MaxBackupVersions = 2;
+
+        /// <summary>
+        /// Hapus .bak lebih lama dari MaxBackupVersions terakhir berdasarkan
+        /// waktu modifikasi. Dipanggil retroaktif saat startup dan setiap
+        /// backup baru dibuat.
+        /// </summary>
+        internal static void CleanupOldBackups(string directory)
+        {
+            try
+            {
+                if (!Directory.Exists(directory))
+                    return;
+
+                // Kumpulkan semua file .bak di directory ini
+                var bakFiles = Directory.GetFiles(directory, "*.bak")
+                    .Select(f => new FileInfo(f))
+                    .OrderByDescending(f => f.LastWriteTime)
+                    .ToList();
+
+                if (bakFiles.Count <= MaxBackupVersions)
+                    return;
+
+                // Hapus yang lebih lama dari MaxBackupVersions terakhir
+                foreach (var old in bakFiles.Skip(MaxBackupVersions))
+                {
+                    try
+                    {
+                        old.Delete();
+                        App.Logger.WriteLine("JsonManager", $"Old backup cleaned: {old.Name} (retention={MaxBackupVersions})");
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Logger.WriteException("JsonManager", ex);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("JsonManager", ex);
+            }
+        }
+
+        /// <summary>
+        /// Retroaktif cleanup: jalankan di semua direktori yang mungkin berisi .bak
+        /// saat startup. Panggil dari Bootstrapper/Program setelah Load().
+        /// </summary>
+        public static void CleanupAllBackupsOnStartup()
+        {
+            try
+            {
+                string baseDir = Paths.Base;
+                if (Directory.Exists(baseDir))
+                    CleanupOldBackups(baseDir);
+
+                // Versi Roblox juga bisa punya .bak
+                string versionsDir = Path.Combine(Paths.LocalAppData, "Roblox", "Versions");
+                if (Directory.Exists(versionsDir))
+                {
+                    foreach (string versionDir in Directory.GetDirectories(versionsDir))
+                    {
+                        string clientSettings = Path.Combine(versionDir, "ClientSettings");
+                        if (Directory.Exists(clientSettings))
+                            CleanupOldBackups(clientSettings);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("JsonManager", ex);
+            }
         }
     }
 }
