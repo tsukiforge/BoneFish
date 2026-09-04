@@ -1020,7 +1020,7 @@ namespace Bloxstrap
                 }
 
                 _externalGamePid = pid;
-                _externalActivityWatcher = new ActivityWatcher(logFile);
+                _externalActivityWatcher = new ActivityWatcher(logFile, attachExisting: true);
                 _externalActivityWatcher.OnGameJoin += ExternalGameJoinHandler;
                 _externalActivityWatcher.OnGameLeave += ExternalGameLeaveHandler;
                 _externalActivityWatcher.Start();

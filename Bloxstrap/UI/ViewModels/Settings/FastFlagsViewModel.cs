@@ -309,6 +309,19 @@ namespace Bloxstrap.UI.ViewModels.Settings
             OnPropertyChanged(nameof(SystemInfoText));
         }
 
+        // ── Deteksi Ulang Hardware ─────────────────────────────────────────────────
+        // ForceRefreshHardwareCache() hapus persistent cache + reset static cache,
+        // lalu deteksi ulang (IOCTL) dan tulis cache baru. Untuk kasus user upgrade
+        // fisik (misal HDD → SSD) tanpa mau nunggu TTL 30 hari.
+        public ICommand RefreshHardwareDetectionCommand => new RelayCommand(RefreshHardwareDetection);
+
+        private void RefreshHardwareDetection()
+        {
+            Integrations.AutoOptimizeService.ForceRefreshHardwareCache();
+            RefreshSystemInfo();
+            Notify(Strings.FastFlags_SystemInfo_HardwareRedetected);
+        }
+
         private static string LoadSystemInfo()
         {
             try
