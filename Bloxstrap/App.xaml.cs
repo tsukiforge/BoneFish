@@ -368,6 +368,17 @@ namespace Bloxstrap
                 }
 
                 Settings.Load();
+
+                // ── Legacy settings migration (FIX v7.4.0) ───────────────────────────
+                // Users with a Settings.json from before the rename to BoneFish may still
+                // have an old project name ("Fishstrap"/"Bloxstrap") persisted as their
+                // bootstrapper title. Reset only exact matches of historical project
+                // names — custom user titles are never touched. The Save() below persists
+                // the fix, so the migration is self-limiting and only ever rewrites the
+                // file once.
+                if (SettingsMigration.MigrateLegacyValues(Settings.Prop))
+                    Settings.Save();
+
                 State.Load();
                 RobloxState.Load();
 
