@@ -684,6 +684,19 @@ namespace Bloxstrap
 
             App.Logger.WriteLine(LOG_IDENT, "Doing upgrade");
 
+            // ── Cleanup .bak menumpuk saat update (FIX v7.3.1) ──────────────
+            // Hapus backup .bak yang menumpuk (>2 versi) SEBELUM overwrite binary
+            // supaya folder BoneFish tidak membengkak dari versi ke versi.
+            try
+            {
+                JsonManager<Settings>.CleanupAllBackupsOnStartup();
+                App.Logger.WriteLine(LOG_IDENT, "Old .bak files cleaned during upgrade");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+
             Filesystem.AssertReadOnly(Paths.Application);
 
             using (var ipl = new InterProcessLock("AutoUpdater", TimeSpan.FromSeconds(5)))

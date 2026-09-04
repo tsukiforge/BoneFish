@@ -391,6 +391,19 @@ namespace Bloxstrap
                 FastFlags.Load();
                 GlobalSettings.Load();
 
+                // ── Retroactive .bak cleanup (FIX v7.3.1) ─────────────────────
+                // Bersihkan backup .bak yang menumpuk (>2 versi) di semua direktori
+                // BoneFish saat startup. Dilakukan SETELAH Load() supaya logging
+                // sudah aktif dan Paths.Base sudah valid.
+                try
+                {
+                    JsonManager<Settings>.CleanupAllBackupsOnStartup();
+                }
+                catch (Exception ex)
+                {
+                    Logger.WriteException(LOG_IDENT, ex);
+                }
+
                 try
                 {
                     // Watcher mode = launcher baru saja hand-off sesi aktif (proses tetap

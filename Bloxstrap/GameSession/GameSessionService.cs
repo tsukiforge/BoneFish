@@ -6,6 +6,16 @@ namespace Bloxstrap.GameSession
     {
         private const string LOG_IDENT = "GameSession";
 
+        // ── Serialisasi Session Lifecycle (FIX race condition v7.3.1) ─────────────
+        // ActivityWatcher dapat me-replay puluhan join/leave saat reattach ke proses
+        // Roblox eksternal yang sudah lama berjalan — menyebabkan BeginSession/
+        // EndSession overlap/bersamaan, file I/O race di active.json.tmp, dan
+        // notifikasi tray duplikat. SemaphoreSlim memastikan HANYA SATU operasi
+        // session yang berjalan; operasi berikutnya menunggu (await) yang sebelumnya
+        // selesai. Deadline 30s mencegah deadlock jika sesi sebelumnya terjebak.
+        private readonly SemaphoreSlim _sessionLock = new(1, 1);
+        private static readonly TimeSpan SessionLockTimeout = TimeSpan.FromSeconds(30);
+
         private readonly Func<IEnumerable<ProcessSnapshot>> _processSource;
         private readonly Func<int, bool> _isProcessAlive;
         private readonly Func<ICollection<GameSessionRule>> _rulesSource;
@@ -35,10 +45,30 @@ namespace Bloxstrap.GameSession
         {
             const string LOG_IDENT_LOCAL = "GameSession::BeginSession";
 
+            if (!await _sessionLock.WaitAsync(SessionLockTimeout, cancellationToken))
+            {
+                App.Logger.WriteLine(LOG_IDENT_LOCAL, "BeginSession timeout — sebelumnya masih berjalan?");
+                throw new TimeoutException("BeginSession timeout: operasi session sebelumnya belum selesai dalam 30 detik.");
+            }
+
+            try
+            {
+                return await BeginSessionCoreAsync(cancellationToken);
+            }
+            finally
+            {
+                _sessionLock.Release();
+            }
+        }
+
+        private async Task<GameSessionRecord> BeginSessionCoreAsync(CancellationToken cancellationToken)
+        {
+            const string LOG_IDENT_LOCAL = "GameSession::BeginSession";
+
             if (Store.ReadActive() is { } existing)
             {
                 if (ShouldRestoreStale(existing))
-                    EndSession();
+                    EndSessionCore(null);
 
                 if (Store.ReadActive() is not null)
                     throw new InvalidOperationException("A previous Game Session still has processes pending restore.");
@@ -163,7 +193,7 @@ namespace Bloxstrap.GameSession
             }
             catch
             {
-                EndSession();
+                EndSessionCore(null);
                 throw;
             }
 
@@ -188,6 +218,7 @@ namespace Bloxstrap.GameSession
             return Suspension.RescueSuspendedProcesses();
         }
 
+
         public void AttachGameProcess(int processId)
         {
             if (ActiveSession is null)
@@ -208,6 +239,25 @@ namespace Bloxstrap.GameSession
         }
 
         public SessionSummary EndSession(int? expectedGameProcessId = null)
+        {
+            // EndSession synchronous — gunakan TryWait supaya tidak block caller.
+            // Kalau tidak bisa lock (opsi lain sedang jalan), tetap lanjut —
+            // endSession bersifat idempotent dan harus selalu bisa dipanggil
+            // (mis. proses Roblox mati → Watcher harus restore segera).
+            bool locked = _sessionLock.Wait(0);
+
+            try
+            {
+                return EndSessionCore(expectedGameProcessId);
+            }
+            finally
+            {
+                if (locked)
+                    _sessionLock.Release();
+            }
+        }
+
+        private SessionSummary EndSessionCore(int? expectedGameProcessId)
         {
             const string LOG_IDENT_LOCAL = "GameSession::EndSession";
             GameSessionRecord? session = ActiveSession ?? Store.ReadActive();

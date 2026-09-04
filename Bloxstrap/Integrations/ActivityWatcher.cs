@@ -56,8 +56,23 @@
 
         public bool IsDisposed = false;
 
-        public ActivityWatcher(string? logFile = null)
+        // ── Attach-existing mode (FIX race condition v7.3.1) ──────────────────
+        // Saat watcher reattach ke proses Roblox yang SUDAH BERJALAN lama, log file
+        // berisi histori join/leave LAMA yang bukan milik sesi baru ini. Tanpa flag
+        // ini, ActivityWatcher me-replay SELURUH histori → puluhan OnGameJoin/
+        // OnGameLeave terpicu → race condition: BeginSession/EndSession overlap,
+        // file I/O race, notifikasi tray duplikat (3x untuk 1 kejadian).
+        //
+        // attachExisting=true: skip ke END of log file → hanya memproses entry BARU
+        // yang ditulis SETELAH watcher dimulai (state terkini, bukan histori).
+        // attachExisting=false (default): baca dari awal → replay histori, diperlukan
+        // untuk ActivityWatcher INTERNAL yang diluncurkan bersama Roblox baru.
+        private readonly bool _attachExisting;
+
+        public ActivityWatcher(string? logFile = null, bool attachExisting = false)
         {
+            _attachExisting = attachExisting;
+
             if (!String.IsNullOrEmpty(logFile))
                 LogLocation = logFile;
         }
@@ -118,7 +133,19 @@
             
             var logFileStream = logFileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
-            App.Logger.WriteLine(LOG_IDENT, $"Opened {LogLocation}");
+            if (_attachExisting)
+            {
+                // Skip ke END of log file — hanya proses entry BARU yang datang.
+                // Tanpa ini, log yang sudah berisi histori join/leave lama akan
+                // di-replay sebagai event baru → race condition BeginSession/EndSession.
+                long initialPosition = logFileStream.Length;
+                logFileStream.Seek(initialPosition, SeekOrigin.Begin);
+                App.Logger.WriteLine(LOG_IDENT, $"Opened {LogLocation} (attachExisting — skipped {initialPosition:N0} bytes of history)");
+            }
+            else
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Opened {LogLocation} (full replay from beginning)");
+            }
 
             using var streamReader = new StreamReader(logFileStream);
 
