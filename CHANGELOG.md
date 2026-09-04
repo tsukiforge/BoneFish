@@ -1,5 +1,60 @@
 # BoneFish Changelog
 
+## v7.4.0 - Fix Crash TaskDialog "Invalid Cursor Handle" + Migrasi BootstrapperTitle Lama
+
+Release date: 2026-09-04
+
+### 🛡️ FIX 1 — Crash saat buka Roblox: COMException "Invalid cursor handle" (0x8007057A)
+
+Bug OS-level Windows/.NET yang sudah lama dikenal (terjadi juga di aplikasi yang
+tidak terkait seperti LaunchBox, bahkan fitur System Restore bawaan Windows) —
+bukan logic error di kode BoneFish. `TaskDialog.ShowDialog()` di
+`VistaDialog_Load()` bisa gagal dengan `COMException "Invalid cursor handle"
+(0x8007057A)` dan meng-crash seluruh launch sebelum bootstrapper tampil.
+
+- **Try-catch spesifik** — hanya `COMException` dengan HRESULT `0x8007057A` /
+  `0x80070579` (ERROR_INVALID_CURSOR_HANDLE) atau pesan "Invalid cursor handle"
+  yang ditangkap. Error lain tetap lewat crash path normal, tidak disembunyikan.
+- **Log + retry sekali** — kejadian dicatat ke log (`App.Logger`), lalu
+  `TaskDialog.ShowDialog()` dicoba ulang sekali setelah delay singkat (500 ms)
+  karena sifatnya transient/sporadik.
+- **Fallback aman** — jika retry juga gagal, bootstrapper beralih ke
+  `ProgressDialog` (dialog WinForms murni, tanpa Vista TaskDialog) dan progress /
+  cancel diteruskan untuk sisa launch — user tidak pernah melihat unhandled
+  exception dialog.
+- Pola try-catch yang sama diterapkan di `ShowSuccess()` (navigasi
+  `_dialogPage.Navigate`) — fallback ke plain message box via
+  `BaseFunctions.ShowSuccess`.
+
+### 🔄 FIX 2 — BootstrapperTitle lama ("Fishstrap"/"Bloxstrap") dimigrasikan
+
+User dengan Settings.json dari sebelum rename ke BoneFish masih menyimpan nilai
+lama yang tidak pernah dimigrasikan, sehingga title menampilkan "Fishstrap"
+alih-alih "BoneFish".
+
+- Migrasi satu kali di `App.OnStartup()` setelah `Settings.Load()`: jika
+  `BootstrapperTitle` **SAMA PERSIS** dengan nama historis project (`Bloxstrap`,
+  `Fishstrap`, `BoneFish-QA`) → di-reset ke `App.ProjectName` dan disimpan ulang.
+- **Custom title user TIDAK pernah disentuh** — hanya exact match nama historis
+  yang direset (mis. user sengaja set "Roblox" tidak akan diubah).
+- Self-limiting: setelah Save pertama, nilai sudah "BoneFish", jadi tidak pernah
+  menimpa preferensi lagi di startup berikutnya.
+- **Audit BootstrapperIcon** — ditemukan kondisi serupa: `IconFishstrap` adalah
+  enum mati (dikomentari dari `Selections` dan switch `GetIcon()`, render
+  fallback ke icon Bloxstrap). Nilai lama yang tersimpan dinormalisasi sekali ke
+  `IconBloxstrap` agar tidak ada kejutan mapping icon di masa depan.
+
+### ✅ Verifikasi
+
+- Build 0 error, 0 warning.
+- Test baru: 7 unit test `SettingsMigrationTests` — semua hijau, termasuk
+  konfirmasi title tampil "BoneFish" setelah migrasi berjalan sekali.
+- Reproduksi crash TaskDialog: **tidak bisa direproduksi konsisten** — sifatnya
+  sporadis/transient tergantung state OS (dilaporkan juga di aplikasi lain yang
+  tidak terkait). Fix bersifat defensif: log + retry + fallback.
+
+---
+
 ## v7.2.9 - Fix Mic Roblox Tidak Berfungsi Setelah Game Session
 
 Release date: 2026-08-23
