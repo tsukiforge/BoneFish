@@ -125,6 +125,11 @@ namespace Bloxstrap.Models.Persistable
         // Fast Loading — toggle independen untuk percepat loading aset
         public bool EnableFastLoadingFlags { get; set; } = false;
 
+        // FPS Unlocker — toggle INDEPENDEN (bisa stack dengan preset apa pun):
+        // deteksi refresh rate monitor & tulis FramerateCap di GlobalBasicSettings_13.xml.
+        // Terpisah dari preset potato/ExtremeMode yang bertujuan menurunkan beban.
+        public bool FpsUnlockerEnabled { get; set; } = false;
+
         // TDR Mitigation — toggle independen untuk KURANGI freeze/layar putih
         // (Intel iGPU Driver TDR, Event ID 4101) dengan menurunkan beban GPU.
         // Bukan menghilangkan total — akar masalah di driver, bukan software.

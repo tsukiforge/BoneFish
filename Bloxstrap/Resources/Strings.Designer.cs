@@ -3862,6 +3862,24 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to FPS Unlocker (Ikuti Refresh Rate Monitor).
+        /// </summary>
+        public static string Menu_FastFlags_FpsUnlocker_Title {
+            get {
+                return ResourceManager.GetString("Menu.FastFlags.FpsUnlocker.Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Unlock FPS otomatis: deteksi refresh rate monitor lalu set FramerateCap Roblox (GlobalBasicSettings_13.xml). Toggle independen — bisa di-stack dengan preset apa pun. Nonaktifkan untuk kembali ke cap default Roblox..
+        /// </summary>
+        public static string Menu_FastFlags_FpsUnlocker_Description {
+            get {
+                return ResourceManager.GetString("Menu.FastFlags.FpsUnlocker.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Control how detailed meshes appear in-game..
         /// </summary>
         public static string Menu_FastFlags_MeshDetail_Description {

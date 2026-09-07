@@ -72,6 +72,19 @@ namespace Bloxstrap
             element.Value = value?.ToString()!;
         }
 
+        public void RemoveValue(string path)
+        {
+            path = ResolvePath(path);
+
+            Document?.XPathSelectElement(path)?.Remove();
+        }
+
+        public void RemovePreset(string prefix)
+        {
+            foreach (var pair in PresetPaths.Where(x => x.Key.StartsWith(prefix)))
+                RemoveValue(pair.Value);
+        }
+
         public string? GetValue(string path)
         {
             path = ResolvePath(path);

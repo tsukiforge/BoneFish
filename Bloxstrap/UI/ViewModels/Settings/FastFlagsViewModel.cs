@@ -29,6 +29,17 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
         public bool IsNotApplying => !IsApplying;
 
+        private string _applyingText = "⏳ Menerapkan FastFlag & menulis ke disk...";
+        public string ApplyingText
+        {
+            get => _applyingText;
+            set
+            {
+                _applyingText = value;
+                OnPropertyChanged(nameof(ApplyingText));
+            }
+        }
+
         public event EventHandler? RequestPageReloadEvent
         {
             add
@@ -418,6 +429,89 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 OnPropertyChanged(nameof(EnableTdrMitigation));
                 try { App.FastFlags.Save(); } catch { }
                 try { App.Settings.Save(); } catch { }
+            }
+        }
+
+        // ── FPS Unlocker — toggle INDEPENDEN (stack dengan preset apa pun) ───────
+        // Aktifkan → loading configuration (IsApplying) → deteksi refresh rate monitor
+        // → tulis FramerateCap di GlobalBasicSettings_13.xml → langsung aktif.
+        // Tidak dipakai DFIntTaskSchedulerTargetFps (bukan allowlist sejak 2025-09-29).
+
+        private string _fpsUnlockerStatus = "";
+
+        public bool FpsUnlockerEnabled
+        {
+            get => App.Settings.Prop.FpsUnlockerEnabled;
+            set
+            {
+                if (App.Settings.Prop.FpsUnlockerEnabled == value)
+                    return;
+
+                App.Settings.Prop.FpsUnlockerEnabled = value;
+                OnPropertyChanged(nameof(FpsUnlockerEnabled));
+                OnPropertyChanged(nameof(FpsUnlockerStatusText));
+                try { App.Settings.Save(); } catch { }
+
+                _ = ToggleFpsUnlockerAsync(value);
+            }
+        }
+
+        public string FpsUnlockerStatusText
+        {
+            get
+            {
+                if (!App.Settings.Prop.FpsUnlockerEnabled)
+                    return Strings.Menu_FastFlags_FpsUnlocker_Description;
+
+                return String.IsNullOrEmpty(_fpsUnlockerStatus)
+                    ? Strings.Menu_FastFlags_FpsUnlocker_Description
+                    : _fpsUnlockerStatus;
+            }
+        }
+
+        private async Task ToggleFpsUnlockerAsync(bool enable)
+        {
+            if (IsApplying)
+                return;
+
+            IsApplying = true;
+            ApplyingText = "⏳ Mendeteksi refresh rate monitor & menulis FramerateCap...";
+
+            try
+            {
+                if (!enable)
+                {
+                    await Task.Run(Integrations.FpsUnlockerService.Revert);
+                    _fpsUnlockerStatus = "";
+                }
+                else
+                {
+                    var result = await Task.Run(Integrations.FpsUnlockerService.Apply);
+
+                    if (!result.Ok)
+                    {
+                        App.Settings.Prop.FpsUnlockerEnabled = false;
+                        try { App.Settings.Save(); } catch { }
+
+                        _fpsUnlockerStatus = "Status: Gagal — tidak bisa mendeteksi refresh rate monitor";
+                        OnPropertyChanged(nameof(FpsUnlockerEnabled));
+                    }
+                    else if (result.Deferred)
+                    {
+                        _fpsUnlockerStatus = $"Status: Siap — FramerateCap {result.Cap} Hz, diterapkan saat Roblox dijalankan";
+                    }
+                    else
+                    {
+                        _fpsUnlockerStatus = $"Status: Aktif — FramerateCap {result.Cap} Hz (mengikuti refresh rate monitor)";
+                    }
+                }
+
+                OnPropertyChanged(nameof(FpsUnlockerStatusText));
+            }
+            finally
+            {
+                IsApplying = false;
+                ApplyingText = "⏳ Menerapkan FastFlag & menulis ke disk...";
             }
         }
 
