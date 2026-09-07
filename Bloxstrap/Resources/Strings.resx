@@ -1883,6 +1883,12 @@ Defaulting to {1}.</value>
   <data name="Watcher.CrashDetected.Balloon" xml:space="preserve">
     <value>Roblox crash terdeteksi! Klik notifikasi ini untuk menyambung ulang ke game terakhir.</value>
   </data>
+  <data name="Menu.FastFlags.FpsUnlocker.Title" xml:space="preserve">
+    <value>FPS Unlocker (Ikuti Refresh Rate Monitor)</value>
+  </data>
+  <data name="Menu.FastFlags.FpsUnlocker.Description" xml:space="preserve">
+    <value>Unlock FPS otomatis: deteksi refresh rate monitor lalu set FramerateCap Roblox (GlobalBasicSettings_13.xml). Toggle independen — bisa di-stack dengan preset apa pun. Nonaktifkan untuk kembali ke cap default Roblox.</value>
+  </data>
   <data name="Watcher.CrashDetected.Message" xml:space="preserve">
     <value>Roblox mengalami crash. Apakah Anda ingin menyambung ulang ke game terakhir?</value>
   </data>

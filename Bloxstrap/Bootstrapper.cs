@@ -779,6 +779,21 @@ namespace Bloxstrap
 
             SetStatus(Strings.Bootstrapper_Status_Starting);
 
+            // FPS Unlocker — apply FramerateCap sebelum Roblox start. Diulang tiap launch
+            // sehingga kasus "GlobalBasicSettings_13.xml belum ada saat toggle dinyalakan"
+            // tertutup otomatis begitu file muncul.
+            if (App.Settings.Prop.FpsUnlockerEnabled)
+            {
+                try
+                {
+                    Integrations.FpsUnlockerService.Apply();
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteException(LOG_IDENT, ex);
+                }
+            }
+
             if (_launchMode == LaunchMode.Player)
             {
                 GameJoin gameJoin = new();

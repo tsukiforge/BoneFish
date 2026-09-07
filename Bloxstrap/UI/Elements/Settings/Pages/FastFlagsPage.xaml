@@ -42,7 +42,7 @@
             <StackPanel Orientation="Horizontal">
                 <ui:ProgressRing Width="16" Height="16" IsIndeterminate="True" />
                 <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="13"
-                           Foreground="#2196F3" Text="⏳ Menerapkan FastFlag &amp; menulis ke disk..." />
+                           Foreground="#2196F3" Text="{Binding ApplyingText}" />
             </StackPanel>
         </Border>
 
@@ -200,6 +200,13 @@
                     Header="Fast Loading (Percepat Muncul Aset)"
                     Description="Optimasi loading: texture &amp; mesh muncul lebih cepat. Stack dengan preset apa pun. Aktif otomatis berdasarkan jumlah core CPU.">
                     <ui:ToggleSwitch IsChecked="{Binding EnableFastLoadingFlags, Mode=TwoWay}" />
+                </controls:OptionControl>
+
+                <!-- FPS UNLOCKER TOGGLE -->
+                <controls:OptionControl
+                    Header="{x:Static resources:Strings.Menu_FastFlags_FpsUnlocker_Title}"
+                    Description="{Binding FpsUnlockerStatusText}">
+                    <ui:ToggleSwitch IsChecked="{Binding FpsUnlockerEnabled, Mode=TwoWay}" />
                 </controls:OptionControl>
 
                 <!-- TDR MITIGATION TOGGLE -->
