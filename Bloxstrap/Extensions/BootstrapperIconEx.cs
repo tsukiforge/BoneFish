@@ -25,7 +25,6 @@ namespace Bloxstrap.Extensions
         }
         public static IReadOnlyCollection<BootstrapperIcon> Selections => new BootstrapperIcon[]
         {
-            //BootstrapperIcon.IconFishstrap,
             BootstrapperIcon.IconBloxstrap,
             BootstrapperIcon.Icon2022,
             BootstrapperIcon.Icon2019,
@@ -74,7 +73,6 @@ namespace Bloxstrap.Extensions
 
             return icon switch
             {
-                //BootstrapperIcon.IconFishstrap => Properties.Resources.IconFishstrap,
                 BootstrapperIcon.IconBloxstrap => Properties.Resources.IconBloxstrap,
                 BootstrapperIcon.Icon2008 => Properties.Resources.Icon2008,
                 BootstrapperIcon.Icon2011 => Properties.Resources.Icon2011,

@@ -96,11 +96,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Expose internals (AutoOptimizeService etc.) to the unit test project only. -->
-    <InternalsVisibleTo Include="Bloxstrap.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
     <AssemblyAttribute Include="Bloxstrap.Models.Attributes.BuildMetadataAttribute">
       <_Parameter1>$([System.DateTime]::UtcNow.ToString("s"))Z</_Parameter1>
       <_Parameter2>$(COMPUTERNAME)\$(USERNAME)</_Parameter2>

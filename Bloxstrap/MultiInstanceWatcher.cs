@@ -8,8 +8,8 @@
 
             try
             {
-                // prevent any possible race conditions by checking for bloxstrap processes too
-                int count = Process.GetProcesses().Count(x => x.ProcessName is "RobloxPlayerBeta" or "Fishstrap");
+                // prevent any possible race conditions by checking for bootstrapper processes too
+                int count = Process.GetProcesses().Count(x => x.ProcessName is "RobloxPlayerBeta" or App.ProjectName);
                 count -= 1; // ignore the current process
                 return count;
             }

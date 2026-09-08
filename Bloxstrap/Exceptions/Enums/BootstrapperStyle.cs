@@ -9,7 +9,7 @@
         ClassicFluentDialog,
         TwentyFiveDialog,
         ByfronDialog,
-        [EnumName(StaticName = "Fishstrap")]
+        [EnumName(StaticName = "BoneFish")]
         FluentDialog,
         FluentAeroDialog,
         CustomDialog
