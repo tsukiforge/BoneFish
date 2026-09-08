@@ -103,18 +103,6 @@ namespace Bloxstrap.Properties {
 		        /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
         /// </summary>
-        internal static System.Drawing.Icon IconFishstrap
-        {
-            get
-            {
-                object obj = ResourceManager.GetObject("IconFishstrap", resourceCulture);
-                return ((System.Drawing.Icon)(obj));
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
-        /// </summary>
         internal static System.Drawing.Icon IconBloxstrap
         {
             get
