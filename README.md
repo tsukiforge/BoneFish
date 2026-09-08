@@ -13,7 +13,7 @@
 [![Discord][badge-discord]][discord-invite]
 [![Stars][badge-stars]](#)
 
-[Download Latest Release][repo-latest] · [Visit Website][website] · [Report Bug][repo-new-issue] · [Join Discord][discord-invite]
+[Download Latest Release][repo-latest] · [Visit Website][website] · [Report Bug][repo-new-issue] · [Join Discord][discord-invite] · [💖 Sponsor][tako]
 
 </div>
 
@@ -199,6 +199,16 @@ When reporting bugs, please include:
 
 ---
 
+## 💖 Sponsor
+
+If you like BoneFish and want to support its development, you can donate here:
+
+**[tako.id/c/SiMahiro](https://tako.id/c/SiMahiro)**
+
+Every donation helps a lot — thank you for your support! 🙏
+
+---
+
 ## 🙏 Special Thanks
 
 ### Core Contributors
@@ -276,3 +286,4 @@ Use at your own risk. We are not responsible for any account actions taken by Ro
 [sober]:      https://sober.vinegarhq.org
 [rovalra]:    https://www.rovalra.com
 [website]:    https://bonefishstudio.vercel.app
+[tako]:       https://tako.id/c/SiMahiro
