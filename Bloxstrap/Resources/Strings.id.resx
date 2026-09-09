@@ -794,7 +794,7 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
     <value>Setelan tersimpan!</value>
   </data>
   <data name="Menu.Title" xml:space="preserve">
-    <value>Setelan BoneFish</value>
+    <value>Bonefish</value>
   </data>
   <data name="Dialog.LanguageSelector.Header" xml:space="preserve">
     <value>Pilih bahasa yang di inginkan</value>
@@ -910,7 +910,7 @@ Memilih 'Tidak' akan mengabaikan peringatan ini dan melanjutkan instalasi.</valu
 
 Situs resmi untuk mengunduh BoneFish ada di {0} dan {1}, Jadi tolong diverifikasi jika Anda mendapatnya dari situs yang resmi
 
-Proses pemasangan akan cepat dan mudah, Anda dapat mengatur setelan BoneFish setelah pemasangan selesai.</value>
+Proses pemasangan akan cepat dan mudah, Anda dapat mengatur Bonefish setelah pemasangan selesai.</value>
     <comment>{0} and {1} are URLs</comment>
   </data>
   <data name="Installer.Welcome.NextToContinue" xml:space="preserve">
@@ -947,7 +947,7 @@ Juga, hindari menggunakan pintasan "Roblox Player" untuk menjalankan Roblox, kar
 Apa yang ingin Anda lakukan?</value>
   </data>
   <data name="Installer.Completion.Settings.Title" xml:space="preserve">
-    <value>Atur setelan BoneFish</value>
+    <value>Atur Bonefish</value>
   </data>
   <data name="Installer.Completion.Settings.Description" xml:space="preserve">
     <value>Sesuaikan dengan semua fitur yang dimilikinya</value>
