@@ -9,6 +9,7 @@ namespace Bloxstrap.Integrations
     public static class FpsUnlockerService
     {
         private const string LOG_IDENT = "FpsUnlocker";
+        private const int MaximumRobloxFramerateCap = 240;
 
         private const int ENUM_CURRENT_SETTINGS = -1;
 
@@ -65,8 +66,7 @@ namespace Bloxstrap.Integrations
                 return new FpsUnlockerResult(false, false, 0);
             }
 
-            // Roblox menerima FramerateCap di rentang 30-240
-            int cap = Math.Clamp(refreshRate, 30, 240);
+            int cap = MaximumRobloxFramerateCap;
 
             App.Logger.WriteLine(LOG_IDENT, $"Menerapkan FramerateCap={cap} (refresh rate monitor: {refreshRate} Hz)");
 
