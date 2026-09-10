@@ -1,11 +1,11 @@
-# FPS Unlocker (BoneFish v7.5+)
+# FPS Unlocker
 
 ## Apa ini?
 
 Toggle **independen** di Settings → Fast Flags yang mendeteksi refresh rate monitor
-lalu menulis cap FPS ke pengaturan Roblox (`GlobalBasicSettings_13.xml` →
-`FramerateCap`). Bisa di-stack dengan preset visual apa pun — tidak terikat preset
-tertentu.
+lalu menulis batas maksimum 240 FPS ke pengaturan Roblox
+(`GlobalBasicSettings_13.xml` → `FramerateCap`). Bisa di-stack dengan preset
+visual apa pun — tidak terikat preset tertentu.
 
 ## Apakah beneran nambah FPS atau cuma pajangan?
 
@@ -13,19 +13,19 @@ tertentu.
 
 | Refresh Rate Monitor | Efek |
 |---|---|
-| **60 Hz** (laptop standar, ThinkPad) | **Placebo / pajangan.** Roblox default cap-nya 60 — tidak ada kenaikan FPS. |
-| **75 Hz** | **Naik ±15 FPS** dari default 60 (Roblox render 75 fps, bukan 60). |
-| **120 / 144 / 165 / 240 Hz** | **Nyata.** Roblox di-unlock dari 60 ke refresh rate monitor — FPS bisa jauh lebih tinggi (tergantung GPU & CPU). |
+| **60 Hz** (laptop standar, ThinkPad) | Batas software dapat naik hingga 240 FPS, tetapi layar tetap menampilkan 60 Hz. |
+| **75 Hz** | Batas software dapat naik hingga 240 FPS; FPS aktual tetap bergantung pada GPU dan CPU. |
+| **120 / 144 / 165 / 240 Hz** | Roblox dapat merender di atas 60 FPS hingga batas 240 FPS, jika GPU dan CPU mampu. |
 
-**Kesimpulan**: fitur ini FUNGSIONAL, bukan sekadar hiasan. Tapi manfaatnya
-hanya terasa di monitor >60 Hz. Di laptop biasa (60 Hz), toggle ini tidak
-mengubah apa pun — FramerateCap tetap 60.
+**Kesimpulan**: fitur ini menaikkan batas software hingga 240 FPS. Itu tidak
+menjamin FPS aktual 240 atau membuat FPS tidak terbatas: GPU, CPU, suhu, mode
+grafis, dan batas client Roblox tetap menentukan hasil akhirnya.
 
 ## Cara kerja
 
 1. User mengaktifkan toggle → muncul *loading configuration*.
-2. `EnumDisplaySettings` (Win32) mendeteksi refresh rate monitor.
-3. `FramerateCap` ditulis ke `GlobalBasicSettings_13.xml` (file settings Roblox).
+2. `EnumDisplaySettings` (Win32) mendeteksi refresh rate monitor untuk logging.
+3. `FramerateCap=240` ditulis ke `GlobalBasicSettings_13.xml` (file settings Roblox).
 4. Tiap kali BoneFish meluncurkan Roblox, nilai ini di-apply ulang (best-effort).
 5. Saat toggle dimatikan → elemen `FramerateCap` dihapus → Roblox kembali ke
    default-nya (60 FPS).
@@ -40,10 +40,10 @@ pengganti resmi yang diakui Roblox.
 
 - **Aktifkan toggle**, lalu cek file:
   `%LOCALAPPDATA%\Roblox\GlobalBasicSettings_13.xml`
-  Cari `<int name="FramerateCap">...</int>` — nilainya harus sesuai refresh rate monitor.
+  Cari `<int name="FramerateCap">240</int>`.
 - **Nonaktifkan toggle** — elemen `FramerateCap` dihapus dari file tersebut.
-- Di dalam game Roblox, buka Settings → Graphics → *Frame Rate Limit* — nilainya
-  akan mengikuti apa yang ditulis BoneFish.
+- Ukur FPS dengan overlay Roblox atau FPS monitor. Nilai aktual dapat lebih rendah
+  dari 240 jika perangkat tidak mampu mempertahankannya.
 
 ## File terkait
 
