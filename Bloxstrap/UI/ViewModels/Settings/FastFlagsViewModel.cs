@@ -498,11 +498,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     }
                     else if (result.Deferred)
                     {
-                        _fpsUnlockerStatus = $"Status: Siap — FramerateCap {result.Cap} Hz, diterapkan saat Roblox dijalankan";
+                        _fpsUnlockerStatus = $"Status: Siap — batas {result.Cap} FPS, diterapkan saat Roblox dijalankan";
                     }
                     else
                     {
-                        _fpsUnlockerStatus = $"Status: Aktif — FramerateCap {result.Cap} Hz (mengikuti refresh rate monitor)";
+                        _fpsUnlockerStatus = $"Status: Aktif — batas hingga {result.Cap} FPS (FPS aktual bergantung perangkat)";
                     }
                 }
 
