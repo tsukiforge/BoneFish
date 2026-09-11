@@ -20,8 +20,9 @@ namespace Bloxstrap
         public const string ProjectName = "BoneFish";
 #endif
         public const string ProjectOwner = "faizinuha";
-        public const string ProjectRepository = "faizinuha/BoneFish";
-        public const string ProjectDownloadLink = "https://github.com/faizinuha/BoneFish/releases";
+        public const string ProjectRepository = "tsukiforge/BoneFish";
+        public const string SecondaryProjectRepository = "BoneFishStudio/BoneFish";
+        public const string ProjectDownloadLink = "https://github.com/tsukiforge/BoneFish/releases";
         public const string ProjectHelpLink = "https://github.com/bloxstraplabs/bloxstrap/wiki";
         public const string ProjectSupportLink = "https://github.com/faizinuha/BoneFish/issues/new";
         public const string ProjectRemoteDataLink = "https://config.fishstrap.app/v1/Data.json";
@@ -166,17 +167,20 @@ namespace Bloxstrap
         }
 
         public static async Task<GithubRelease?> GetLatestRelease()
+            => await GetLatestRelease(ProjectRepository);
+
+        public static async Task<GithubRelease?> GetLatestRelease(string repository)
         {
             const string LOG_IDENT = "App::GetLatestRelease";
 
             try
             {
-                Uri githubReleasesUrl = new($"https://api.github.com/repos/{ProjectRepository}/releases/latest");
+                Uri githubReleasesUrl = new($"https://api.github.com/repos/{repository}/releases/latest");
                 var releaseInfo = await Http.GetJson<GithubRelease>(githubReleasesUrl);
 
                 if (releaseInfo is null || releaseInfo.Assets is null)
                 {
-                    Logger.WriteLine(LOG_IDENT, "Encountered invalid data");
+                    Logger.WriteLine(LOG_IDENT, $"Encountered invalid data from {repository}");
                     return null;
                 }
 
@@ -184,6 +188,7 @@ namespace Bloxstrap
             }
             catch (Exception ex)
             {
+                Logger.WriteLine(LOG_IDENT, $"Failed to check {repository}");
                 Logger.WriteException(LOG_IDENT, ex);
             }
 
@@ -197,6 +202,9 @@ namespace Bloxstrap
 
         private static bool IsPortableInstallFolder(string processDir)
         {
+            if (File.Exists(Path.Combine(processDir, "BoneFish.portable")))
+                return true;
+
             bool hasSettings = false;
             bool hasState = false;
             int count = 0;
@@ -284,12 +292,20 @@ namespace Bloxstrap
 
             LaunchSettings = new LaunchSettings(e.Args);
 
-            // installation check begins here
+            // A portable package contains a marker beside the executable. It must
+            // take precedence over an existing installed copy on this machine.
             using var uninstallKey = Registry.CurrentUser.OpenSubKey(UninstallKey);
             string? installLocation = null;
             bool fixInstallLocation = false;
+            string? processDirectory = Directory.GetParent(Paths.Process)?.FullName;
+            bool portableRun = processDirectory is not null && IsPortableInstallFolder(processDirectory);
 
-            if (uninstallKey?.GetValue("InstallLocation") is string value)
+            if (portableRun)
+            {
+                installLocation = processDirectory;
+                Logger.WriteLine(LOG_IDENT, $"Portable mode detected at '{processDirectory}'");
+            }
+            else if (uninstallKey?.GetValue("InstallLocation") is string value)
             {
                 if (Directory.Exists(value))
                 {
@@ -314,11 +330,11 @@ namespace Bloxstrap
             }
 
             // silently change install location if we detect a portable run
-            if (installLocation is null && Directory.GetParent(Paths.Process)?.FullName is string processDir)
+            if (!portableRun && installLocation is null && processDirectory is not null)
             {
-                if (IsPortableInstallFolder(processDir))
+                if (IsPortableInstallFolder(processDirectory))
                 {
-                    installLocation = processDir;
+                    installLocation = processDirectory;
                     fixInstallLocation = true;
                 }
             }

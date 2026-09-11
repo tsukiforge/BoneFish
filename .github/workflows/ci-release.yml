@@ -26,11 +26,20 @@ jobs:
     - name: Publish
       run: dotnet publish -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:CommitHash=${{ github.sha }} -p:CommitRef=${{ github.ref_type }}/${{ github.ref_name }} -p:SelfContained=false -r win-x64 -c Release .\Bloxstrap\Bloxstrap.csproj
 
+    - name: Prepare installer and portable packages
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Path artifacts, portable -Force | Out-Null
+        Copy-Item .\Bloxstrap\bin\Release\net9.0-windows\win-x64\publish\BoneFish.exe .\artifacts\BoneFish.exe
+        Copy-Item .\Bloxstrap\bin\Release\net9.0-windows\win-x64\publish\BoneFish.exe .\portable\BoneFish.exe
+        New-Item -ItemType File -Path .\portable\BoneFish.portable | Out-Null
+        Compress-Archive -Path .\portable\* -DestinationPath .\artifacts\BoneFish-Portable.zip -Force
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v7
       with:
         name: BoneFish-Release
-        path: .\Bloxstrap\bin\Release\net9.0-windows\win-x64\publish\BoneFish.exe
+        path: .\artifacts\*
         if-no-files-found: error
 
   release:
@@ -47,14 +56,13 @@ jobs:
           name: BoneFish-Release
           path: release
 
-      - name: Rename binaries
-        run: mv release/BoneFish.exe BoneFish.exe
-
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
-          files: BoneFish.exe
+          files: |
+            release/BoneFish.exe
+            release/BoneFish-Portable.zip
           name: BoneFish ${{ github.ref_name }}
           fail_on_unmatched_files: true
 
@@ -72,14 +80,13 @@ jobs:
           name: BoneFish-Release
           path: release
 
-      - name: Rename binaries
-        run: mv release/BoneFish.exe BoneFish.exe
-
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
-          files: BoneFish.exe
+          files: |
+            release/BoneFish.exe
+            release/BoneFish-Portable.zip
           name: BoneFish ${{ github.ref_name }}
           fail_on_unmatched_files: true
 
@@ -108,9 +115,6 @@ jobs:
           name: BoneFish-Release
           path: release
 
-      - name: Rename binaries
-        run: mv release/BoneFish.exe BoneFish.exe
-
       - name: Extract changelog for this version
         id: changelog
         run: |
@@ -138,6 +142,8 @@ jobs:
           tag_name: v${{ steps.get_version.outputs.version }}
           name: BoneFish v${{ steps.get_version.outputs.version }}
           body_path: /tmp/release_body.md
-          files: BoneFish.exe
+          files: |
+            release/BoneFish.exe
+            release/BoneFish-Portable.zip
           draft: false
           prerelease: false

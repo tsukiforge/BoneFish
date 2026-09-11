@@ -16,6 +16,9 @@ namespace Bloxstrap.UI
         
         private readonly Watcher _watcher;
 
+        private System.Drawing.Icon? _updateIcon;
+        private string? _updateReleaseUrl;
+
         private ActivityWatcher? _activityWatcher => _watcher.ActivityWatcher;
 
         EventHandler? _alertClickHandler;
@@ -35,6 +38,8 @@ namespace Bloxstrap.UI
 
             _notifyIcon.MouseClick += MouseClickEventHandler;
 
+            _ = CheckForUpdatesAsync();
+
             if (_activityWatcher is not null && App.Settings.Prop.ShowServerDetails)
                 _activityWatcher.ShowNotif += ShowNotif;
 
@@ -45,6 +50,12 @@ namespace Bloxstrap.UI
         #region Context menu
         public void MouseClickEventHandler(object? sender, System.Windows.Forms.MouseEventArgs e)
         {
+            if (e.Button == System.Windows.Forms.MouseButtons.Left && _updateReleaseUrl is not null)
+            {
+                Utilities.ShellExecute(_updateReleaseUrl);
+                return;
+            }
+
             if (e.Button != System.Windows.Forms.MouseButtons.Right)
                 return;
 
@@ -52,6 +63,76 @@ namespace Bloxstrap.UI
             _menuContainer.ContextMenu.IsOpen = true;
         }
         #endregion
+
+        private async Task CheckForUpdatesAsync()
+        {
+            const string LOG_IDENT = "NotifyIconWrapper::CheckForUpdates";
+
+            if (!App.Settings.Prop.CheckForUpdates)
+                return;
+
+            try
+            {
+                GithubRelease? primaryRelease = await App.GetLatestRelease(App.ProjectRepository);
+                GithubRelease? secondaryRelease = await App.GetLatestRelease(App.SecondaryProjectRepository);
+
+                var releases = new[]
+                {
+                    (Repository: App.ProjectRepository, Release: primaryRelease),
+                    (Repository: App.SecondaryProjectRepository, Release: secondaryRelease)
+                }
+                .Where(item => item.Release is not null)
+                .Select(item => (item.Repository, Release: item.Release!))
+                .Where(item => Version.TryParse(item.Release.TagName.TrimStart('v'), out _))
+                .OrderByDescending(item => Utilities.GetVersionFromString(item.Release.TagName))
+                .ToList();
+
+                if (releases.Count == 0)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "No valid release found from either repository");
+                    return;
+                }
+
+                var latest = releases[0];
+                if (Utilities.CompareVersions(App.Version, latest.Release.TagName) != VersionComparison.LessThan)
+                    return;
+
+                _updateReleaseUrl = $"https://github.com/{latest.Repository}/releases/tag/{latest.Release.TagName}";
+                _updateIcon = CreateUpdateIcon();
+                _notifyIcon.Icon = _updateIcon;
+                _notifyIcon.Text = $"BoneFish - Update {latest.Release.TagName} tersedia";
+
+                ShowAlert(
+                    "BoneFish update tersedia",
+                    $"Versi {latest.Release.TagName} tersedia dari {latest.Repository}. Klik notifikasi atau icon tray untuk membuka release.",
+                    10,
+                    (_, _) => Utilities.ShellExecute(_updateReleaseUrl));
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Update check failed (non-fatal)");
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+        }
+
+        private static System.Drawing.Icon CreateUpdateIcon()
+        {
+            using var bitmap = Properties.Resources.IconBoneFish.ToBitmap();
+            using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+            using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Red))
+            using (var outline = new System.Drawing.Pen(System.Drawing.Color.White, 1.5f))
+            {
+                float diameter = Math.Max(5, bitmap.Width / 3f);
+                float x = bitmap.Width - diameter - 1;
+                float y = 1;
+                graphics.FillEllipse(brush, x, y, diameter, diameter);
+                graphics.DrawEllipse(outline, x, y, diameter, diameter);
+            }
+
+            IntPtr handle = bitmap.GetHicon();
+            using var icon = System.Drawing.Icon.FromHandle(handle);
+            return (System.Drawing.Icon)icon.Clone();
+        }
 
         #region Activity handlers
         public async void ShowNotif(object? sender, EventArgs e)
@@ -146,6 +227,7 @@ namespace Bloxstrap.UI
 
             _menuContainer.Dispatcher.Invoke(_menuContainer.Close);
             _notifyIcon.Dispose();
+            _updateIcon?.Dispose();
 
             GC.SuppressFinalize(this);
         }
