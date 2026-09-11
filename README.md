@@ -145,6 +145,10 @@ After the setup wizard opens:
 
 The CLI installer and manual installer use the same setup wizard. Do not download executables from unofficial mirrors.
 
+#### Portable / no-install version
+
+Download `BoneFish-Portable.zip` from the release assets and extract it to a folder you control. Run `BoneFish.exe` directly from that folder. The portable build stores its settings, logs, themes, and modifications beside the executable and does not register an installed copy in Windows.
+
 ### System Requirements
 
 - **OS:** Windows 10 (1809+) or Windows 11
