@@ -62,8 +62,18 @@ namespace Bloxstrap
         // BoneFish kehilangan proteksi suspend sama sekali.
         private int? _externalGamePid;
         private ActivityWatcher? _externalActivityWatcher;
-        private readonly HashSet<int> _ignoredExternalPids = new();
+        private Task? _externalMonitorTask;
+        private readonly Dictionary<int, DateTime> _externalLogRetryAfterUtc = new();
         private const string RobloxPlayerProcessName = "RobloxPlayerBeta";
+
+        private void EnsureExternalGameMonitor()
+        {
+            if (!App.Settings.Prop.EnableSystemTrayOnClose
+                || _externalMonitorTask is { IsCompleted: false })
+                return;
+
+            _externalMonitorTask = Task.Run(MonitorExternalGameSessions);
+        }
 
         public Watcher()
         {
@@ -555,6 +565,10 @@ namespace Bloxstrap
             ActivityWatcher?.Start();
             WindowManipulation?.ApplyWindowModifications();
 
+            // Start monitoring immediately so Roblox launched from the official
+            // tray or website is handled even before this tracked session ends.
+            EnsureExternalGameMonitor();
+
             if (App.Settings.Prop.FakeBorderlessFullscreen)
                 WindowManipulation?.FakeBorderless();
 
@@ -633,7 +647,7 @@ namespace Bloxstrap
                     var externalExitTask = Task.Run(() => {
                         try { return _exitEvent.WaitOne(); } catch { return false; }
                     });
-                    var externalMonitorTask = Task.Run(() => MonitorExternalGameSessions());
+                    EnsureExternalGameMonitor();
                     await Task.WhenAny(exitSignalTask, externalExitTask);
                 }
                 else
@@ -671,7 +685,7 @@ namespace Bloxstrap
                         }
                     });
 
-                    var externalMonitorTask = Task.Run(() => MonitorExternalGameSessions());
+                    EnsureExternalGameMonitor();
                     await Task.WhenAny(exitSignalTask, externalExitTask);
                 }
             }
@@ -907,8 +921,10 @@ namespace Bloxstrap
                     continue;
                 }
 
-                // Buang pid yang di-ignore yang sudah mati supaya set tidak membengkak.
-                _ignoredExternalPids.RemoveWhere(pid => !Utilities.GetProcessesSafe().Any(x => x.Id == pid));
+                // Buang retry state untuk PID yang sudah mati supaya dictionary tidak membengkak.
+                HashSet<int> livePids = Utilities.GetProcessesSafe().Select(process => process.Id).ToHashSet();
+                foreach (int retryProcessId in _externalLogRetryAfterUtc.Keys.Where(processId => !livePids.Contains(processId)).ToList())
+                    _externalLogRetryAfterUtc.Remove(retryProcessId);
 
                 int? candidate = FindUntrackedRobloxProcess();
                 if (candidate is int pid)
@@ -935,7 +951,9 @@ namespace Bloxstrap
                     int pid = process.Id;
                     if (_watcherData is not null && pid == _watcherData.ProcessId)
                         continue;
-                    if (_externalGamePid == pid || _ignoredExternalPids.Contains(pid))
+                    if (_externalGamePid == pid
+                        || (_externalLogRetryAfterUtc.TryGetValue(pid, out DateTime retryAfter)
+                            && retryAfter > DateTime.UtcNow))
                         continue;
 
                     return pid;
@@ -1012,13 +1030,13 @@ namespace Bloxstrap
                 string? logFile = FindRobloxLogFileForProcess(pid);
                 if (logFile is null)
                 {
-                    // Tidak ada log untuk proses ini (mungkin Roblox self-update) —
-                    // jangan spam retry; ignore sampai proses mati.
-                    App.Logger.WriteLine(LOG_IDENT, $"Log file untuk game eksternal pid={pid} tidak ditemukan — proses diabaikan");
-                    _ignoredExternalPids.Add(pid);
+                    // Log dapat muncul beberapa detik setelah proses Roblox dibuat.
+                    // Retry berkala agar startup race tidak mematikan monitoring sesi.
+                    _externalLogRetryAfterUtc[pid] = DateTime.UtcNow.AddSeconds(5);
                     return;
                 }
 
+                _externalLogRetryAfterUtc.Remove(pid);
                 _externalGamePid = pid;
                 _externalActivityWatcher = new ActivityWatcher(logFile, attachExisting: true);
                 _externalActivityWatcher.OnGameJoin += ExternalGameJoinHandler;

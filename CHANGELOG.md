@@ -1,5 +1,65 @@
 # BoneFish Changelog
 
+## v7.6.0 - Dual-Repository Update Indicator, Game Session Tray Reliability & FPS Unlocker
+
+Release date: 2026-09-11
+
+### 🎮 Game Session dari Roblox System Tray
+
+- **Monitor external Roblox dimulai lebih awal** saat BoneFish berjalan di system
+  tray, sehingga Roblox yang dibuka dari official Roblox tray atau website tetap
+  dapat terdeteksi sebelum sesi Roblox sebelumnya berakhir.
+- **Retry pencarian log Roblox** setiap 5 detik jika proses sudah muncul tetapi
+  file log belum dibuat. Startup race tidak lagi membuat PID Roblox diabaikan
+  sampai prosesnya mati.
+- Notifikasi suspend tetap muncul hanya jika ada proses yang benar-benar berhasil
+  disuspend. Proses yang diproteksi atau tidak memiliki rule tidak dilaporkan
+  sebagai suspend palsu.
+
+### 🔴 Indikator Update di System Tray
+
+- System tray kini memeriksa dua jalur release resmi:
+  - `https://github.com/tsukiforge/BoneFish/releases`
+  - `https://github.com/BoneFishStudio/BoneFish/releases`
+- Release dengan versi tertinggi dari kedua repository dipilih sebagai sumber
+  update.
+- Jika versi tersebut lebih baru daripada versi aplikasi, icon BoneFish mendapat
+  badge merah dan tooltip update.
+- Klik kiri icon atau notifikasi update membuka halaman release yang benar.
+- Jika salah satu repository gagal diakses, repository lainnya tetap diperiksa.
+
+### 🚀 FPS Unlocker hingga 240 FPS
+
+- `FramerateCap` Roblox kini ditetapkan ke **240 FPS**, bukan dibatasi sama dengan
+  refresh rate monitor.
+- FPS aktual tetap bergantung pada CPU, GPU, suhu, kualitas grafis, dan batas
+  client Roblox. Nilai 240 FPS adalah batas software, bukan jaminan FPS nyata.
+- Status UI dan dokumentasi diperbarui agar menjelaskan batasan ini dengan jelas.
+
+### 🧰 PowerShell CLI Installer
+
+- Installer resmi baru tersedia di `Scripts/Install-BoneFish.ps1`.
+- Selalu mengambil `BoneFish.exe` dari GitHub Release terbaru.
+- Memvalidasi sistem Windows 64-bit dan signature executable sebelum dijalankan.
+- Menampilkan banner ASCII, status berwarna, pesan error yang jelas, serta opsi
+  `-SkipLaunch` dan `-KeepDownload`.
+- README diperbarui dengan instruksi instalasi CLI dan instalasi manual.
+
+### 📦 Dua Paket Release
+
+- `BoneFish-Setup.exe` untuk instalasi normal dengan setup wizard dan shortcut.
+- `BoneFish-Portable.zip` untuk menjalankan BoneFish langsung dari folder tanpa
+  wizard installer atau registrasi install Windows. Data portable disimpan di
+  folder yang sama dengan executable.
+
+### ✅ Verifikasi
+
+- `Watcher.cs` tidak memiliki error dari analyzer editor.
+- Resource XML valid.
+- `git diff --check` berhasil dengan konfigurasi line ending CRLF repository.
+- Build penuh memerlukan restore dependency NuGet pada environment Windows/.NET
+  yang lengkap.
+
 ## v7.4.0 - Fix Crash TaskDialog "Invalid Cursor Handle" + Migrasi BootstrapperTitle Lama
 
 Release date: 2026-09-04
