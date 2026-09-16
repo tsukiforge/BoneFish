@@ -1,5 +1,23 @@
 # BoneFish Changelog
 
+## v7.6.1 - Bug Fix Update Tray
+
+Release date: 2026-09-16
+
+### 🐛 Bug Fix — Update Tray Terlalu Mengganggu
+
+- Menghapus balloon notification otomatis saat update GitHub ditemukan.
+- Update kini hanya ditandai dengan badge merah pada icon system tray.
+- Tooltip icon menampilkan bahwa update tersedia.
+- Klik kiri icon membuka halaman release GitHub yang sesuai.
+- Pengecekan update yang gagal tetap bersifat non-fatal dan tidak mengganggu
+  penggunaan BoneFish.
+
+### ✅ Verifikasi
+
+- Build Release berhasil.
+- `git diff --check` berhasil.
+
 ## v7.6.0 - Dual-Repository Update Indicator, Game Session Tray Reliability & FPS Unlocker
 
 Release date: 2026-09-11
@@ -16,16 +34,18 @@ Release date: 2026-09-11
   disuspend. Proses yang diproteksi atau tidak memiliki rule tidak dilaporkan
   sebagai suspend palsu.
 
-### 🔴 Indikator Update di System Tray
+### 🐛 Bug Fix — Update Tray Terlalu Mengganggu
 
-- System tray kini memeriksa dua jalur release resmi:
+- Update checker tetap memeriksa dua jalur release resmi:
   - `https://github.com/tsukiforge/BoneFish/releases`
   - `https://github.com/BoneFishStudio/BoneFish/releases`
-- Release dengan versi tertinggi dari kedua repository dipilih sebagai sumber
-  update.
-- Jika versi tersebut lebih baru daripada versi aplikasi, icon BoneFish mendapat
-  badge merah dan tooltip update.
-- Klik kiri icon atau notifikasi update membuka halaman release yang benar.
+- Release dengan versi tertinggi dari kedua repository tetap dipilih sebagai
+  sumber update.
+- Balloon notification otomatis dihapus karena mengganggu saat BoneFish mulai
+  berjalan.
+- Jika versi tersebut lebih baru daripada versi aplikasi, hanya icon BoneFish
+  yang mendapat badge merah dan tooltip update.
+- Klik kiri icon tray membuka halaman release yang benar.
 - Jika salah satu repository gagal diakses, repository lainnya tetap diperiksa.
 
 ### 🚀 FPS Unlocker hingga 240 FPS

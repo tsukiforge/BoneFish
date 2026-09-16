@@ -102,11 +102,10 @@ namespace Bloxstrap.UI
                 _notifyIcon.Icon = _updateIcon;
                 _notifyIcon.Text = $"BoneFish - Update {latest.Release.TagName} tersedia";
 
-                ShowAlert(
-                    "BoneFish update tersedia",
-                    $"Versi {latest.Release.TagName} tersedia dari {latest.Repository}. Klik notifikasi atau icon tray untuk membuka release.",
-                    10,
-                    (_, _) => Utilities.ShellExecute(_updateReleaseUrl));
+                App.Logger.WriteLine(
+                    LOG_IDENT,
+                    $"Update tersedia: {latest.Release.TagName} dari {latest.Repository}. " +
+                    "Indicator tray aktif; popup otomatis tidak ditampilkan.");
             }
             catch (Exception ex)
             {
