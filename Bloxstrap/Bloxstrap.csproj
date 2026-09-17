@@ -7,8 +7,8 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
     <ApplicationIcon>Bloxstrap.ico</ApplicationIcon>
-    <Version>7.6.3</Version>
-    <FileVersion>7.6.3</FileVersion>
+    <Version>7.7.0</Version>
+    <FileVersion>7.7.3</FileVersion>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -18,6 +18,7 @@
     <Product>$(AssemblyName)</Product>
     <RootNamespace>Bloxstrap</RootNamespace>
     <SelfContained>false</SelfContained>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>
