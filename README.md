@@ -97,11 +97,57 @@
 
 ### Installation
 
-1. **Download** the latest release from [Releases][repo-latest]
-2. **Extract** the ZIP file to a folder
-3. **Run** `BoneFish.exe`
-4. **Follow** the setup wizard
-5. **Enjoy** your enhanced Roblox experience!
+#### Option A: PowerShell CLI installer
+
+The official CLI installer downloads `BoneFish.exe` from the [official GitHub Releases][repo-latest], validates the Windows executable, and opens the normal BoneFish setup wizard. It does not require administrator access because BoneFish installs per user.
+
+Open **PowerShell** and run:
+
+```powershell
+$script = Join-Path $env:TEMP "Install-BoneFish.ps1"
+Invoke-WebRequest "https://raw.githubusercontent.com/tsukiforge/BoneFish/main/Scripts/Install-BoneFish.ps1" -OutFile $script
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script
+```
+
+The command uses `-ExecutionPolicy Bypass` only for this process and does not change your Windows execution policy permanently.
+
+#### Option B: Run the installer from a clone
+
+```powershell
+git clone https://github.com/tsukiforge/BoneFish.git
+Set-Location BoneFish
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Scripts\Install-BoneFish.ps1
+```
+
+Useful parameters:
+
+```powershell
+# Download and validate the release without opening the setup wizard
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Scripts\Install-BoneFish.ps1 -SkipLaunch
+
+# Keep a copy of the latest executable in %LOCALAPPDATA%\BoneFish\Downloads
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Scripts\Install-BoneFish.ps1 -KeepDownload
+```
+
+The installer always uses the newest published GitHub release. No version number needs to be selected manually.
+
+After the setup wizard opens:
+
+1. Confirm the installation directory. The default is `%LOCALAPPDATA%\BoneFish`.
+2. Choose whether to create Desktop and Start Menu shortcuts.
+3. Complete the wizard and launch BoneFish from the shortcut or Start Menu.
+
+#### Manual installation
+
+1. Download `BoneFish.exe` from [the official Releases page][repo-latest].
+2. Run `BoneFish.exe`.
+3. Follow the setup wizard.
+
+The CLI installer and manual installer use the same setup wizard. Do not download executables from unofficial mirrors.
+
+#### Portable / no-install version
+
+Download `BoneFish-Portable.zip` from the release assets and extract it to a folder you control. Run `BoneFish.exe` directly from that folder. The portable build stores its settings, logs, themes, and modifications beside the executable and does not register an installed copy in Windows.
 
 ### System Requirements
 
@@ -142,25 +188,6 @@ Enable in **Fast Flags** page:
 - Independent toggle — stacks with any performance preset
 - Automatically detects your monitor refresh rate
 - Most noticeable on 120Hz+ displays
-
----
-
-## 🎬 YouTube Content Script
-
-BoneFish includes a detailed **YouTube content script** for creators who want to showcase the application.
-
-📄 **[View Full Script](YOUTUBE-CONTENT-SCRIPT.md)**
-
-The script includes:
-- Complete video outline (15-20 minutes)
-- Shot-by-shot breakdown with timestamps
-- Voice-over suggestions in Indonesian
-- B-roll requirements and editing tips
-- Music recommendations
-- Video description template with hashtags
-- Thumbnail design tips
-
-Perfect for creating professional tutorials and reviews!
 
 ---
 
