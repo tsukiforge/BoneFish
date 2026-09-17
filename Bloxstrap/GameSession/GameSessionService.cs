@@ -61,6 +61,21 @@ namespace Bloxstrap.GameSession
             }
         }
 
+        /// <summary>
+        /// v7.6.3 — identitas proses dianggap cukup dikenal bila NAMA prosesnya
+        /// terbaca, walau path/StartTime tidak bisa dibaca (akibat handle akses
+        /// dibatasi pada proses tertentu, mis. browser Chromium terbaru, launcher
+        /// anti-cheat, atau aplikasi UWP). Dulu kondisi itu langsung diklasifikasi
+        /// Critical sehingga aplikasi yang justru paling ingin di-suspend tidak
+        /// pernah tersentuh (feedback: "aplikasi yang saya pilih tidak ikut suspend").
+        /// Proses tanpa nama tetap ditolak — nama dipakai untuk mencocokkan rule
+        /// dan untuk me-restore.
+        /// </summary>
+        public static bool IsKnownProcess(ProcessSnapshot snapshot)
+        {
+            return !String.IsNullOrWhiteSpace(snapshot.ProcessName);
+        }
+
         private async Task<GameSessionRecord> BeginSessionCoreAsync(CancellationToken cancellationToken)
         {
             const string LOG_IDENT_LOCAL = "GameSession::BeginSession";
@@ -71,19 +86,68 @@ namespace Bloxstrap.GameSession
                     EndSessionCore(null);
 
                 if (Store.ReadActive() is not null)
-                    throw new InvalidOperationException("A previous Game Session still has processes pending restore.");
+                {
+                    // v7.6.3 FIX — dulu kondisi ini melempar InvalidOperationException
+                    // SETIAP kali user masuk game, sehingga Game Session tampak "tidak
+                    // pernah berhasil sama sekali" setelah satu kegagalan restore.
+                    // Sekarang record pending yang tidak bisa di-restore dipulihkan
+                    // sekaligus: semua thread di-resume lewat rescue scan, record
+                    // dibuang, lalu sesi baru dimulai normal.
+                    App.Logger.WriteLine(LOG_IDENT_LOCAL,
+                        "Sesi sebelumnya masih pending restore — memaksa pemulihan dan memulai sesi baru");
+
+                    try
+                    {
+                        IReadOnlyList<RescuedProcess> rescued = Suspension.RescueSuspendedProcesses();
+                        App.Logger.WriteLine(LOG_IDENT_LOCAL,
+                            $"Pemulihan paksa selesai: {rescued.Count} proses di-resume (rescue scan)");
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Logger.WriteLine(LOG_IDENT_LOCAL, $"Rescue scan gagal (dilanjutkan): {ex.Message}");
+                    }
+
+                    EndSessionCore(null);
+                }
             }
 
-            SecurityDetectionState detectorState = await Detector.RefreshAsync(cancellationToken);
+            SecurityDetectionState detectorState;
+            try
+            {
+                detectorState = await Detector.RefreshAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // v7.6.3 FIX — kegagalan WMI (Timeout/COMException, sering di PC dengan
+                // antivirus third-party atau WMI repository bermasalah) dulu membuat
+                // BeginSessionAsync gagal total sehingga TIDAK ADA aplikasi yang
+                // ter-suspend. Sekarang detector yang error diperlakukan seperti
+                // Degraded: proses tetap aman dari daftar proteksi statis, user tetap
+                // bisa suspend aplikasi pilihannya sendiri.
+                App.Logger.WriteLine(LOG_IDENT_LOCAL, $"Detector refresh gagal — dilanjutkan sebagai Degraded: {ex.Message}");
+                detectorState = SecurityDetectionState.Degraded;
+            }
+
             List<ProcessSnapshot> processes = _processSource().ToList();
 
             // PID semua Windows service (SCM). Service = komponen sistem/vendor —
             // sinyal CRITICAL tambahan di classifier supaya audio stack, driver
             // companion, dan sync service (bahkan yang jalan di session user,
             // mis. OneDrive.Sync.Service) tidak pernah ter-suspend.
-            IReadOnlySet<int> serviceProcessIds = ServiceProcessDetector.GetServiceProcessIds(cancellationToken);
-            if (serviceProcessIds.Count > 0)
-                App.Logger.WriteLine(LOG_IDENT_LOCAL, $"{serviceProcessIds.Count} Windows service PID terdaftar sebagai protected");
+            // v7.6.3: kegagalan query WMI TIDAK lagi membatalkan seluruh sesi —
+            // cukup dengan daftar proteksi statis (ProcessClassifier) dijalankan.
+            IReadOnlySet<int> serviceProcessIds;
+            try
+            {
+                serviceProcessIds = ServiceProcessDetector.GetServiceProcessIds(cancellationToken);
+                if (serviceProcessIds.Count > 0)
+                    App.Logger.WriteLine(LOG_IDENT_LOCAL, $"{serviceProcessIds.Count} Windows service PID terdaftar sebagai protected");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT_LOCAL, $"Service PID enumeration gagal — lanjut tanpa daftar service: {ex.Message}");
+                serviceProcessIds = new HashSet<int>();
+            }
 
             var session = new GameSessionRecord
             {
@@ -164,8 +228,28 @@ namespace Bloxstrap.GameSession
                         continue;
                     }
 
-                    ProcessSuspendResult result = Suspension.SuspendProcess(process.ProcessId, cancellationToken);
-                    if (result.SuspendedThreadIds.Count == 0)
+                    ProcessSuspendResult result;
+                    try
+                    {
+                        result = Suspension.SuspendProcess(process.ProcessId, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        // v7.6.3 FIX — satu proses bermasalah tidak boleh menggagalkan
+                        // seluruh sesi (dulu exception dari SuspendProcess merambat ke
+                        // try blok luar → EndSessionCore → SEMUA aplikasi yang sudah
+                        // terlanjur disuspend ikut di-resume dan user kehilangan
+                        // proteksi sepenuhnya).
+                        App.Logger.WriteLine(LOG_IDENT_LOCAL,
+                            $"Suspend PID={process.ProcessId} ({process.ProcessName}) gagal — dilewati: {ex.Message}");
+                        continue;
+                    }
+
+                    if (result.SuspendedThreadIds.Count == 0 && !result.ProcessLevelSuspend)
                         continue;
 
                     session.AppliedRules.Add(RuleKey(rule));
@@ -179,7 +263,7 @@ namespace Bloxstrap.GameSession
                         AppliedRule = RuleKey(rule),
                         ThreadIds = result.SuspendedThreadIds,
                         TotalThreadCount = result.TotalThreadCount,
-                        SuspendedThreadCount = result.SuspendedThreadIds.Count,
+                        SuspendedThreadCount = result.ProcessLevelSuspend ? result.TotalThreadCount : result.SuspendedThreadIds.Count,
                         FailedThreadCount = result.FailedThreadCount,
                         PartiallySuspended = result.PartiallySuspended
                     });
@@ -188,6 +272,7 @@ namespace Bloxstrap.GameSession
                     App.Logger.WriteLine(
                         LOG_IDENT_LOCAL,
                         $"{process.ProcessName} ter-suspend {result.SuspendedThreadIds.Count}/{result.TotalThreadCount} thread" +
+                        (result.ProcessLevelSuspend ? " [process-level]" : "") +
                         (result.PartiallySuspended ? " (PartiallySuspended)" : ""));
                 }
             }
