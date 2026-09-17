@@ -69,12 +69,21 @@ namespace Bloxstrap.UI
             const string LOG_IDENT = "NotifyIconWrapper::CheckForUpdates";
 
             if (!App.Settings.Prop.CheckForUpdates)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Update check skipped because CheckForUpdates is disabled");
                 return;
+            }
 
             try
             {
                 GithubRelease? primaryRelease = await App.GetLatestRelease(App.ProjectRepository);
                 GithubRelease? secondaryRelease = await App.GetLatestRelease(App.SecondaryProjectRepository);
+
+                App.Logger.WriteLine(
+                    LOG_IDENT,
+                    $"Local version: {App.Version}; " +
+                    $"{App.ProjectRepository}: {primaryRelease?.TagName ?? "unavailable"}; " +
+                    $"{App.SecondaryProjectRepository}: {secondaryRelease?.TagName ?? "unavailable"}");
 
                 var releases = new[]
                 {
@@ -94,8 +103,15 @@ namespace Bloxstrap.UI
                 }
 
                 var latest = releases[0];
-                if (Utilities.CompareVersions(App.Version, latest.Release.TagName) != VersionComparison.LessThan)
+                VersionComparison comparison = Utilities.CompareVersions(App.Version, latest.Release.TagName);
+                if (comparison != VersionComparison.LessThan)
+                {
+                    App.Logger.WriteLine(
+                        LOG_IDENT,
+                        $"No update needed: local {App.Version} is {comparison.ToString().ToLowerInvariant()} " +
+                        $"than or equal to release {latest.Release.TagName} from {latest.Repository}");
                     return;
+                }
 
                 _updateReleaseUrl = $"https://github.com/{latest.Repository}/releases/tag/{latest.Release.TagName}";
                 _updateIcon = CreateUpdateIcon();
