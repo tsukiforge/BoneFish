@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Management;
 using System.Runtime.InteropServices;
 
 namespace Bloxstrap.Integrations
@@ -279,10 +280,230 @@ namespace Bloxstrap.Integrations
             App.Logger.WriteLine(LOG_IDENT, $"Hardware detection manually refreshed: {(isSSD ? "SSD" : "HDD")} (persistent cache re-written)");
         }
 
+        // ── v7.6.3 FIX: deteksi tipe storage via WMI ─────────────────────────────
+        // Dulu hanya memakai IOCTL_STORAGE_QUERY_PROPERTY (seek penalty) ke volume
+        // handle yang dibuka dengan GENERIC_READ — pada Windows modern handle volume
+        // butuh hak admin, jadi CreateFile sering gagal dan kode jatuh ke fallback
+        // "Assuming HDD". Akibatnya PC all-SSD terdeteksi sebagai HDD (feedback
+        // v7.6.0: "PC saya tidak ada HDD sama sekali, adanya tipe SSD saja").
+        //
+        // Sekarang deteksi berlapis, layer pertama yang berhasil dipakai:
+        //   1. WMI MSFT_PhysicalDisk (MediaType + BusType NVMe) — akurat tanpa admin.
+        //   2. WMI Win32_DiskDrive — heuristik nama model untuk disk yang tidak
+        //      terklasifikasi oleh MSFT_PhysicalDisk.
+        //   3. IOCTL seek-penalty (logika ASLI, nama diubah jadi
+        //      DetectStorageTypeViaSeekPenalty) — fallback terakhir.
+        private static bool DetectStorageType()
+        {
+            bool? wmiResult = TryDetectStorageTypeViaWmi();
+            if (wmiResult.HasValue)
+                return wmiResult.Value;
+
+            App.Logger.WriteLine(LOG_IDENT, "WMI storage detection unavailable — falling back to IOCTL seek-penalty query");
+            return DetectStorageTypeViaSeekPenalty();
+        }
+
+        private static bool? TryDetectStorageTypeViaWmi()
+        {
+            try
+            {
+                // Key = nomor physical disk; value = "SSD" / "HDD" (hanya diisi bila yakin).
+                var kindByDisk = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                // 1) MSFT_PhysicalDisk — sumber paling akurat.
+                try
+                {
+                    using var searcher = new ManagementObjectSearcher(
+                        @"\\.\root\Microsoft\Windows\Storage",
+                        "SELECT DeviceId, BusType, MediaType FROM MSFT_PhysicalDisk");
+
+                    foreach (ManagementBaseObject disk in searcher.Get())
+                    {
+                        try
+                        {
+                            string? diskNumber = disk["DeviceId"]?.ToString()?.Trim();
+                            if (String.IsNullOrWhiteSpace(diskNumber))
+                                continue;
+
+                            string? kind = ClassifyPhysicalDisk(
+                                disk["MediaType"]?.ToString(),
+                                disk["BusType"]?.ToString());
+
+                            if (kind is not null)
+                                kindByDisk[diskNumber] = kind;
+                        }
+                        finally { disk.Dispose(); }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"MSFT_PhysicalDisk query failed: {ex.Message}");
+                }
+
+                if (kindByDisk.Count > 0)
+                {
+                    App.Logger.WriteLine(LOG_IDENT,
+                        "MSFT_PhysicalDisk classified: " +
+                        String.Join(", ", kindByDisk.Select(kv => $"disk #{kv.Key} = {kv.Value}")));
+                }
+
+                // 2) Win32_DiskDrive — heuristik nama model untuk disk yang belum
+                //    terklasifikasi (MediaType sering "Unspecified" pada SATA lama).
+                try
+                {
+                    using var searcher = new ManagementObjectSearcher(
+                        @"\\.\root\cimv2",
+                        "SELECT Index, Model FROM Win32_DiskDrive");
+
+                    foreach (ManagementBaseObject disk in searcher.Get())
+                    {
+                        try
+                        {
+                            string? diskNumber = disk["Index"]?.ToString()?.Trim();
+                            if (String.IsNullOrWhiteSpace(diskNumber) || kindByDisk.ContainsKey(diskNumber))
+                                continue;
+
+                            bool? guess = GuessSsdFromModel(disk["Model"]?.ToString());
+                            if (guess.HasValue)
+                                kindByDisk[diskNumber] = guess.Value ? "SSD" : "HDD";
+                        }
+                        finally { disk.Dispose(); }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Win32_DiskDrive query failed: {ex.Message}");
+                }
+
+                if (kindByDisk.Count == 0)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "WMI storage detection returned no classified disks");
+                    return null;
+                }
+
+                bool anySsd = kindByDisk.Values.Any(kind => kind == "SSD");
+                bool anyHdd = kindByDisk.Values.Any(kind => kind == "HDD");
+
+                // PC all-SSD (kasus feedback v7.6.0): tidak ada disk yang terklasifikasi
+                // HDD → pasti SSD, tidak perlu peta drive-letter → disk.
+                if (!anyHdd && anySsd)
+                {
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Storage detection via WMI: all {kindByDisk.Count} classified disk(s) are SSD/NVMe");
+                    return true;
+                }
+
+                // Mixed (SSD + HDD): tentukan disk yang menampung volume sistem.
+                string? systemDiskNumber = GetSystemPhysicalDiskNumber();
+                if (!String.IsNullOrEmpty(systemDiskNumber)
+                    && kindByDisk.TryGetValue(systemDiskNumber, out string? systemKind))
+                {
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Storage detection via WMI: system disk #{systemDiskNumber} is {systemKind}");
+                    return systemKind == "SSD";
+                }
+
+                App.Logger.WriteLine(LOG_IDENT, "Storage detection via WMI: system disk could not be classified — falling back to IOCTL");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"WMI storage detection failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string? ClassifyPhysicalDisk(string? mediaTypeRaw, string? busTypeRaw)
+        {
+            // MSFT_PhysicalDisk.MediaType: 0 = Unspecified, 3 = HDD, 4 = SSD.
+            if (ushort.TryParse(mediaTypeRaw, out ushort mediaType))
+            {
+                if (mediaType == 4)
+                    return "SSD";
+                if (mediaType == 3)
+                    return "HDD";
+            }
+
+            // BusType 17 = NVMe → selalu SSD. Jenis lain ambigu (SATA/ATA bisa
+            // HDD maupun SSD), sedangkan USB/SD/virtual tidak relevan sebagai disk sistem.
+            if (ushort.TryParse(busTypeRaw, out ushort busType) && busType == 17)
+                return "SSD";
+
+            return null;
+        }
+
+        private static bool? GuessSsdFromModel(string? model)
+        {
+            if (String.IsNullOrWhiteSpace(model))
+                return null;
+
+            string upper = model.ToUpperInvariant();
+
+            // Bias ke SSD: salah deteksi "SSD" hanya membuat preset HDD tidak aktif,
+            // sedangkan salah deteksi "HDD" membuat PC all-SSD dapat preset HDD.
+            if (upper.Contains("SSD") || upper.Contains("NVME") || upper.Contains("NVM EXPRESS") || upper.Contains("M.2"))
+                return true;
+
+            // Tidak menebak HDD dari nama model — terlalu berisiko.
+            return null;
+        }
+
+        /// <summary>
+        /// Petakan drive letter volume sistem (mis. "C:") ke nomor physical disk
+        /// melalui asosiasi WMI: LogicalDisk → Partition → DiskDrive.
+        /// </summary>
+        private static string? GetSystemPhysicalDiskNumber()
+        {
+            try
+            {
+                string driveLetter = (Path.GetPathRoot(Environment.SystemDirectory) ?? "C:").TrimEnd('\\');
+
+                string? partitionDeviceId = null;
+                using (var searcher = new ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"ASSOCIATORS OF {{Win32_LogicalDisk.DeviceID='{driveLetter}'}} WHERE AssocClass=Win32_LogicalDiskToPartition"))
+                {
+                    foreach (ManagementBaseObject partition in searcher.Get())
+                    {
+                        try { partitionDeviceId = partition["DeviceID"]?.ToString(); }
+                        finally { partition.Dispose(); }
+
+                        if (!String.IsNullOrEmpty(partitionDeviceId))
+                            break;
+                    }
+                }
+
+                if (String.IsNullOrEmpty(partitionDeviceId))
+                    return null;
+
+                using var diskSearcher = new ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{partitionDeviceId}'}} WHERE AssocClass=Win32_DiskDriveToDiskPartition");
+
+                foreach (ManagementBaseObject disk in diskSearcher.Get())
+                {
+                    try
+                    {
+                        string? index = disk["Index"]?.ToString()?.Trim();
+                        if (!String.IsNullOrWhiteSpace(index))
+                            return index;
+                    }
+                    finally { disk.Dispose(); }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"System disk mapping failed: {ex.Message}");
+            }
+
+            return null;
+        }
+
         // Query seek-penalty IOCTL — logika deteksi ASLI (tidak diubah), hanya
         // dipisah dari caching supaya IsSSD() bisa memotong query ini saat
-        // persistent cache masih valid.
-        private static bool DetectStorageType()
+        // persistent cache masih valid. Sejak v7.6.3 dipakai sebagai fallback
+        // terakhir bila kedua query WMI tidak tersedia.
+        private static bool DetectStorageTypeViaSeekPenalty()
         {
             try
             {

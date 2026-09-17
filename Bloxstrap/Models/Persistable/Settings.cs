@@ -101,8 +101,13 @@ namespace Bloxstrap.Models.Persistable
         public string CrosshairColor { get; set; } = "#00FF00";    // Lime green default
         public double CrosshairSize { get; set; } = 40;             // 20-200px
         public double CrosshairOpacity { get; set; } = 0.8;         // 0.1-1.0
-        public double CrosshairX { get; set; } = 0;                 // screen position
+        public double CrosshairX { get; set; } = 0;                 // DEPRECATED (v7.6.3): dulu pojok kiri-atas window — bikin crosshair bergeser saat ukuran diubah. Tidak dipakai lagi.
         public double CrosshairY { get; set; } = 0;
+        // v7.6.3 FIX: posisi crosshair kini disimpan sebagai TITIK TENGAH crosshair di layar.
+        // Jadi apapun ukuran crosshair, titik bidik selalu tepat di posisi yang sama (tengah layar).
+        // (0, 0) = belum pernah digeser → otomatis di tengah layar.
+        public double CrosshairCenterX { get; set; } = 0;
+        public double CrosshairCenterY { get; set; } = 0;
 
         // wallpaper background (EnableWallpaperLauncher dihapus — FIX 3: background selalu aktif)
 

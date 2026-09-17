@@ -76,13 +76,14 @@ namespace Bloxstrap.GameSession
             if (detector.State != SecurityDetectionState.Ok)
                 return ProcessClassification.Critical;
 
-            // A readable identity is required before a rule can mutate another process.
-            if (String.IsNullOrWhiteSpace(snapshot.ProcessName)
-                || String.IsNullOrWhiteSpace(snapshot.ExecutablePath)
-                || !snapshot.StartTimeUtc.HasValue)
-            {
+            // v7.6.3 FIX — dulu path executable DAN StartTime wajib terbaca, sehingga
+            // aplikasi yang handle aksesnya dibatasi (browser Chromium, launcher
+            // anti-cheat, UWP) tidak PERNAH bisa di-suspend meski user mencentangnya
+            // di UI (feedback: "tidak benar2 ke suspend dan masih berjalan").
+            // Nama proses sekarang cukup: pencocokan rule dan label restore memakai
+            // nama, dan keamanan target tetap dijaga daftar proteksi IsAlwaysProtected.
+            if (!GameSessionService.IsKnownProcess(snapshot))
                 return ProcessClassification.Critical;
-            }
 
             return ProcessClassification.Safe;
         }
@@ -97,10 +98,10 @@ namespace Bloxstrap.GameSession
             if (IsAlwaysProtected(snapshot, detector, selfProcessId, gameProcessId, serviceProcessIds))
                 return true;
 
-            // Unknown identity is never safe to touch.
-            return String.IsNullOrWhiteSpace(snapshot.ProcessName)
-                || String.IsNullOrWhiteSpace(snapshot.ExecutablePath)
-                || !snapshot.StartTimeUtc.HasValue;
+            // v7.6.3 — proses tanpa nama tidak bisa dicocokkan ke rule maupun
+            // di-restore, jadi tetap ditolak. Path/StartTime yang tak terbaca tidak
+            // lagi dianggap critical (lihat Classify).
+            return String.IsNullOrWhiteSpace(snapshot.ProcessName);
         }
 
         public static bool IsAlwaysProtected(

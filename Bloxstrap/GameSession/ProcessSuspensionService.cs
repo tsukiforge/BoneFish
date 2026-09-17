@@ -10,6 +10,13 @@ namespace Bloxstrap.GameSession
         public int FailedThreadCount { get; init; }
         public bool PartiallySuspended { get; init; }
         public int SweepPasses { get; init; }
+
+        /// <summary>
+        /// v7.6.3 — true bila proses di-suspend secara atomik via NtSuspendProcess.
+        /// ThreadIds yang tercatat saat itu hanya snapshot untuk verifikasi; resume
+        /// memakai jalur level proses, bukan daftar thread ini.
+        /// </summary>
+        public bool ProcessLevelSuspend { get; init; }
     }
 
     public sealed class RescuedProcess
@@ -62,7 +69,74 @@ namespace Bloxstrap.GameSession
             return snapshots;
         }
 
+        /// <summary>
+        /// v7.6.3 FIX — jalur utama sekarang NtSuspendProcess (atomik). Versi lama
+        /// men-suspend per-thread dengan maksimal 5 sweep pass; aplikasi yang terus
+        /// menambah thread (browser, launcher, Discord) selalu punya thread baru yang
+        /// lolos antar sweep, sehingga proses "tetap berjalan seperti biasa" padahal
+        /// statusnya katanya suspended. NtSuspendProcess membuat kernel menahan semua
+        /// thread — termasuk yang lahir selama operasi — tanpa race.
+        /// </summary>
         public ProcessSuspendResult SuspendProcess(int processId, CancellationToken cancellationToken = default)
+        {
+            const string LOG_IDENT = "GameSession::SuspendProcess";
+            var stopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                using IProcessAccessor accessor = _accessorFactory(processId);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                IReadOnlyCollection<int> threadSnapshot = accessor.GetThreadIds();
+
+                if (accessor.TrySuspendProcess())
+                {
+                    // Verifikasi: probe beberapa thread untuk memastikan benar-benar
+                    // tersuspend. Bila NtSuspendProcess sukses, semua thread pasti
+                    // suspend count >= 1.
+                    int verified = 0;
+                    int probeBudget = Math.Min(threadSnapshot.Count, 8);
+                    foreach (int threadId in threadSnapshot.Take(probeBudget))
+                    {
+                        if (accessor.IsThreadSuspended(threadId))
+                            verified++;
+                    }
+
+                    App.Logger.WriteLine(
+                        LOG_IDENT,
+                        $"PID={processId}: process-level suspend OK; threads~{threadSnapshot.Count}; verified={verified}/{probeBudget}");
+
+                    return new ProcessSuspendResult
+                    {
+                        SuspendedThreadIds = threadSnapshot.ToList(),
+                        TotalThreadCount = threadSnapshot.Count,
+                        FailedThreadCount = 0,
+                        PartiallySuspended = false,
+                        SweepPasses = 1,
+                        ProcessLevelSuspend = true
+                    };
+                }
+
+                // Process-level gagal (mis. ntdll tidak tersedia) — jalur lama per-thread.
+                App.Logger.WriteLine(LOG_IDENT, $"PID={processId}: process-level suspend unavailable — falling back to per-thread sweep");
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"PID={processId}: process-level suspend failed: {ex.Message} — falling back to per-thread sweep");
+            }
+
+            return SuspendProcessPerThread(processId, cancellationToken);
+        }
+
+        /// <summary>
+        /// Jalur lama (v7.6.2 dan sebelumnya): suspend per-thread dengan sweep.
+        /// Dipertahankan sebagai fallback dan untuk test/diagnostik.
+        /// </summary>
+        public ProcessSuspendResult SuspendProcessPerThread(int processId, CancellationToken cancellationToken = default)
         {
             const string LOG_IDENT = "GameSession::SuspendProcess";
             var result = new ProcessSuspendResultBuilder();
@@ -226,12 +300,58 @@ namespace Bloxstrap.GameSession
                     }
                 }
 
-                // ── FIX: Enhanced verification logging + retry (v7.3.1) ──────────
-                // Pola SynTPEnh: thread State masih Suspended setelah 2x resume+sleep.
-                // Root cause dugaan: Windows thread scheduler belum update state setelah
-                // resume (timing-dependent, bukan resume yang benar-benar gagal). Retry
-                // tambahan (100ms delay) sebelum VerificationFailed memberi waktu OS
-                // untuk update thread state.
+                if (!accessor.IsAlive)
+                    return Failed(record, RestoreStatus.NotFound,
+                        "Proses sudah ditutup manual sebelum restore.");
+
+                // ── v7.6.3 FIX — resume level proses dulu ───────────────────────────
+                // NtResumeProcess membalikkan NtSuspendProcess secara atomik: kernel
+                // menurunkan suspend count SETIAP thread, termasuk thread yang lahir
+                // setelah suspend. Ini menutup celah lama di mana thread baru (spawn
+                // saat proses terlanjur disuspend per-thread, atau app yang restart
+                // subprocess-nya sendiri) tidak pernah masuk daftar ThreadIds dan
+                // tertinggal beku — serta pola "VerificationFailed" pada app yang
+                // spawn thread baru saat direstore.
+                if (accessor.SupportsProcessLevelControl && accessor.TryResumeProcess())
+                {
+                    // Verifikasi ringkas: thread snapshot lama tidak boleh ada yang
+                    // masih tersuspend. Thread yang sudah mati dihitung sukses.
+                    for (int attempt = 0; attempt < 2; attempt++)
+                    {
+                        if (!accessor.IsAlive)
+                            return Failed(record, RestoreStatus.NotFound,
+                                "Proses sudah ditutup manual saat verifikasi restore.");
+
+                        Thread.Sleep(100);
+
+                        IReadOnlyCollection<int> currentThreadIds = accessor.GetThreadIds();
+                        bool stillSuspended = record.ThreadIds
+                            .Distinct()
+                            .Any(threadId => currentThreadIds.Contains(threadId) && accessor.IsThreadSuspended(threadId));
+
+                        if (!stillSuspended)
+                        {
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"PID={record.ProcessId} ({record.ProcessName}) restored via process-level resume and verified.");
+                            return new RestoreResult
+                            {
+                                ProcessName = record.ProcessName,
+                                Status = RestoreStatus.Restored,
+                                Message = "Proses kembali berjalan dan terverifikasi."
+                            };
+                        }
+
+                        // Thread yang masih tersuspend punya suspend count > 1 (pernah
+                        // di-suspend dua kali) — resume sekali lagi.
+                        foreach (int threadId in record.ThreadIds.Distinct())
+                            accessor.TryResumeThread(threadId);
+                    }
+
+                    return Failed(record, RestoreStatus.VerificationFailed,
+                        "Process-level resume dijalankan namun sebagian thread masih tersuspend.");
+                }
+
+                // ── Fallback jalur lama: resume per-thread berdasarkan catatan ──────
                 int resumeFailures = 0;
                 int initialThreadCount = record.ThreadIds.Distinct().Count();
 
@@ -254,8 +374,8 @@ namespace Bloxstrap.GameSession
 
                 // Snapshot current thread count for logging (new threads spawned between
                 // suspend and restore would explain SynTPEnh's VerificationFailed pattern).
-                IReadOnlyCollection<int> currentThreadIds = accessor.GetThreadIds();
-                int currentThreadCount = currentThreadIds.Count;
+                IReadOnlyCollection<int> currentThreadIdsFallback = accessor.GetThreadIds();
+                int currentThreadCount = currentThreadIdsFallback.Count;
                 int newThreadCount = currentThreadCount - initialThreadCount;
 
                 for (int attempt = 0; attempt < 2; attempt++)
@@ -269,10 +389,10 @@ namespace Bloxstrap.GameSession
                     Thread.Sleep(100);
 
                     // Re-read thread list — threads may have appeared/disappeared.
-                    currentThreadIds = accessor.GetThreadIds();
+                    currentThreadIdsFallback = accessor.GetThreadIds();
                     bool stillSuspended = record.ThreadIds
                         .Distinct()
-                        .Any(threadId => currentThreadIds.Contains(threadId) && accessor.IsThreadSuspended(threadId));
+                        .Any(threadId => currentThreadIdsFallback.Contains(threadId) && accessor.IsThreadSuspended(threadId));
 
                     if (!stillSuspended && resumeFailures == 0)
                     {

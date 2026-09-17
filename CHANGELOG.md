@@ -1,5 +1,68 @@
 # BoneFish Changelog
 
+## v7.6.3 - Fix Deteksi Storage, Game Session Suspend & Crosshair Centering
+
+Release date: 2026-09-17
+
+### 💾 FIX 1 — Deteksi tipe disk salah (PC all-SSD terdeteksi HDD)
+
+Deteksi lama hanya mengandalkan IOCTL seek-penalty ke volume handle yang dibuka
+with `GENERIC_READ` — pada Windows modern ini butuh hak admin, sering gagal, dan
+kode jatuh ke fallback "Assuming HDD". Akibatnya PC yang seluruh disk-nya SSD
+terdeteksi sebagai HDD.
+
+- Deteksi sekarang berlapis: **WMI `MSFT_PhysicalDisk`** (MediaType + BusType
+  NVMe) → **heuristik model `Win32_DiskDrive`** → IOCTL seek-penalty (fallback
+  terakhir, logika lama tidak dibuang).
+- PC yang semua disk terklasifikasi SSD/NVMe langsung dianggap SSD tanpa perlu
+  pemetaan drive-letter → disk.
+- Pada sistem mixed (SSD + HDD), disk penampung Windows ditentukan lewat
+  asosiasi WMI LogicalDisk → Partition → DiskDrive.
+- Hasil tetap di-cache persisten 30 hari; tombol "Deteksi Ulang Hardware"
+  tetap berfungsi untuk refresh paksa.
+
+### 🎮 FIX 2 — Game Session Manager: aplikasi tidak benar-benar ter-suspend
+
+Empat akar masalah diperbaiki sekaligus:
+
+- **Suspend per-thread sering bocor.** Sweep per-thread (maks 5 pass / 2 detik)
+  selalu ketinggalan thread baru yang lahir di tengah operasi — browser,
+  launcher, dan Discord terus menambah thread, sehingga proses tetap hidup.
+  Jalur utama kini **`NtSuspendProcess`/`NtResumeProcess`** (atomik, level
+  proses — sama seperti Process Explorer/pssuspend), dengan sweep per-thread
+  lama sebagai fallback dan untuk rescue scan.
+- **Sesi pending memblokir sesi baru selamanya.** Satu record restore yang
+  gagal membuat `BeginSessionAsync` melempar `InvalidOperationException` setiap
+  kali user masuk game — fitur terlihat "tidak pernah berhasil". Sekarang record
+  pending dipulihkan paksa (rescue scan), dibuang, lalu sesi baru mulai normal.
+- **Kegagalan WMI membatalkan seluruh sesi.** Kegagalan query Security Center /
+  service PID (umum pada PC dengan antivirus pihak ketiga) kini diperlakukan
+  seperti state Degraded — daftar proteksi statis tetap berjalan, aplikasi
+  pilihan user tetap di-suspend.
+- **Identitas proses terlalu ketat.** Aplikasi yang path/StartTime-nya tidak
+  bisa dibaca (browser Chromium, launcher anti-cheat, UWP) dulu diklasifikasi
+  Critical sehingga tidak pernah tersentuh meski user mencentangnya. Nama proses
+  kini cukup; proteksi keamanan tetap dari daftar IsAlwaysProtected + service
+  PID + Session 0. Satu proses yang gagal di-suspend juga tidak lagi menggugurkan
+  sesi (dulu semua aplikasi yang sudah terlanjur disuspend ikut di-resume).
+
+### 🎯 FIX 3 — Crosshair bergeser saat ukuran diperbesar
+
+Posisi crosshair dulu disimpan sebagai pojok kiri-atas window, sementara ukuran
+window mengikuti pengaturan CrosshairSize — jadi memperbesar crosshair
+menggeser pusat bidik ke kanan-bawah, keluar dari tengah layar.
+
+- Posisi kini disimpan sebagai **titik tengah crosshair** (`CrosshairCenterX/Y`).
+  Pengubahan ukuran/style menggeser window, bukan pusatnya — titik bidik selalu
+  tepat di tengah layar dalam ukuran apapun.
+- Posisi lama dimigrasi satu kali otomatis saat pertama kali dijalankan.
+
+### ✅ Verifikasi
+
+- `dotnet build` Release konfigurasi Debug berhasil (0 error).
+- Perilaku restore lama tetap kompatibel dengan record `active.json` versi
+  sebelumnya (fallback jalur per-thread bila record tidak ber-flag process-level).
+
 ## v7.6.2 - Bug Fix Update Check Transparency
 
 Release date: 2026-09-17

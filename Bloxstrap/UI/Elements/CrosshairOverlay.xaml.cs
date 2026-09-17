@@ -54,11 +54,22 @@ namespace Bloxstrap.UI.Elements
             double gap = size * 0.25;
             double opacity = Math.Clamp(settings.CrosshairOpacity, 0.1, 1.0);
 
+            // v7.6.3 FIX — catat posisi TITIK TENGAH crosshair saat ini SEBELUM window
+            // di-resize, lalu kembalikan window sehingga titik tengahnya tetap di
+            // tempat yang sama. Dulu Left/Top tidak disentuh saat ukuran berubah, dan
+            // karena ukuran window mengikuti CrosshairSize, crosshair membesar ke
+            // kanan-bawah → pusatnya bergeser dan tidak lagi di tengah layar.
+            double anchorCenterX = Left + Width / 2;
+            double anchorCenterY = Top + Height / 2;
+
             Width = size + 40;
             Height = size + 40;
             CrosshairCanvas.Width = Width;
             CrosshairCanvas.Height = Height;
             this.Opacity = opacity;
+
+            Left = anchorCenterX - Width / 2;
+            Top = anchorCenterY - Height / 2;
 
             CrosshairCanvas.Children.Clear();
 
@@ -184,6 +195,7 @@ namespace Bloxstrap.UI.Elements
             {
                 _isDragging = true;
                 _lastMousePos = PointToScreen(e.GetPosition(this));
+                SavePosition();
             }
         }
 
@@ -208,8 +220,12 @@ namespace Bloxstrap.UI.Elements
         {
             try
             {
-                App.Settings.Prop.CrosshairX = Left;
-                App.Settings.Prop.CrosshairY = Top;
+                // v7.6.3 FIX — simpan TITIK TENGAH crosshair, bukan pojok kiri-atas
+                // window. Dengan begitu perubahan ukuran (window membesar/mengecil)
+                // tidak menggeser titik bidik: LoadPosition selalu meletakkan window
+                // di sekitar titik tengah yang sama.
+                App.Settings.Prop.CrosshairCenterX = Left + Width / 2;
+                App.Settings.Prop.CrosshairCenterY = Top + Height / 2;
                 App.Settings.Save();
             }
             catch (Exception ex)
@@ -222,17 +238,33 @@ namespace Bloxstrap.UI.Elements
         {
             try
             {
-                // Default: center of screen
-                if (App.Settings.Prop.CrosshairX == 0 && App.Settings.Prop.CrosshairY == 0)
+                double screenCenterX = SystemParameters.PrimaryScreenWidth / 2;
+                double screenCenterY = SystemParameters.PrimaryScreenHeight / 2;
+
+                // Default: tengah layar. CenterX/CenterY == 0 berarti belum pernah
+                // digeser user (titik tengah sah tidak pernah 0 persis di layar riil).
+                double centerX = App.Settings.Prop.CrosshairCenterX != 0 || App.Settings.Prop.CrosshairCenterY != 0
+                    ? App.Settings.Prop.CrosshairCenterX
+                    : screenCenterX;
+                double centerY = App.Settings.Prop.CrosshairCenterX != 0 || App.Settings.Prop.CrosshairCenterY != 0
+                    ? App.Settings.Prop.CrosshairCenterY
+                    : screenCenterY;
+
+                // Migrasi satu kali dari pengaturan lama (pojok kiri-atas window):
+                // jika ada nilai lama yang tidak nol, konversi ke titik tengah dengan
+                // ukuran window saat ini, simpan, lalu abaikan selamanya.
+                if ((App.Settings.Prop.CrosshairCenterX == 0 && App.Settings.Prop.CrosshairCenterY == 0)
+                    && (App.Settings.Prop.CrosshairX != 0 || App.Settings.Prop.CrosshairY != 0))
                 {
-                    Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
-                    Top = (SystemParameters.PrimaryScreenHeight - Height) / 2;
+                    centerX = App.Settings.Prop.CrosshairX + Width / 2;
+                    centerY = App.Settings.Prop.CrosshairY + Height / 2;
+                    App.Settings.Prop.CrosshairCenterX = centerX;
+                    App.Settings.Prop.CrosshairCenterY = centerY;
+                    try { App.Settings.Save(); } catch { }
                 }
-                else
-                {
-                    Left = App.Settings.Prop.CrosshairX;
-                    Top = App.Settings.Prop.CrosshairY;
-                }
+
+                Left = centerX - Width / 2;
+                Top = centerY - Height / 2;
             }
             catch
             {
