@@ -1,5 +1,37 @@
 # BoneFish Changelog
 
+## v7.6.2 - Bug Fix Update Check Transparency
+
+Release date: 2026-09-17
+
+### 🐛 Bug Fix — Update Checker Terlihat Tidak Bekerja
+
+- Update checker sekarang mencatat versi aplikasi lokal dan hasil pemeriksaan
+  dari setiap repository ke log BoneFish.
+- Jika `CheckForUpdates` dimatikan, log menjelaskan bahwa pemeriksaan memang
+  dilewati.
+- Jika tidak ada update, log mencatat bahwa versi lokal sudah sama atau lebih
+  baru daripada release GitHub yang ditemukan.
+- Jika salah satu repository tidak tersedia, jalur lainnya tetap digunakan dan
+  repository yang gagal ditandai sebagai `unavailable` di log.
+- Badge merah hanya ditampilkan jika versi release GitHub benar-benar lebih baru
+  daripada versi aplikasi. Versi yang sama tidak dianggap sebagai update.
+- Tidak ada balloon notification otomatis; hasil update tetap ditampilkan secara
+  senyap melalui icon tray.
+
+### 🔎 Contoh Diagnostik
+
+Jika aplikasi `7.6.2` memeriksa release `v7.6.2`, log akan mencatat bahwa tidak
+ada update yang diperlukan. Badge merah baru muncul ketika release publik lebih
+baru, misalnya `v7.6.3`.
+
+### ✅ Verifikasi
+
+- Build Release berhasil.
+- `git diff --check` berhasil.
+- Perbandingan versi menggunakan `System.Version` dan menghapus prefix `v` dari
+  tag GitHub sebelum dibandingkan.
+
 ## v7.6.1 - Bug Fix Update Tray
 
 Release date: 2026-09-16
