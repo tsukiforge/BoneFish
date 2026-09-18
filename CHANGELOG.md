@@ -1,5 +1,21 @@
 # BoneFish Changelog
 
+## v7.7.0 - Build Fix: EnableWindowsTargeting untuk Linux
+
+Release date: 2026-09-18
+
+### 🛠️ FIX — Build Compatibility di Linux
+
+- Menambahkan `<EnableWindowsTargeting>true</EnableWindowsTargeting>` ke `Bloxstrap/Bloxstrap.csproj` dan `wpfui/src/Wpf.Ui/Wpf.Ui.csproj` agar proyek bisa build di environment non-Windows (Linux).
+- Perubahan ini hanya affect kompilasi dan tidak mempengaruhi fitur pengguna.
+- Build sekarang sukses dengan 0 error, 0 warning di platform Linux.
+
+### ✅ Verifikasi
+
+- `dotnet build` Build berhasil pada Linux dengan 0 error, 0 warning.
+- `git diff` menampilkan perubahan di 2 file csproj yang sudah di-commit.
+
+
 ## v7.6.3 - Fix Deteksi Storage, Game Session Suspend & Crosshair Centering
 
 Release date: 2026-09-17
