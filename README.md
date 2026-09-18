@@ -296,15 +296,15 @@ Use at your own risk. We are not responsible for any account actions taken by Ro
 
 <!-- Badge Links -->
 [badge-license]:   https://img.shields.io/badge/license-MIT-blue?style=flat-square
-[badge-actions]:   https://img.shields.io/github/actions/workflow/status/BoneFishStudio/BoneFish/ci-release.yml?style=flat-square&label=build
-[badge-downloads]: https://img.shields.io/github/downloads/BoneFishStudio/BoneFish/total?style=flat-square
-[badge-latest]:    https://img.shields.io/github/v/release/BoneFishStudio/BoneFish?style=flat-square
+[badge-actions]:   https://img.shields.io/github/actions/workflow/status/tsukiforge/BoneFish/ci-release.yml?style=flat-square&label=build
+[badge-downloads]: https://img.shields.io/github/downloads/tsukiforge/BoneFish/total?style=flat-square
+[badge-latest]:    https://img.shields.io/github/v/release/tsukiforge/BoneFish?style=flat-square
 [badge-discord]:   https://img.shields.io/discord/1299397064165429360?style=flat-square&logo=discord&logoColor=white&label=discord&color=4d3dff
-[badge-stars]:     https://img.shields.io/github/stars/BoneFishStudio/BoneFish?style=flat-square&color=dd9900
+[badge-stars]:     https://img.shields.io/github/stars/tsukiforge/BoneFish?style=flat-square&color=dd9900
 
 <!-- Repository Links -->
-[repo-latest]:    https://github.com/BoneFishStudio/BoneFish/releases/latest
-[repo-new-issue]: https://github.com/BoneFishStudio/BoneFish/issues/new/choose
+[repo-latest]:    https://github.com/tsukiforge/BoneFish/releases/latest
+[repo-new-issue]: https://github.com/tsukiforge/BoneFish/issues/new/choose
 [discord-invite]: https://discord.gg/SRs5zb9BJd
 
 <!-- External Links -->
