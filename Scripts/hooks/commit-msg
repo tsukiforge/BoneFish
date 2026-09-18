@@ -1,0 +1,49 @@
+#!/bin/sh
+# commit-msg hook: hapus trailer/footer atribusi AI dari pesan commit.
+# Pasang sekali per clone:  git config core.hooksPath Scripts/hooks
+# Cek tanpa commit:        Scripts/hooks/commit-msg <file-pesan>
+
+MSG_FILE="$1"
+[ -f "$MSG_FILE" ] || exit 0
+
+# Python3 lebih andal (emoji, CRLF, BOM). Fallback ke sed kalau tidak ada.
+if command -v python3 >/dev/null 2>&1; then
+    python3 - "$MSG_FILE" <<'PYEOF'
+import re, sys
+
+path = sys.argv[1]
+with open(path, "rb") as f:
+    raw = f.read()
+
+bom = b"" if not raw.startswith(b"\xef\xbb\xbf") else b"\xef\xbb\xbf"
+body = raw[len(bom):]
+crlf = b"\r\n" in body
+nl = b"\r\n" if crlf else b"\n"
+
+ai_names = rb"(codebuff|copilot|claude|codex|cursor|anthropic|openai|gemini|aider)"
+
+kept = []
+for line in body.splitlines(keepends=True):
+    bare = line.rstrip(b"\r\n")
+    if re.search(rb"^\s*(\W+\s*)?(co-?authored?-by)\s*:", bare, re.I) and re.search(ai_names, bare, re.I):
+        continue
+    if re.search(rb"generated\s+with", bare, re.I) and re.search(ai_names, bare, re.I):
+        continue
+    kept.append(line)
+
+out = b"".join(kept)
+out = out.rstrip()
+if out:
+    out += nl
+with open(path, "wb") as f:
+    f.write(bom + out)
+PYEOF
+    exit 0
+fi
+
+# Fallback POSIX-ish (GNU sed)
+sed -i -E \
+  -e '/^[[:space:]]*[^A-Za-z]*[Cc][Oo][-]?[Aa][Uu][Tt][Hh][Oo][Rr][Ee][Dd][-]?[Bb][Yy][[:space:]]*:/d' \
+  -e '/[Gg]enerated[[:space:]]+with/d' \
+  "$MSG_FILE"
+exit 0
