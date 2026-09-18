@@ -101,6 +101,24 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        // ★ FIX v7.6.3: opt-in suspend tetap jalan saat detektor keamanan gagal.
+        // Default OFF — perubahan ini hanya mengubah hasil di PC yang Security
+        // Center-nya mati/disable, yang sebelumnya membuat suspend tidak pernah bekerja.
+        public bool AllowSuspensionOnDetectorFailure
+        {
+            get => App.Settings.Prop.GameSessionAllowSuspensionOnDetectorFailure;
+            set
+            {
+                if (App.Settings.Prop.GameSessionAllowSuspensionOnDetectorFailure == value)
+                    return;
+
+                App.Settings.Prop.GameSessionAllowSuspensionOnDetectorFailure = value;
+                OnPropertyChanged(nameof(AllowSuspensionOnDetectorFailure));
+                try { App.Settings.Save(); } catch { }
+                _ = ScanAsync();
+            }
+        }
+
         public bool HasDetectorNotice
         {
             get => _hasDetectorNotice;
@@ -258,7 +276,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             foreach (ProcessSnapshot process in liveProcesses)
             {
-                if (ProcessClassifier.IsCritical(process, App.GameSession.Detector, Environment.ProcessId, 0))
+                // ★ FIX v7.6.3: IsAlwaysProtected (bukan IsCritical) — proses elevated
+                // (path tak terbaca) tetap masuk daftar supaya bisa dicentang user.
+                if (ProcessClassifier.IsAlwaysProtected(process, App.GameSession.Detector, Environment.ProcessId, 0))
                     continue;
 
                 if (FindRule(rules, process) is null)
@@ -306,7 +326,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
                         ProcessId = -1,
                         SessionId = Environment.ProcessId == 0 ? -1 : Process.GetCurrentProcess().SessionId,
                         ProcessName = rule.ProcessName,
-                        ExecutablePath = rule.ExecutablePath
+                        ExecutablePath = rule.ExecutablePath,
+                        // ★ FIX v7.6.3: rule proses elevated tidak punya StartTimeUtc tersimpan
+                        // (MainModule/StartTime tak terbaca dari proses non-admin). Tanpa nilai
+                        // ini snapshot filter dianggap "identitas tidak lengkap" dan rule-nya
+                        // tidak pernah tampil di daftar — user tidak bisa centang/lepas centang.
+                        // IsAlwaysProtected tidak membaca StartTimeUtc, jadi placeholder aman.
+                        StartTimeUtc = DateTime.UtcNow
                     },
                     App.GameSession.Detector,
                     Environment.ProcessId,
@@ -367,7 +393,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 SecurityDetectionState.Degraded => Strings.GameSession_DetectorDegraded,
                 _ => ""
             };
-            SuspensionStatus = state == SecurityDetectionState.Ok
+
+            // ★ FIX v7.6.3: status "0 proses akan di-suspend" hanya benar-benar berlaku
+            // kalau user TIDAK mengaktifkan opt-in suspension-on-detector-failure.
+            SuspensionStatus = (state == SecurityDetectionState.Ok || AllowSuspensionOnDetectorFailure)
                 ? ""
                 : Strings.GameSession_ZeroSuspended;
         }

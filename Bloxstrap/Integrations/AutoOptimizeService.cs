@@ -1,5 +1,7 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
+using System.Management;
 using System.Runtime.InteropServices;
 
 namespace Bloxstrap.Integrations
@@ -46,7 +48,6 @@ namespace Bloxstrap.Integrations
             out uint lpBytesReturned,
             IntPtr lpOverlapped);
 
-        private const uint GENERIC_READ = 0x80000000;
         private const uint FILE_SHARE_READ = 0x00000001;
         private const uint FILE_SHARE_WRITE = 0x00000002;
         private const uint OPEN_EXISTING = 3;
@@ -136,8 +137,15 @@ namespace Bloxstrap.Integrations
         private const int HardwareCacheMaxAgeDays = 30;
         private static readonly string HardwareCachePath = Path.Combine(Paths.LocalAppData, App.ProjectName, "HardwareCache.json");
 
+        // ★ FIX v7.6.3: cache v1 ditulis oleh detektor yang salah (GENERIC_READ pada
+        // volume handle selalu AccessDenied untuk proses non-admin → "Assuming HDD"
+        // di SEMUA PC biasa). Versi ini meng-invalidasi cache lama secara otomatis
+        // sehingga deteksi dijalankan ulang dengan logika yang benar.
+        private const int HardwareCacheVersion = 2;
+
         public sealed class HardwareCacheEntry
         {
+            public int Version { get; set; } = HardwareCacheVersion;
             public bool IsSSD { get; set; }
             public string SystemDriveRoot { get; set; } = "";
             public uint VolumeSerial { get; set; }
@@ -188,6 +196,13 @@ namespace Bloxstrap.Integrations
                 if (entry is null)
                     return null;
 
+                if (entry.Version != HardwareCacheVersion)
+                {
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Persistent storage cache version {entry.Version} != {HardwareCacheVersion} (ditulis detektor lama yang salah) — re-detecting");
+                    return null;
+                }
+
                 if ((DateTime.UtcNow - entry.DetectedAtUtc).TotalDays > HardwareCacheMaxAgeDays)
                 {
                     App.Logger.WriteLine(LOG_IDENT, $"Persistent storage cache expired (>{HardwareCacheMaxAgeDays} days) — re-detecting");
@@ -222,6 +237,7 @@ namespace Bloxstrap.Integrations
             {
                 var entry = new HardwareCacheEntry
                 {
+                    Version = HardwareCacheVersion,
                     IsSSD = isSSD,
                     SystemDriveRoot = GetSystemDriveRoot(),
                     VolumeSerial = GetSystemVolumeSerial(),
@@ -279,20 +295,57 @@ namespace Bloxstrap.Integrations
             App.Logger.WriteLine(LOG_IDENT, $"Hardware detection manually refreshed: {(isSSD ? "SSD" : "HDD")} (persistent cache re-written)");
         }
 
-        // Query seek-penalty IOCTL — logika deteksi ASLI (tidak diubah), hanya
-        // dipisah dari caching supaya IsSSD() bisa memotong query ini saat
-        // persistent cache masih valid.
+        // ── Deteksi storage 3-layer (FIX v7.6.3) ─────────────────────────────────
+        // BUG LAMA: handle volume ("\\.\C:") dibuka dengan GENERIC_READ. Akses itu
+        // SELALU ditolak (ERROR_ACCESS_DENIED) untuk proses non-admin → DeviceIoControl
+        // gagal → fallback "Assuming HDD" menjalankan di SEMUA PC biasa (termasuk PC
+        // user yang 100% SSD). Perbaikan:
+        //   Layer 1: IOCTL seek-penalty tetap, tapi dengan dwDesiredAccess = 0.
+        //            Query properti TIDAK butuh akses baca/tulis — handle akses-0
+        //            diperbolehkan untuk volume dan bekerja tanpa admin.
+        //   Layer 2: WMI MSFT_PhysicalDisk (Storage namespace, Win8+). MediaType
+        //            3=SSD, 4=HDD. Sumber resmi Windows (dipakai Task Manager).
+        //   Layer 3: fallback terakhir BARU boleh "assume HDD".
         private static bool DetectStorageType()
         {
+            if (TryDetectViaSeekPenaltyIoctl(out bool ioctlIsSsd))
+            {
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"Storage detected via seek-penalty IOCTL: {(ioctlIsSsd ? "SSD" : "HDD")}");
+                return ioctlIsSsd;
+            }
+
+            if (TryDetectViaWmiPhysicalDisk(out bool wmiIsSsd))
+            {
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"Storage detected via WMI MSFT_PhysicalDisk: {(wmiIsSsd ? "SSD" : "HDD")}");
+                return wmiIsSsd;
+            }
+
+            App.Logger.WriteLine(LOG_IDENT,
+                "All storage detection methods failed — assuming HDD (conservative fallback)");
+            return false;
+        }
+
+        /// <summary>
+        /// Layer 1: IOCTL_STORAGE_QUERY_PROPERTY (StorageDeviceSeekPenaltyProperty)
+        /// pada handle volume dengan dwDesiredAccess = 0 — bekerja tanpa admin.
+        /// Return false hanya jika query benar-benar tidak bisa dijalankan (bukan
+        /// "ternyata HDD"), supaya caller bisa turun ke layer berikutnya.
+        /// </summary>
+        private static bool TryDetectViaSeekPenaltyIoctl(out bool isSsd)
+        {
+            isSsd = false;
+
             try
             {
-                // Buka handle ke system volume ("\\.\C:")
+                // Buka handle ke system volume ("\\.\C:") TANPA akses baca/tulis.
                 string systemDrive = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
                 string volumePath = @"\\.\" + systemDrive.TrimEnd('\\');
 
                 IntPtr hVolume = CreateFile(
                     volumePath,
-                    GENERIC_READ,
+                    0, // ★ FIX: akses-0 cukup untuk query properti; GENERIC_READ selalu AccessDenied non-admin
                     FILE_SHARE_READ | FILE_SHARE_WRITE,
                     IntPtr.Zero,
                     OPEN_EXISTING,
@@ -301,13 +354,14 @@ namespace Bloxstrap.Integrations
 
                 if (hVolume == INVALID_HANDLE_VALUE)
                 {
-                    App.Logger.WriteLine(LOG_IDENT, $"Could not open volume {volumePath} for seek penalty query. Assuming HDD.");
+                    int openError = Marshal.GetLastWin32Error();
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Could not open volume {volumePath} (error={openError}) — trying next method");
                     return false;
                 }
 
                 try
                 {
-                    // Prepare query struct
                     var query = new STORAGE_PROPERTY_QUERY
                     {
                         PropertyId = StorageDeviceSeekPenaltyProperty,
@@ -340,20 +394,14 @@ namespace Bloxstrap.Integrations
                         if (success && bytesReturned >= (uint)descSize)
                         {
                             var descriptor = Marshal.PtrToStructure<STORAGE_SEEK_PENALTY_DESCRIPTOR>(descPtr);
-                            bool isSSD = descriptor.IncursSeekPenalty == 0; // false = no seek penalty = SSD
+                            isSsd = descriptor.IncursSeekPenalty == 0; // false = no seek penalty = SSD
+                            return true;
+                        }
 
-                            App.Logger.WriteLine(LOG_IDENT,
-                                $"Storage detected via DeviceIoControl: {(isSSD ? "SSD" : "HDD")} " +
-                                $"(IncursSeekPenalty={descriptor.IncursSeekPenalty})");
-                            return isSSD;
-                        }
-                        else
-                        {
-                            int lastError = Marshal.GetLastWin32Error();
-                            App.Logger.WriteLine(LOG_IDENT,
-                                $"DeviceIoControl seek penalty query failed (error={lastError}). Assuming HDD.");
-                            return false;
-                        }
+                        int lastError = Marshal.GetLastWin32Error();
+                        App.Logger.WriteLine(LOG_IDENT,
+                            $"DeviceIoControl seek penalty query failed (error={lastError}) — trying next method");
+                        return false;
                     }
                     finally
                     {
@@ -368,8 +416,122 @@ namespace Bloxstrap.Integrations
             }
             catch (Exception ex)
             {
-                App.Logger.WriteLine(LOG_IDENT, $"Storage detection via DeviceIoControl failed: {ex.Message}. Assuming HDD.");
+                App.Logger.WriteLine(LOG_IDENT, $"Seek penalty detection failed: {ex.Message} — trying next method");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Layer 2: WMI MSFT_PhysicalDisk (root\Microsoft\Windows\Storage, Win8+).
+        /// Ini sumber data yang sama dipakai Task Manager kolom "Disk type".
+        /// DeviceId sistem drive (mis. "1") dicocokkan lewat Win32_LogicalDiskToPartition.
+        /// Return false jika WMI tidak tersedia / hasil ambigu, bukan jika HDD.
+        /// </summary>
+        private static bool TryDetectViaWmiPhysicalDisk(out bool isSsd)
+        {
+            isSsd = false;
+
+            try
+            {
+                string systemDriveRoot = GetSystemDriveRoot(); // mis. "C:\"
+                string driveLetter = systemDriveRoot.TrimEnd('\\'); // "C:"
+
+                // Cari DeviceId disk fisik yang menaungi partisi sistem drive.
+                string? diskDeviceId = null;
+                using (var assocSearcher = new ManagementObjectSearcher(
+                    "root\\cimv2",
+                    $"ASSOCIATORS OF {{Win32_LogicalDisk.DeviceID='{driveLetter}'}} WHERE AssocClass=Win32_LogicalDiskToPartition"))
+                {
+                    foreach (ManagementObject partition in assocSearcher.Get().Cast<ManagementObject>())
+                    {
+                        using var partitionObj = partition;
+                        string partitionDeviceId = partitionObj["DeviceId"]?.ToString() ?? "";
+                        if (String.IsNullOrWhiteSpace(partitionDeviceId))
+                            continue;
+
+                        // "Disk #0, Partition #1" → ambil nomor disknya
+                        int diskIndex = GetDiskIndexFromPartitionId(partitionDeviceId);
+                        if (diskIndex >= 0)
+                        {
+                            diskDeviceId = diskIndex.ToString();
+                            break;
+                        }
+                    }
+                }
+
+                if (diskDeviceId is null)
+                {
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Could not map system drive {driveLetter} to a physical disk — trying next method");
+                    return false;
+                }
+
+                var scope = new ManagementScope("root\\Microsoft\\Windows\\Storage");
+                scope.Connect();
+
+                using var diskSearcher = new ManagementObjectSearcher(
+                    scope,
+                    new ObjectQuery($"SELECT DeviceId, MediaType FROM MSFT_PhysicalDisk WHERE DeviceId='{diskDeviceId}'"));
+
+                foreach (ManagementObject disk in diskSearcher.Get().Cast<ManagementObject>())
+                {
+                    using var diskObj = disk;
+                    object? mediaTypeRaw = diskObj["MediaType"];
+                    if (mediaTypeRaw is null)
+                        continue;
+
+                    ushort mediaType = Convert.ToUInt16(mediaTypeRaw);
+                    // MSFT_PhysicalDisk.MediaType: 3=SSD, 4=HDD, 0=Unspecified
+                    switch (mediaType)
+                    {
+                        case 3:
+                            isSsd = true;
+                            return true;
+                        case 4:
+                            isSsd = false;
+                            return true;
+                        default:
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"MSFT_PhysicalDisk MediaType={mediaType} (unspecified) — trying next method");
+                            return false;
+                    }
+                }
+
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"MSFT_PhysicalDisk DeviceId={diskDeviceId} not found — trying next method");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"WMI MSFT_PhysicalDisk detection failed: {ex.Message} — trying next method");
+                return false;
+            }
+        }
+
+        private static int GetDiskIndexFromPartitionId(string partitionDeviceId)
+        {
+            // Format: "Disk #0, Partition #1" (locale-dependent separator, tapi
+            // prefix "Disk #N" stabil di semua locale Windows).
+            try
+            {
+                const string prefix = "Disk #";
+                int start = partitionDeviceId.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+                if (start < 0)
+                    return -1;
+
+                start += prefix.Length;
+                int end = start;
+                while (end < partitionDeviceId.Length && Char.IsDigit(partitionDeviceId[end]))
+                    end++;
+
+                if (end == start)
+                    return -1;
+
+                return Int32.Parse(partitionDeviceId[start..end], CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return -1;
             }
         }
 

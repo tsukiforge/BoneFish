@@ -1617,8 +1617,14 @@ Apakah Anda ingin melanjutkan?</value>
   <data name="GameSession.SuspendLabel" xml:space="preserve">
     <value>Suspend saat bermain</value>
   </data>
+  <data name="GameSession.AllowDetectorFailTitle" xml:space="preserve">
+    <value>Lanjutkan suspend saat deteksi keamanan gagal</value>
+  </data>
   <data name="GameSession.AutoSelectTitle" xml:space="preserve">
     <value>Pilih aplikasi aman secara otomatis</value>
+  </data>
+  <data name="GameSession.AllowDetectorFailDescription" xml:space="preserve">
+    <value>Jika Windows Security Center mati atau WMI diblokir, suspend tetap berjalan untuk aplikasi yang Anda centang. Proses Windows, antivirus, dan sistem tetap dilindungi.</value>
   </data>
   <data name="GameSession.AutoSelectDescription" xml:space="preserve">
     <value>Saat aktif, aplikasi baru yang lolos semua pemeriksaan keamanan akan dipilih otomatis. Anda tetap bisa menonaktifkan aplikasi apa pun di bawah; pengecualian tersebut akan diingat.</value>

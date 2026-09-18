@@ -75,6 +75,23 @@
             </Grid>
         </ui:Card>
 
+        <!-- ★ FIX v7.6.3: opt-in suspend tetap jalan saat Security Center/WMI gagal -->
+        <ui:Card Margin="0,12,0,0" Padding="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="{x:Static resources:Strings.GameSession_AllowDetectorFailTitle}" FontSize="14" FontWeight="Medium" />
+                    <TextBlock Margin="0,3,0,0" Text="{x:Static resources:Strings.GameSession_AllowDetectorFailDescription}"
+                               TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+                <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
+                                 IsChecked="{Binding AllowSuspensionOnDetectorFailure, Mode=TwoWay}" />
+            </Grid>
+        </ui:Card>
+
         <Grid Margin="0,16,0,4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />

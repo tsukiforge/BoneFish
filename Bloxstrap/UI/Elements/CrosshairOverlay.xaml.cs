@@ -22,17 +22,38 @@ namespace Bloxstrap.UI.Elements
         private Point _lastMousePos;
         private bool _isDragging = false;
 
+        // ── FIX v7.6.3: posisi disimpan sebagai TITIK TENGAH overlay ─────────────
+        // Dulu posisi disimpan sebagai Left/Top (pojok kiri atas) dan centering
+        // dihitung dari ukuran window. Akibatnya:
+        //   1. Constructor memanggil LoadPosition() SEBELUM ApplyCurrentSettings(),
+        //      jadi centering awal dihitung dari ukuran default XAML (80px), bukan
+        //      ukuran asli — window langsung tidak pas tengah.
+        //   2. Saat user memperbesar ukuran crosshair, pojok kiri atas tidak bergerak
+        //      sehingga TITIK TENGAH crosshair bergeser — persis keluhan "crosshair
+        //      tidak jatuh di tengah layar saat ukuran diperbesar".
+        // Sekarang: seluruh posisi (settings + drag) dihitung dari titik tengah, dan
+        // ApplyCurrentSettings() men-anchor center pada setiap perubahan ukuran,
+        // sehingga crosshair selalu tepat di tengah layar pada ukuran APA PUN.
+        private double _savedCenterX;
+        private double _savedCenterY;
+        private bool _userMoved = false;
+
         // Cached shapes for dynamic redraw
         private readonly Ellipse _dotShape = new();
         private readonly Line _hLine = new();
+        private readonly Line _hLineRight = new();
         private readonly Line _vLine = new();
+        private readonly Line _vLineBottom = new();
         private readonly Ellipse _ringShape = new();
 
         public CrosshairOverlay()
         {
             InitializeComponent();
-            LoadPosition();
+
+            // ★ FIX v7.6.3: urutan diperbaiki — ukuran window harus final SEBELUM
+            // posisi tengah layar dihitung, bukan sebaliknya.
             ApplyCurrentSettings();
+            LoadPosition();
             UpdateVisibility();
         }
 
@@ -54,8 +75,23 @@ namespace Bloxstrap.UI.Elements
             double gap = size * 0.25;
             double opacity = Math.Clamp(settings.CrosshairOpacity, 0.1, 1.0);
 
+            // ── FIX v7.6.3: anchor TITIK TENGAH saat ukuran berubah ─────────────
+            // Center lama: posisi tengah window saat ini (kalau sudah pernah diposisikan).
+            // Center lama dipertahankan → window membesar/mengecil SIMETRIS di sekitar
+            // titik tengah, dan titik tengah itu sendiri tidak pernah bergeser.
+            double oldCenterX = Left + Width / 2;
+            double oldCenterY = Top + Height / 2;
+            bool hasValidCenter = IsLoaded || _userMoved || _savedCenterX != 0 || _savedCenterY != 0;
+
             Width = size + 40;
             Height = size + 40;
+
+            if (hasValidCenter)
+            {
+                Left = oldCenterX - Width / 2;
+                Top = oldCenterY - Height / 2;
+            }
+
             CrosshairCanvas.Width = Width;
             CrosshairCanvas.Height = Height;
             this.Opacity = opacity;
@@ -70,96 +106,63 @@ namespace Bloxstrap.UI.Elements
             {
                 case "Cross":
                 default:
-                    // Horizontal line (left segment)
-                    _hLine.X1 = centerX - size / 2;
-                    _hLine.Y1 = centerY;
-                    _hLine.X2 = centerX - gap;
-                    _hLine.Y2 = centerY;
-                    _hLine.Stroke = brush;
-                    _hLine.StrokeThickness = thickness;
-                    _hLine.StrokeStartLineCap = PenLineCap.Round;
-                    _hLine.StrokeEndLineCap = PenLineCap.Round;
+                    ConfigureLine(_hLine, brush, thickness, centerX - size / 2, centerY, centerX - gap, centerY);
+                    ConfigureLine(_hLineRight, brush, thickness, centerX + gap, centerY, centerX + size / 2, centerY);
+                    ConfigureLine(_vLine, brush, thickness, centerX, centerY - size / 2, centerX, centerY - gap);
+                    ConfigureLine(_vLineBottom, brush, thickness, centerX, centerY + gap, centerX, centerY + size / 2);
                     CrosshairCanvas.Children.Add(_hLine);
-
-                    // Horizontal line (right segment)
-                    var hLineRight = new Line
-                    {
-                        X1 = centerX + gap,
-                        Y1 = centerY,
-                        X2 = centerX + size / 2,
-                        Y2 = centerY,
-                        Stroke = brush,
-                        StrokeThickness = thickness,
-                        StrokeStartLineCap = PenLineCap.Round,
-                        StrokeEndLineCap = PenLineCap.Round
-                    };
-                    CrosshairCanvas.Children.Add(hLineRight);
-
-                    // Vertical line (top segment)
-                    _vLine.X1 = centerX;
-                    _vLine.Y1 = centerY - size / 2;
-                    _vLine.X2 = centerX;
-                    _vLine.Y2 = centerY - gap;
-                    _vLine.Stroke = brush;
-                    _vLine.StrokeThickness = thickness;
-                    _vLine.StrokeStartLineCap = PenLineCap.Round;
-                    _vLine.StrokeEndLineCap = PenLineCap.Round;
+                    CrosshairCanvas.Children.Add(_hLineRight);
                     CrosshairCanvas.Children.Add(_vLine);
-
-                    // Vertical line (bottom segment)
-                    var vLineBottom = new Line
-                    {
-                        X1 = centerX,
-                        Y1 = centerY + gap,
-                        X2 = centerX,
-                        Y2 = centerY + size / 2,
-                        Stroke = brush,
-                        StrokeThickness = thickness,
-                        StrokeStartLineCap = PenLineCap.Round,
-                        StrokeEndLineCap = PenLineCap.Round
-                    };
-                    CrosshairCanvas.Children.Add(vLineBottom);
+                    CrosshairCanvas.Children.Add(_vLineBottom);
                     break;
 
                 case "Dot":
-                    _dotShape.Width = size * 0.3;
-                    _dotShape.Height = size * 0.3;
-                    _dotShape.Fill = brush;
+                    ConfigureEllipse(_dotShape, brush, null, 0, size * 0.3, centerX, centerY);
                     CrosshairCanvas.Children.Add(_dotShape);
-                    Canvas.SetLeft(_dotShape, centerX - _dotShape.Width / 2);
-                    Canvas.SetTop(_dotShape, centerY - _dotShape.Height / 2);
                     break;
 
                 case "Circle":
-                    _ringShape.Width = size * 0.8;
-                    _ringShape.Height = size * 0.8;
-                    _ringShape.Stroke = brush;
-                    _ringShape.StrokeThickness = thickness;
+                    ConfigureEllipse(_ringShape, null, brush, thickness, size * 0.8, centerX, centerY);
                     CrosshairCanvas.Children.Add(_ringShape);
-                    Canvas.SetLeft(_ringShape, centerX - _ringShape.Width / 2);
-                    Canvas.SetTop(_ringShape, centerY - _ringShape.Height / 2);
                     break;
 
                 case "CrossDot":
-                    // Cross lines
-                    var cdHLeft = new Line { X1 = centerX - size / 2, Y1 = centerY, X2 = centerX - gap, Y2 = centerY, Stroke = brush, StrokeThickness = thickness, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
-                    var cdHRight = new Line { X1 = centerX + gap, Y1 = centerY, X2 = centerX + size / 2, Y2 = centerY, Stroke = brush, StrokeThickness = thickness, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
-                    var cdVTop = new Line { X1 = centerX, Y1 = centerY - size / 2, X2 = centerX, Y2 = centerY - gap, Stroke = brush, StrokeThickness = thickness, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
-                    var cdVBottom = new Line { X1 = centerX, Y1 = centerY + gap, X2 = centerX, Y2 = centerY + size / 2, Stroke = brush, StrokeThickness = thickness, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
-                    CrosshairCanvas.Children.Add(cdHLeft);
-                    CrosshairCanvas.Children.Add(cdHRight);
-                    CrosshairCanvas.Children.Add(cdVTop);
-                    CrosshairCanvas.Children.Add(cdVBottom);
+                    ConfigureLine(_hLine, brush, thickness, centerX - size / 2, centerY, centerX - gap, centerY);
+                    ConfigureLine(_hLineRight, brush, thickness, centerX + gap, centerY, centerX + size / 2, centerY);
+                    ConfigureLine(_vLine, brush, thickness, centerX, centerY - size / 2, centerX, centerY - gap);
+                    ConfigureLine(_vLineBottom, brush, thickness, centerX, centerY + gap, centerX, centerY + size / 2);
+                    CrosshairCanvas.Children.Add(_hLine);
+                    CrosshairCanvas.Children.Add(_hLineRight);
+                    CrosshairCanvas.Children.Add(_vLine);
+                    CrosshairCanvas.Children.Add(_vLineBottom);
 
-                    // Center dot
-                    _dotShape.Width = size * 0.15;
-                    _dotShape.Height = size * 0.15;
-                    _dotShape.Fill = brush;
+                    ConfigureEllipse(_dotShape, brush, null, 0, size * 0.15, centerX, centerY);
                     CrosshairCanvas.Children.Add(_dotShape);
-                    Canvas.SetLeft(_dotShape, centerX - _dotShape.Width / 2);
-                    Canvas.SetTop(_dotShape, centerY - _dotShape.Height / 2);
                     break;
             }
+        }
+
+        private static void ConfigureLine(Line line, Brush brush, double thickness, double x1, double y1, double x2, double y2)
+        {
+            line.X1 = x1;
+            line.Y1 = y1;
+            line.X2 = x2;
+            line.Y2 = y2;
+            line.Stroke = brush;
+            line.StrokeThickness = thickness;
+            line.StrokeStartLineCap = PenLineCap.Round;
+            line.StrokeEndLineCap = PenLineCap.Round;
+        }
+
+        private static void ConfigureEllipse(Ellipse ellipse, Brush? fill, Brush? stroke, double strokeThickness, double diameter, double centerX, double centerY)
+        {
+            ellipse.Width = diameter;
+            ellipse.Height = diameter;
+            ellipse.Fill = fill;
+            ellipse.Stroke = stroke;
+            ellipse.StrokeThickness = strokeThickness;
+            Canvas.SetLeft(ellipse, centerX - diameter / 2);
+            Canvas.SetTop(ellipse, centerY - diameter / 2);
         }
 
         private void UpdateVisibility()
@@ -208,8 +211,13 @@ namespace Bloxstrap.UI.Elements
         {
             try
             {
-                App.Settings.Prop.CrosshairX = Left;
-                App.Settings.Prop.CrosshairY = Top;
+                // ★ FIX v7.6.3: simpan TITIK TENGAH, bukan pojok kiri atas.
+                _userMoved = true;
+                _savedCenterX = Left + Width / 2;
+                _savedCenterY = Top + Height / 2;
+
+                App.Settings.Prop.CrosshairX = _savedCenterX;
+                App.Settings.Prop.CrosshairY = _savedCenterY;
                 App.Settings.Save();
             }
             catch (Exception ex)
@@ -222,22 +230,34 @@ namespace Bloxstrap.UI.Elements
         {
             try
             {
-                // Default: center of screen
-                if (App.Settings.Prop.CrosshairX == 0 && App.Settings.Prop.CrosshairY == 0)
+                double screenCenterX = SystemParameters.PrimaryScreenWidth / 2;
+                double screenCenterY = SystemParameters.PrimaryScreenHeight / 2;
+
+                // ★ FIX v7.6.3: CrosshairX/Y sekarang menyimpan TITIK TENGAH overlay.
+                // Nilai (0,0) berarti belum pernah diposisikan → tengah layar.
+                // (Data lama dari versi sebelumnya menyimpan pojok window; untuk
+                // posisi default (0,0) hasilnya identik — tepat di tengah layar.)
+                _savedCenterX = App.Settings.Prop.CrosshairX;
+                _savedCenterY = App.Settings.Prop.CrosshairY;
+                _userMoved = _savedCenterX != 0 || _savedCenterY != 0;
+
+                if (!_userMoved)
                 {
-                    Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
-                    Top = (SystemParameters.PrimaryScreenHeight - Height) / 2;
+                    _savedCenterX = screenCenterX;
+                    _savedCenterY = screenCenterY;
                 }
-                else
-                {
-                    Left = App.Settings.Prop.CrosshairX;
-                    Top = App.Settings.Prop.CrosshairY;
-                }
+
+                Left = _savedCenterX - Width / 2;
+                Top = _savedCenterY - Height / 2;
             }
             catch
             {
-                Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
-                Top = (SystemParameters.PrimaryScreenHeight - Height) / 2;
+                _savedCenterX = SystemParameters.PrimaryScreenWidth / 2;
+                _savedCenterY = SystemParameters.PrimaryScreenHeight / 2;
+                _userMoved = false;
+
+                Left = _savedCenterX - Width / 2;
+                Top = _savedCenterY - Height / 2;
             }
         }
 

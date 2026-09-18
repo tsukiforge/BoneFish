@@ -5,8 +5,22 @@ namespace Bloxstrap.GameSession
 {
     /// <summary>
     /// Detects security software before any user-approved process can be touched.
-    /// Any infrastructure failure is conservative: the caller must not suspend
-    /// unverified processes while the detector is degraded or unavailable.
+    ///
+    /// ★ FIX v7.6.3 — perubahan semantik failure:
+    /// Dulu SEMUA kegagalan infrastruktur deteksi (Security Center service mati,
+    /// WMI diblokir, WMI repository rusak) menghasilkan state Unavailable, dan
+    /// ProcessClassifier mem-fail-closed: NOL proses di-suspend selamanya tanpa
+    /// penjelasan. Di PC yang Security Center-nya di-disable (Windows debloat,
+    /// group policy, OOShutUp, dsb.) fitur suspend jadi "tidak pernah bekerja
+    /// sama sekali" padahal user sudah mencentang aplikasinya.
+    ///
+    /// Sekarang kegagalan infrastruktur menghasilkan Degraded: nama-nama proses
+    /// keamanan yang diketahui (Defender + daftar vendor statis + path yang berhasil
+    /// terbaca) tetap dilindungi penuh, tapi proses yang sudah disetujui USER secara
+    /// eksplisit boleh di-suspend. Kombinasi Unavailable tetap dipakai HANYA sebagai
+    /// hard-stop ketika user belum mengaktifkan GameSessionAllowSuspensionOnDetectorFailure.
+    /// Produk keamanan pihak ketiga yang TERDETEKSI (mapped) tetap membuat suspend
+    /// dihentikan total — itu jalur IsAlwaysProtected, bukan jalur state ini.
     /// </summary>
     public class SecuritySoftwareDetector
     {
@@ -66,10 +80,10 @@ namespace Bloxstrap.GameSession
 
                 ServiceProbe securityCenter = QueryService("wscsvc");
                 if (!securityCenter.Exists)
-                    return SetUnavailable("Security Center service (wscsvc) was not found.");
+                    return SetDegraded("Security Center service (wscsvc) was not found.");
 
                 if (!securityCenter.IsRunning || securityCenter.StartMode.Equals("Disabled", StringComparison.OrdinalIgnoreCase))
-                    return SetUnavailable("Security Center service is stopped or disabled.");
+                    return SetDegraded("Security Center service is stopped or disabled.");
 
                 ServiceProbe defender = QueryService("WinDefend");
                 bool defenderRunning = defender.Exists && defender.IsRunning;
@@ -85,11 +99,14 @@ namespace Bloxstrap.GameSession
                 if (defenderRunning)
                     AddKnownNames(ProductProcessNames["defender"]);
 
+                // ★ FIX v7.6.3: kegagalan query WMI bukan alasan mematikan suspend
+                // selamanya — daftar proses keamanan statis tetap terpasang (AddKnownNames
+                // defender di atas + ProductProcessNames saat productName terbaca).
                 if (successfulQueries == 0)
-                    return SetUnavailable("Security Center product queries were unavailable.");
+                    return SetDegraded("Security Center product queries were unavailable.");
 
                 if (requiredQueryFailed)
-                    return SetUnavailable("The required antivirus product query was unavailable.");
+                    return SetDegraded("The required antivirus product query was unavailable.");
 
                 if (_detectedProducts.Count == 0 && !defenderRunning)
                     return SetDegraded("Security Center returned no registered security product.");
@@ -109,7 +126,7 @@ namespace Bloxstrap.GameSession
             catch (Exception ex)
             {
                 App.Logger.WriteException(LOG_IDENT, ex);
-                return SetUnavailable($"Security detection failed: {ex.Message}");
+                return SetDegraded($"Security detection failed: {ex.Message}");
             }
         }
 

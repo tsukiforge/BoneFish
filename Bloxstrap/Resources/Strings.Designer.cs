@@ -5230,6 +5230,18 @@ public static string Menu_GameSession_Description {
             }
         }
 
+        public static string GameSession_AllowDetectorFailTitle {
+            get {
+                return ResourceManager.GetString("GameSession.AllowDetectorFailTitle", resourceCulture);
+            }
+        }
+
+        public static string GameSession_AllowDetectorFailDescription {
+            get {
+                return ResourceManager.GetString("GameSession.AllowDetectorFailDescription", resourceCulture);
+            }
+        }
+
         public static string GameSession_AutoSelectTitle {
             get {
                 return ResourceManager.GetString("GameSession.AutoSelectTitle", resourceCulture);

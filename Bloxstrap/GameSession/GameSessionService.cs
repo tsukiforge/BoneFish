@@ -99,6 +99,14 @@ namespace Bloxstrap.GameSession
             ICollection<GameSessionRule> storedRules = _rulesSource();
             bool rulesChanged = false;
 
+            bool detectorSoftFail = App.Settings.Prop.GameSessionAllowSuspensionOnDetectorFailure
+                && detectorState != SecurityDetectionState.Ok;
+            if (detectorSoftFail)
+            {
+                App.Logger.WriteLine(LOG_IDENT_LOCAL,
+                    $"Detector={detectorState} tapi opt-in suspension-on-detector-failure aktif — suspend lanjut untuk proses yang disetujui user (guard IsAlwaysProtected tetap penuh)");
+            }
+
             if (App.Settings.Prop.GameSessionAutoSelectSafeApps && detectorState == SecurityDetectionState.Ok)
             {
                 foreach (ProcessSnapshot process in processes)
@@ -165,8 +173,16 @@ namespace Bloxstrap.GameSession
                     }
 
                     ProcessSuspendResult result = Suspension.SuspendProcess(process.ProcessId, cancellationToken);
+
+                    // ── FIX v7.6.3: jangan senyap saat 0 thread tersuspend ──────────
                     if (result.SuspendedThreadIds.Count == 0)
+                    {
+                        App.Logger.WriteLine(LOG_IDENT_LOCAL,
+                            $"Gagal suspend PID={process.ProcessId} ({process.ProcessName}): 0 thread tersuspend " +
+                            $"(failed={result.FailedThreadCount}; total={result.TotalThreadCount}; partial={result.PartiallySuspended}) " +
+                            "— proses mungkin elevated/protected. Cek file log.");
                         continue;
+                    }
 
                     session.AppliedRules.Add(RuleKey(rule));
                     session.SuspendedProcesses.Add(new SuspendedProcessRecord
@@ -368,10 +384,15 @@ namespace Bloxstrap.GameSession
 
         public IReadOnlyList<ProcessSnapshot> ScanForUi()
         {
+            // ★ FIX v7.6.3: filter pakai IsAlwaysProtected, bukan IsCritical.
+            // IsCritical juga menolak proses dengan path/start-time tidak terbaca
+            // (proses elevated dari proses non-admin) — akibatnya aplikasi elevated
+            // TIDAK PERNAH muncul di daftar dan tidak bisa dipilih user. Guard
+            // proteksi sebenarnya tetap penuh lewat IsAlwaysProtected.
             return _processSource()
                 .Where(process => process.ProcessId != Environment.ProcessId)
                 .Where(process => !String.IsNullOrWhiteSpace(process.ProcessName))
-                .Where(process => !ProcessClassifier.IsCritical(process, Detector, Environment.ProcessId, 0))
+                .Where(process => !ProcessClassifier.IsAlwaysProtected(process, Detector, Environment.ProcessId, 0))
                 .GroupBy(process => RuleKey(process), StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
                 .ToList();

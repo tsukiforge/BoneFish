@@ -1,5 +1,57 @@
 # BoneFish Changelog
 
+## v7.6.8 - Fix Deteksi Storage, Game Session Suspend & Crosshair Center
+
+Release date: 2026-09-18
+
+### 💾 Fix: Deteksi storage selalu salah "HDD" di PC non-admin
+
+- **Akar masalah**: handle volume (`\\.\C:`) dibuka dengan `GENERIC_READ`. Akses
+  tersebut **selalu ditolak** untuk proses non-admin, sehingga query
+  `IOCTL_STORAGE_QUERY_PROPERTY` gagal dan kode fallback "Assuming HDD" jalan di
+  SEMUA PC biasa — termasuk PC yang 100% SSD.
+- IOCTL seek-penalty tetap dipakai tapi dengan `dwDesiredAccess = 0` (akses nol),
+  yang cukup untuk query properti dan bekerja tanpa hak admin.
+- Fallback baru: WMI `MSFT_PhysicalDisk` (namespace Storage, Win8+) — sumber data
+  yang sama dipakai Task Manager kolom tipe disk. `Assume HDD` kini hanya terjadi
+  jika SEMUA metode gagal.
+- Persistent cache `HardwareCache.json` dinaikkan ke versi 2 → cache lama yang
+  berisi nilai salah otomatis di-invalidasi dan deteksi dijalankan ulang.
+- Tombol "Deteksi Ulang Hardware" tetap tersedia untuk refresh paksa.
+
+### 🎮 Fix: Suspend Game Session tidak pernah bekerja
+
+- **Akar masalah utama**: detektor keamanan fail-closed. Jika Windows Security
+  Center mati/disable atau WMI diblokir (umum pada Windows debloat / group
+  policy), state detector menjadi `Unavailable` dan SEMUA proses di-skip —
+  suspend tidak pernah terjadi walau aplikasi sudah dicentang.
+- Kegagalan infrastruktur deteksi kini menghasilkan `Degraded` (bukan
+  `Unavailable`): daftar proses keamanan yang diketahui tetap dilindungi penuh.
+- Toggle baru di halaman Game Session — **"Lanjutkan suspend saat deteksi
+  keamanan gagal"** (`GameSessionAllowSuspensionOnDetectorFailure`, default
+  OFF): saat aktif, proses yang Anda setujui tetap di-suspend walau detektor
+  gagal. Proses Windows, service SCM, session 0, dan antivirus tetap dilindungi
+  oleh guard `IsAlwaysProtected`.
+- Proses yang berjalan elevated (path/start-time tidak terbaca dari proses
+  non-admin) tidak lagi otomatis dianggap "critical": kini tampil di daftar dan
+  bisa dicentang. `Skip PID=...` saat suspend gagal (0 thread) kini tercatat di
+  log dengan penyebabnya.
+
+### 🎯 Fix: Crosshair bergeser dari tengah layar saat ukuran diperbesar
+
+- **Akar masalah**: posisi overlay disimpan sebagai pojok kiri atas dan urutan
+  constructor menghitung centering dari ukuran window default 80px sebelum
+  ukuran asli diterapkan.
+- Posisi kini disimpan sebagai **titik tengah** overlay: mengubah ukuran
+  (20–200px) membuat window membesar/mengecil simetris di sekitar titik tengah,
+  jadi crosshair selalu jatuh tepat di tengah layar pada ukuran APA PUN.
+- Posisi drag tetap bisa disesuaikan manual; nilai (0,0) berarti default ke
+  tengah layar.
+
+### ✅ Verifikasi
+
+- Build berhasil (0 error, 0 warning).
+
 ## v7.6.2 - Bug Fix Update Check Transparency
 
 Release date: 2026-09-17

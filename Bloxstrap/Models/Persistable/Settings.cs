@@ -60,6 +60,13 @@ namespace Bloxstrap.Models.Persistable
         // fitur ini. Rules yang sudah dicentang TETAP tersimpan, hanya tidak dieksekusi.
         public bool GameSessionEnabled { get; set; } = false;
 
+        // ★ FIX v7.6.3: saat detector keamanan gagal (Security Center mati/disable —
+        // umum di Windows debloat), suspend dulu selalu fail-closed: NOL proses pernah
+        // ter-suspend walau user sudah mencentangnya. Opt-in ini melanjutkan suspend
+        // untuk proses yang DISETUJUI USER dengan guard IsAlwaysProtected tetap penuh
+        // (daftar proses kritik, service SCM, session 0, Windows path, security vendor).
+        public bool GameSessionAllowSuspensionOnDetectorFailure { get; set; } = false;
+
         // mod preset configuration
         public bool UseDisableAppPatch { get; set; } = false;
 

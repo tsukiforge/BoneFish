@@ -71,19 +71,30 @@ namespace Bloxstrap.GameSession
             if (rule is null || !rule.SuspendDuringGame)
                 return ProcessClassification.Keep;
 
-            // Any uncertainty in security detection is a hard safety stop. This deliberately
-            // disables suspension for the session rather than risking an unknown security tool.
-            if (detector.State != SecurityDetectionState.Ok)
+            // ── FIX v7.6.3: detector state ────────────────────────────────────────────
+            // Unavailable/Degraded dulu adalah hard safety stop untuk SEMUA proses.
+            // Sekarang: kalau user secara eksplisit mengaktifkan
+            // GameSessionAllowSuspensionOnDetectorFailure, proses yang DISETUJUI USER
+            // tetap boleh di-suspend (guard IsAlwaysProtected di atas tetap melindungi
+            // semua proses keamanan yang dikenali). Tanpa opt-in itu, tetap fail-closed.
+            if (detector.State != SecurityDetectionState.Ok && !App.Settings.Prop.GameSessionAllowSuspensionOnDetectorFailure)
                 return ProcessClassification.Critical;
 
-            // A readable identity is required before a rule can mutate another process.
-            if (String.IsNullOrWhiteSpace(snapshot.ProcessName)
-                || String.IsNullOrWhiteSpace(snapshot.ExecutablePath)
-                || !snapshot.StartTimeUtc.HasValue)
-            {
+            // Process name is the minimum identity required — without it we do not even
+            // know what we would be suspending.
+            if (String.IsNullOrWhiteSpace(snapshot.ProcessName))
                 return ProcessClassification.Critical;
-            }
 
+            // ── FIX v7.6.3: path/start-time tidak terbaca ≠ proses berbahaya ──────────
+            // MainModule proses yang berjalan ELEVATED (as admin) tidak bisa dibaca oleh
+            // proses non-admin, dan StartTime kadang gagal untuk proses UWP — BUKAN karena
+            // prosesnya berbahaya. Dulu ketiganya digabung jadi hard-fail → aplikasi
+            // pilihan user yang kebetulan elevated dianggap critical dan TIDAK PERNAH
+            // di-suspend walau sudah dicentang (keluhan "suspend tidak jalan sama sekali").
+            // Identitas rule user (ProcessName/path tersimpan saat proses masih terbaca)
+            // cukup untuk memutuskan proses mana yang user centang. Guard keamanan lain
+            // (IsAlwaysProtected: nama critical, service SCM, session 0, Windows path,
+            // security software) tetap berjalan SEBELUM titik ini.
             return ProcessClassification.Safe;
         }
 
