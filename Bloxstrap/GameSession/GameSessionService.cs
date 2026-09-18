@@ -77,6 +77,9 @@ namespace Bloxstrap.GameSession
             SecurityDetectionState detectorState = await Detector.RefreshAsync(cancellationToken);
             List<ProcessSnapshot> processes = _processSource().ToList();
 
+            // ── FIX v7.7.0: lifecycle logging (spec §6) ──────────────────────
+            App.Logger.WriteLine(LOG_IDENT_LOCAL, $"Game Session Started (detector={detectorState}, processes={processes.Count})");
+
             // PID semua Windows service (SCM). Service = komponen sistem/vendor —
             // sinyal CRITICAL tambahan di classifier supaya audio stack, driver
             // companion, dan sync service (bahkan yang jalan di session user,
@@ -172,17 +175,30 @@ namespace Bloxstrap.GameSession
                         continue;
                     }
 
+                    App.Logger.WriteLine(LOG_IDENT_LOCAL,
+                        $"Rule matched: {process.ProcessName} → target PID={process.ProcessId}");
+
                     ProcessSuspendResult result = Suspension.SuspendProcess(process.ProcessId, cancellationToken);
 
-                    // ── FIX v7.6.3: jangan senyap saat 0 thread tersuspend ──────────
+                    // ── FIX v7.7.0: VERIFIKASI post-suspend, jangan percaya API call ──
+                    // Spec: "Never silently report success if suspension did not
+                    // actually happen." 0 thread tersuspend = GAGAL — proses tetap
+                    // berjalan, TIDAK boleh masuk record (kalau masuk, restore nanti
+                    // percaya proses ini suspended padahal tidak).
                     if (result.SuspendedThreadIds.Count == 0)
                     {
+                        string failReason = result.TotalThreadCount == 0
+                            ? "no accessible threads (elevated or protected process)"
+                            : $"all {result.FailedThreadCount} thread OpenThread/SuspendThread gagal (elevated/protected)";
+
                         App.Logger.WriteLine(LOG_IDENT_LOCAL,
-                            $"Gagal suspend PID={process.ProcessId} ({process.ProcessName}): 0 thread tersuspend " +
-                            $"(failed={result.FailedThreadCount}; total={result.TotalThreadCount}; partial={result.PartiallySuspended}) " +
-                            "— proses mungkin elevated/protected. Cek file log.");
+                            $"Suspend FAILED: PID={process.ProcessId} ({process.ProcessName}) — Status: FAILED, Reason: {failReason}. " +
+                            "Proses TIDAK masuk sesi dan tetap berjalan.");
                         continue;
                     }
+
+                    App.Logger.WriteLine(LOG_IDENT_LOCAL,
+                        $"Suspend OK: PID={process.ProcessId} ({process.ProcessName}) — threads {result.SuspendedThreadIds.Count}/{result.TotalThreadCount}, failed={result.FailedThreadCount}, passes={result.SweepPasses}, Status: SUSPENDED{(result.PartiallySuspended ? " (PARTIAL)" : "")}");
 
                     session.AppliedRules.Add(RuleKey(rule));
                     session.SuspendedProcesses.Add(new SuspendedProcessRecord

@@ -1,9 +1,12 @@
 using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace Bloxstrap.UI.Elements
 {
@@ -22,21 +25,25 @@ namespace Bloxstrap.UI.Elements
         private Point _lastMousePos;
         private bool _isDragging = false;
 
-        // ── FIX v7.6.3: posisi disimpan sebagai TITIK TENGAH overlay ─────────────
-        // Dulu posisi disimpan sebagai Left/Top (pojok kiri atas) dan centering
-        // dihitung dari ukuran window. Akibatnya:
-        //   1. Constructor memanggil LoadPosition() SEBELUM ApplyCurrentSettings(),
-        //      jadi centering awal dihitung dari ukuran default XAML (80px), bukan
-        //      ukuran asli — window langsung tidak pas tengah.
-        //   2. Saat user memperbesar ukuran crosshair, pojok kiri atas tidak bergerak
-        //      sehingga TITIK TENGAH crosshair bergeser — persis keluhan "crosshair
-        //      tidak jatuh di tengah layar saat ukuran diperbesar".
-        // Sekarang: seluruh posisi (settings + drag) dihitung dari titik tengah, dan
-        // ApplyCurrentSettings() men-anchor center pada setiap perubahan ukuran,
-        // sehingga crosshair selalu tepat di tengah layar pada ukuran APA PUN.
+        // ── Posisi disimpan sebagai TITIK TENGAH overlay (fix v7.6.3) ─────────────
+        // Ganti ukuran → window membesar/mengecil SIMETRIS di sekitar titik tengah;
+        // titik tengah tidak pernah bergeser (keluhan "crosshair geser saat size
+        // diperbesar"). Constructor: ApplyCurrentSettings() dulu (ukuran final),
+        // baru LoadPosition() (centering dihitung dari ukuran asli).
         private double _savedCenterX;
         private double _savedCenterY;
         private bool _userMoved = false;
+
+        // ── FIX v7.7.0: Lock to Roblox client-area center ──────────────────────────
+        // Crosshair FPS harus jatuh di TENGAH CLIENT AREA Roblox (bukan tengah
+        // monitor utama — salah saat Roblox windowed/multi-monitor/DPI beda).
+        // Alur: RobloxWindow → GetClientRect + ClientToScreen (koordinat fisik px)
+        // → pusat → konversi px→DIP pakai skala monitor overlay → Left/Top.
+        // DispatcherTimer 150ms menangani: Roblox resize, maximize, pindah monitor.
+        // Drag manual = user intent → lock dimatikan otomatis; toggle settings
+        // untuk mengunci lagi. Posisi custom lama tidak pernah ditimpa saat locked
+        // (SavePosition tidak dipanggil dalam mode lock).
+        private DispatcherTimer? _lockTimer;
 
         // Cached shapes for dynamic redraw
         private readonly Ellipse _dotShape = new();
@@ -50,11 +57,11 @@ namespace Bloxstrap.UI.Elements
         {
             InitializeComponent();
 
-            // ★ FIX v7.6.3: urutan diperbaiki — ukuran window harus final SEBELUM
-            // posisi tengah layar dihitung, bukan sebaliknya.
+            // Urutan penting: ukuran window final dulu, baru posisi dihitung.
             ApplyCurrentSettings();
             LoadPosition();
             UpdateVisibility();
+            UpdateLockTimer();
         }
 
         public void ApplyCurrentSettings()
@@ -75,10 +82,7 @@ namespace Bloxstrap.UI.Elements
             double gap = size * 0.25;
             double opacity = Math.Clamp(settings.CrosshairOpacity, 0.1, 1.0);
 
-            // ── FIX v7.6.3: anchor TITIK TENGAH saat ukuran berubah ─────────────
-            // Center lama: posisi tengah window saat ini (kalau sudah pernah diposisikan).
-            // Center lama dipertahankan → window membesar/mengecil SIMETRIS di sekitar
-            // titik tengah, dan titik tengah itu sendiri tidak pernah bergeser.
+            // Anchor TITIK TENGAH saat ukuran berubah — pusat tidak pernah bergeser.
             double oldCenterX = Left + Width / 2;
             double oldCenterY = Top + Height / 2;
             bool hasValidCenter = IsLoaded || _userMoved || _savedCenterX != 0 || _savedCenterY != 0;
@@ -140,6 +144,8 @@ namespace Bloxstrap.UI.Elements
                     CrosshairCanvas.Children.Add(_dotShape);
                     break;
             }
+
+            UpdateLockTimer();
         }
 
         private static void ConfigureLine(Line line, Brush brush, double thickness, double x1, double y1, double x2, double y2)
@@ -165,6 +171,111 @@ namespace Bloxstrap.UI.Elements
             Canvas.SetTop(ellipse, centerY - diameter / 2);
         }
 
+        // ── Lock to Roblox center ─────────────────────────────────────────────────
+
+        private void UpdateLockTimer()
+        {
+            bool shouldRun = App.Settings.Prop.EnableCrosshair && App.Settings.Prop.CrosshairLockToRoblox;
+
+            if (shouldRun && _lockTimer is null)
+            {
+                _lockTimer = new DispatcherTimer(DispatcherPriority.Background)
+                {
+                    Interval = TimeSpan.FromMilliseconds(150)
+                };
+                _lockTimer.Tick += (_, _) => LockToRobloxCenter();
+                _lockTimer.Start();
+                App.Logger.WriteLine(LOG_IDENT, "Lock-to-Roblox timer started");
+            }
+            else if (!shouldRun && _lockTimer is not null)
+            {
+                _lockTimer.Stop();
+                _lockTimer = null;
+                App.Logger.WriteLine(LOG_IDENT, "Lock-to-Roblox timer stopped");
+            }
+        }
+
+        private void LockToRobloxCenter()
+        {
+            if (Visibility != Visibility.Visible)
+                return;
+
+            IntPtr hwnd = FindVisibleRobloxWindow();
+            if (hwnd == IntPtr.Zero)
+                return; // Roblox tidak jalan — crosshair diam di posisi terakhir
+
+            if (!GetClientRect(hwnd, out RECT clientRect))
+                return;
+
+            var clientOrigin = new POINT(0, 0);
+            if (!ClientToScreen(hwnd, ref clientOrigin))
+                return;
+
+            // Pusat client area dalam KOORDINAT FISIK (px layar).
+            double physCenterX = clientOrigin.X + clientRect.Right / 2.0;
+            double physCenterY = clientOrigin.Y + clientRect.Bottom / 2.0;
+
+            // Konversi px fisik → DIP WPF pakai skala monitor tempat overlay berada.
+            // Overlay selalu dipindah mengikuti Roblox, jadi skala monitor-nya
+            // = skala monitor Roblox (menangani DPI 100/125/150% + multi-monitor).
+            double dpiX = 1.0, dpiY = 1.0;
+            var source = PresentationSource.FromVisual(this);
+            if (source?.CompositionTarget is not null)
+            {
+                dpiX = source.CompositionTarget.TransformToDevice.M11;
+                dpiY = source.CompositionTarget.TransformToDevice.M22;
+            }
+            if (dpiX <= 0) dpiX = 1.0;
+            if (dpiY <= 0) dpiY = 1.0;
+
+            double centerDipX = physCenterX / dpiX;
+            double centerDipY = physCenterY / dpiY;
+
+            double width = ActualWidth > 0 ? ActualWidth : Width;
+            double height = ActualHeight > 0 ? ActualHeight : Height;
+
+            // Pindah TANPA SavePosition — posisi custom user tidak pernah ditimpa
+            // selama lock aktif; mematikan lock mengembalikan posisi tersimpan.
+            Left = centerDipX - width / 2;
+            Top = centerDipY - height / 2;
+        }
+
+        private static IntPtr FindVisibleRobloxWindow()
+        {
+            try
+            {
+                foreach (Process process in Process.GetProcessesByName("RobloxPlayerBeta"))
+                {
+                    using Process p = process;
+                    try
+                    {
+                        IntPtr hwnd = p.MainWindowHandle;
+                        if (hwnd != IntPtr.Zero && IsWindowVisible(hwnd))
+                            return hwnd;
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"FindVisibleRobloxWindow failed: {ex.Message}");
+            }
+            return IntPtr.Zero;
+        }
+
+        private static bool IsLockEnabled => App.Settings.Prop.CrosshairLockToRoblox;
+
+        private void DisableLock()
+        {
+            if (!IsLockEnabled)
+                return;
+
+            App.Settings.Prop.CrosshairLockToRoblox = false;
+            try { App.Settings.Save(); } catch { }
+            UpdateLockTimer();
+            App.Logger.WriteLine(LOG_IDENT, "Lock-to-Roblox disabled (user dragged the crosshair)");
+        }
+
         private void UpdateVisibility()
         {
             if (App.Settings.Prop.EnableCrosshair)
@@ -179,12 +290,18 @@ namespace Bloxstrap.UI.Elements
                 if (IsLoaded && IsVisible)
                     Visibility = Visibility.Collapsed;
             }
+
+            UpdateLockTimer();
         }
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.LeftButton == MouseButtonState.Pressed)
             {
+                // Drag = posisi manual menang: matikan lock supaya timer tidak
+                // bertarung dengan drag. Toggle settings untuk mengunci lagi.
+                DisableLock();
+
                 _isDragging = true;
                 _lastMousePos = PointToScreen(e.GetPosition(this));
             }
@@ -211,7 +328,7 @@ namespace Bloxstrap.UI.Elements
         {
             try
             {
-                // ★ FIX v7.6.3: simpan TITIK TENGAH, bukan pojok kiri atas.
+                // Simpan TITIK TENGAH, bukan pojok kiri atas.
                 _userMoved = true;
                 _savedCenterX = Left + Width / 2;
                 _savedCenterY = Top + Height / 2;
@@ -233,10 +350,8 @@ namespace Bloxstrap.UI.Elements
                 double screenCenterX = SystemParameters.PrimaryScreenWidth / 2;
                 double screenCenterY = SystemParameters.PrimaryScreenHeight / 2;
 
-                // ★ FIX v7.6.3: CrosshairX/Y sekarang menyimpan TITIK TENGAH overlay.
+                // CrosshairX/Y menyimpan TITIK TENGAH overlay.
                 // Nilai (0,0) berarti belum pernah diposisikan → tengah layar.
-                // (Data lama dari versi sebelumnya menyimpan pojok window; untuk
-                // posisi default (0,0) hasilnya identik — tepat di tengah layar.)
                 _savedCenterX = App.Settings.Prop.CrosshairX;
                 _savedCenterY = App.Settings.Prop.CrosshairY;
                 _userMoved = _savedCenterX != 0 || _savedCenterY != 0;
@@ -267,12 +382,48 @@ namespace Bloxstrap.UI.Elements
                 Visibility = Visibility.Collapsed;
             else
                 Visibility = Visibility.Visible;
+
+            UpdateLockTimer();
         }
 
         protected override void OnClosed(EventArgs e)
         {
+            _lockTimer?.Stop();
+            _lockTimer = null;
             App.Logger.WriteLine(LOG_IDENT, "Crosshair overlay closed");
             base.OnClosed(e);
         }
+
+        // ── P/Invoke: Roblox client rect ──────────────────────────────────────────
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+
+            public POINT(int x, int y) { X = x; Y = y; }
+        }
+
+        [DllImport("user32.dll", SetLastError = false)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll", SetLastError = false)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
+
+        [DllImport("user32.dll", SetLastError = false)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
     }
 }

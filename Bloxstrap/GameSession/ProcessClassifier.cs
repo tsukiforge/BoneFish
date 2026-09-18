@@ -64,7 +64,19 @@ namespace Bloxstrap.GameSession
             GameSessionRule? rule,
             IReadOnlySet<int>? serviceProcessIds = null)
         {
-            if (IsCritical(snapshot, detector, selfProcessId, gameProcessId, serviceProcessIds))
+            // ── FIX v7.7.0 — ROOT CAUSE "suspend tidak pernah jalan" ─────────────
+            // Dulu Classify() memanggil IsCritical(), dan IsCritical() hard-fail
+            // untuk proses dengan ExecutablePath/StartTimeUtc tidak terbaca — yaitu
+            // SEMUA proses elevated yang dilihat dari BoneFish non-admin (MainModule
+            // tidak bisa dibaca lintas integrity level). Akibatnya aplikasi pilihan
+            // user yang jalan as-admin dikembalikan sebagai Critical SEBELUM rule
+            // user dipertimbangkan → tidak pernah sampai ke SuspendProcess() walau
+            // sudah dicentang di UI. Proteksi sebenarnya ada di IsAlwaysProtected()
+            // (nama critical, service SCM, session 0, Windows path, security
+            // software) — dipanggil langsung di sini. Identitas rule user
+            // (ProcessName/path tersimpan saat proses masih terbaca) cukup untuk
+            // memutuskan proses sisanya. IsCritical() tetap dipakai auto-select & UI.
+            if (IsAlwaysProtected(snapshot, detector, selfProcessId, gameProcessId, serviceProcessIds))
                 return ProcessClassification.Critical;
 
             // Unapproved applications are visible to the UI but must remain untouched.

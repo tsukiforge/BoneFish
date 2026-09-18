@@ -1,5 +1,37 @@
 # BoneFish Changelog
 
+## v7.7.0 — Storage Detection Rewrite (3-State), Game Session Verification & Crosshair Roblox-Center Lock
+
+Release date: 2026-09-18
+
+### Storage / HDD-SSD Detection (P0)
+- **Engine baru 3-state: SSD / HDD / Unknown.** Tidak ada lagi fallback-tebakan `Unknown → HDD` maupun `Unknown → SSD`. Bukti tidak cukup atau kontradiktif → Unknown (hard requirement).
+- **Root cause salah klasifikasi dua arah ditemukan & diperbaiki:**
+  - *SSD → HDD* (pra-v7.6.3): volume handle dibuka `GENERIC_READ` → selalu AccessDenied non-admin → fallback "Assuming HDD".
+  - *HDD → SSD* (v7.6.3): driver tanpa dukungan seek-penalty (IDE/RAID/virtual/USB bridge) mengembalikan descriptor **kosong** dengan status sukses; kode memperlakukan `IncursSeekPenalty==0` sebagai "SSD" tanpa validasi `Version`/`Size`/rentang nilai.
+- Deteksi kini mengarah ke **physical disk tempat Windows berada** (`Win32_LogicalDiskToPartition` → `\\.\PhysicalDriveN`), bukan handle volume `C:` dan bukan disk pertama.
+- **Multi-source + consistency check:** S1 seek-penalty IOCTL (validasi descriptor ketat; `=1` → HDD kuat, `=0` hanya hint lemah), S2 TRIM descriptor (hint lemah), S3 `MSFT_PhysicalDisk.MediaType` (3=SSD/4=HDD kuat; sumber data Task Manager), S4 BusType NVMe (hint lemah). Bukti kuat berlawanan → Unknown dengan alasan tercatat.
+- **Cache v4:** simpan detector version, disk identity (index/model/bus), confidence & sources; Unknown tidak pernah di-cache; versi beda otomatis invalid; "Deteksi Ulang Hardware" menghapus cache & deteksi penuh.
+- Diagnostik lengkap di log (mapping, tiap sumber, decision + reason); panel System Info menampilkan `SSD`/`HDD`/`Unknown`. Detail & test matrix: `docs/STORAGE-DETECTION.md`.
+- Optimasi HDD Balanced kini hanya jalan pada HDD terkonfirmasi; memory trim SSD hanya pada SSD terkonfirmasi. Unknown = tanpa tuning (aman).
+
+### Game Session Manager (P0)
+- **Root cause "suspend tidak pernah jalan" diperbaiki:** `Classify()` memanggil `IsCritical()` yang hard-fail untuk proses elevated (path/start-time tak terbaca dari proses non-admin) SEBELUM rule user dipertimbangkan — aplikasi pilihan user yang jalan as-admin tidak pernah sampai ke suspend. Kini proteksi memakai `IsAlwaysProtected()` langsung (nama critical, service SCM, session 0, Windows path, security software tetap terlindungi penuh).
+- **Verifikasi pasca-suspend:** 0 thread tersuspend = FAILED — proses tidak masuk record sesi (tidak ada "sukses palsu") dan log memuat `Suspend FAILED ... Reason:`; sukses tercatat `Status: SUSPENDED` dengan hitungan thread.
+- Lifecycle logging: `Game Session Started`, `Rule matched ... target PID=`, hasil suspend per proses.
+
+### Crosshair (P1)
+- **Lock ke tengah Roblox:** pusat crosshair kini mengikuti **pusat client-area jendela Roblox** (`GetClientRect`+`ClientToScreen`, konversi DPI per-monitor) — bukan tengah monitor utama. Menangani windowed/maximized, pindah monitor, DPI 100/125/150%.
+- Drag manual mematikan lock otomatis (posisi custom dihormati & tidak ditimpa); toggle **"Kunci ke Tengah Roblox"** di halaman Experimental untuk mengunci lagi (default ON).
+- Resize tetap center-anchored: ukuran 20–200px tidak pernah menggeser titik tengah.
+
+### Files
+- `Bloxstrap/Integrations/AutoOptimizeService.cs` — engine deteksi v4 + cache v4 + diagnostics.
+- `Bloxstrap/GameSession/ProcessClassifier.cs`, `Bloxstrap/GameSession/GameSessionService.cs` — fix klasifikasi + verifikasi suspend.
+- `Bloxstrap/UI/Elements/CrosshairOverlay.xaml.cs`, `Bloxstrap/UI/Elements/Settings/Pages/ExperimentalPage.xaml`, `Bloxstrap/UI/ViewModels/Settings/ExperimentalViewModel.cs`, `Bloxstrap/Models/Persistable/Settings.cs` — Roblox-center lock.
+- `docs/STORAGE-DETECTION.md` — decision tree, cache, test matrix.
+
+---
 ## v7.6.8 - Fix Deteksi Storage, Game Session Suspend & Crosshair Center
 
 Release date: 2026-09-18

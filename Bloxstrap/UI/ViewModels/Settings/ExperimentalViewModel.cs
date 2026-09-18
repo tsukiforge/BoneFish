@@ -405,7 +405,22 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.Settings.Prop.CrosshairSize = value;
                 OnPropertyChanged(nameof(CrosshairSize));
                 try { App.Settings.Save(); } catch { }
-                
+
+                CrosshairService.Instance?.ApplySettings();
+            }
+        }
+
+        // v7.7.0: kunci pusat crosshair ke pusat client-area Roblox.
+        // Drag manual mematikan lock dari sisi overlay; toggle ini mengunci lagi.
+        public bool CrosshairLockToRoblox
+        {
+            get => App.Settings.Prop.CrosshairLockToRoblox;
+            set
+            {
+                App.Settings.Prop.CrosshairLockToRoblox = value;
+                OnPropertyChanged(nameof(CrosshairLockToRoblox));
+                try { App.Settings.Save(); } catch { }
+
                 CrosshairService.Instance?.ApplySettings();
             }
         }

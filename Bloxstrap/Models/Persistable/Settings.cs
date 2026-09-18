@@ -108,8 +108,12 @@ namespace Bloxstrap.Models.Persistable
         public string CrosshairColor { get; set; } = "#00FF00";    // Lime green default
         public double CrosshairSize { get; set; } = 40;             // 20-200px
         public double CrosshairOpacity { get; set; } = 0.8;         // 0.1-1.0
-        public double CrosshairX { get; set; } = 0;                 // screen position
+        public double CrosshairX { get; set; } = 0;                 // screen position (titik TENGAH overlay)
         public double CrosshairY { get; set; } = 0;
+        // v7.7.0: kunci pusat crosshair ke pusat CLIENT AREA jendela Roblox
+        // (DPI-aware, multi-monitor). Drag manual mematikan lock otomatis;
+        // aktifkan lagi dari settings. Default ON — perilaku yang benar untuk FPS.
+        public bool CrosshairLockToRoblox { get; set; } = true;
 
         // wallpaper background (EnableWallpaperLauncher dihapus — FIX 3: background selalu aktif)
 

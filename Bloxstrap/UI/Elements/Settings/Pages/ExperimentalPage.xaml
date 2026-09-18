@@ -156,10 +156,16 @@
                     <ComboBox SelectedItem="{Binding CrosshairStyle, Mode=TwoWay}" ItemsSource="{Binding CrosshairStyles}" MinWidth="140" />
                 </controls:OptionControl>
 
-                <controls:OptionControl 
+                <controls:OptionControl
                     Header="Ukuran Crosshair" 
-                    Description="Atur besar kecil crosshair (20 - 200px).">
+                    Description="Atur besar kecil crosshair (20 - 200px). Posisi tengah crosshair tidak bergeser saat ukuran diubah.">
                     <Slider Minimum="20" Maximum="200" Value="{Binding CrosshairSize, Mode=TwoWay}" Width="180" TickFrequency="10" IsSnapToTickEnabled="True" />
+                </controls:OptionControl>
+
+                <controls:OptionControl
+                    Header="Kunci ke Tengah Roblox"
+                    Description="Pusat crosshair selalu mengikuti pusat area dalam jendela Roblox (mengikuti DPI &amp; monitor). Drag crosshair untuk mematikan lock dan memakai posisi manual.">
+                    <ui:ToggleSwitch IsChecked="{Binding CrosshairLockToRoblox, Mode=TwoWay}" />
                 </controls:OptionControl>
 
                 <controls:OptionControl 
