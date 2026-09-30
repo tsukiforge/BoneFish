@@ -144,9 +144,15 @@ namespace Bloxstrap.Integrations
         //   v2: IOCTL volume-handle + fallback HDD (2-state, menebak)
         //   v3: IOCTL/WMI 2-state (masih menebak saat gagal)
         //   v4: physical-disk mapping + konsistensi multi-source → SSD/HDD/Unknown.
+        //   v5: fallback flash/removable (USB/SD/MMC) untuk disk sistem yang tidak
+        //       dilaporkan storage stack (MediaType=0) — fix kasus "Unknown".
+        //       + NVMe = bukti SSD KUAT (protokol NVMe tidak ada yang HDD).
+        //       + SATA/RAID + MediaType=0 + TRIM aktif + properti seek-penalty tidak
+        //         didukung driver → hint SSD lemah (Windows tidak menyalakan TRIM
+        //         di disk rotasional). Mengurangi Unknown pada Intel RST.
         // Cache versi lebih lama OTOMATIS di-invalidasi.
         private const int HardwareCacheVersion = 4;
-        private const int StorageDetectorVersion = 4;
+        private const int StorageDetectorVersion = 5;
 
         public enum StorageMediaType { Ssd, Hdd, Unknown }
 
@@ -426,7 +432,8 @@ namespace Bloxstrap.Integrations
             // 2) Kumpulkan sumber
             var votes = new List<(string Name, bool IsSsd, bool Strong)>();
 
-            if (TrySeekPenaltyOnPhysicalDisk(diskIndex.Value, out bool seekPenalty, out string seekDiag))
+            bool seekPenaltyValidated = TrySeekPenaltyOnPhysicalDisk(diskIndex.Value, out bool seekPenalty, out string seekDiag);
+            if (seekPenaltyValidated)
             {
                 result.Diagnostics.Add($"IOCTL SeekPenalty={seekPenalty} ({(seekPenalty ? "HDD hint (strong)" : "SSD hint (weak)")})");
                 votes.Add(("StorageDevice", !seekPenalty, seekPenalty)); // seekPenalty=true → HDD kuat; false → SSD lemah
@@ -436,7 +443,8 @@ namespace Bloxstrap.Integrations
                 result.Diagnostics.Add($"IOCTL SeekPenalty: FAILED — {seekDiag}");
             }
 
-            if (TryTrimOnPhysicalDisk(diskIndex.Value, out bool trimEnabled, out string trimDiag))
+            bool trimValidated = TryTrimOnPhysicalDisk(diskIndex.Value, out bool trimEnabled, out string trimDiag);
+            if (trimValidated)
             {
                 if (trimEnabled)
                 {
@@ -476,11 +484,40 @@ namespace Bloxstrap.Integrations
                         break;
                     default:
                         result.Diagnostics.Add($"WMI MediaType={mediaType} (unspecified — no information)");
+
+                        // ── FIX (audit "storage unknown") ────────────────────────────
+                        // Storage stack Windows tidak bisa membedakan SSD/HDD pada banyak
+                        // bus flash/removable: SD/eMMC dan banyak USB bridge SELALU
+                        // melapor MediaType=0 (Task Manager menampilkan "Unknown").
+                        // Untuk DISK SISTEM di bus tersebut, media-nya secara fisis flash
+                        // (bukan platter magnetik) → treat sebagai HDD (weak hint) supaya
+                        // tweet I/O HDD tetap diterapkan alih-alih jatuh ke Unknown.
+                        if (mediaType == 0 && busType is 7 or 12 or 13) // USB, SD, MMC
+                        {
+                            result.Diagnostics.Add($"BusType={result.BusType} + MediaType unspecified → flash/removable (HDD hint, weak)");
+                            votes.Add(("BusType.RemovableFlash", false, false));
+                        }
                         break;
                 }
 
                 if (busType == 17) // NVMe — selalu solid-state
-                    votes.Add(("BusType.NVMe", true, false));
+                {
+                    // NVMe adalah protokol khusus solid-state — tidak ada perangkat HDD
+                    // NVMe. Ini bukti KUAT (bukan sekadar hint) dan menutup kasus Unknown
+                    // pada storage stack yang gagal melapor MediaType.
+                    result.Diagnostics.Add("BusType=NVMe → SSD (strong — NVMe is always solid-state)");
+                    votes.Add(("BusType.NVMe", true, true));
+                }
+                else if (mediaType == 0 && (busType is 3 or 8 or 11) && trimValidated && trimEnabled && !seekPenaltyValidated)
+                {
+                    // ── FIX (audit "storage unknown" #2) ──────────────────────────
+                    // Kasus Intel RST / driver RAID: MediaType=0 DAN properti seek-penalty
+                    // tidak didukung driver → semua sumber IOCTL diam. Windows tidak
+                    // pernah menyalakan TRIM pada disk rotasional, jadi TRIM aktif di
+                    // bus SATA/RAID adalah indikator SSD yang dapat diandalkan.
+                    result.Diagnostics.Add($"BusType={result.BusType} + MediaType=0 + TrimEnabled + seek-penalty unsupported → SSD hint (weak)");
+                    votes.Add(("SataRaid.TrimCorrelation", true, false));
+                }
             }
             else
             {

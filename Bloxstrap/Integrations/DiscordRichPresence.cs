@@ -32,7 +32,22 @@ namespace Bloxstrap.Integrations
             _activityWatcher.OnRPCMessage += (_, message) => ProcessRPCMessage(message);
 
             _rpcClient.OnReady += (_, e) =>
+            {
                 App.Logger.WriteLine(LOG_IDENT, $"Received ready from user {e.User} ({e.User.ID})");
+
+                // FIX (audit Discord): kalau Roblox diluncurkan sebelum Discord terbuka,
+                // SetPresence awal sempat terkirim tanpa penerima → presence tidak pernah
+                // muncul sampai user pindah game. Sekarang presence di-set ulang begitu
+                // koneksi siap.
+                Task.Run(() =>
+                {
+                    try { UpdatePresence(); }
+                    catch (Exception ex)
+                    {
+                        App.Logger.WriteLine(LOG_IDENT, $"Re-apply presence on ready failed (non-fatal): {ex.Message}");
+                    }
+                });
+            };
 
             _rpcClient.OnPresenceUpdate += (_, e) =>
                 App.Logger.WriteLine(LOG_IDENT, "Presence updated");
@@ -470,7 +485,10 @@ namespace Bloxstrap.Integrations
         public void UpdatePresence()
         {
             const string LOG_IDENT = "DiscordRichPresence::UpdatePresence";
-            
+
+            if (_disposed)
+                return; // koneksi sudah ditutup — jangan sentuh client lagi
+
             if (_currentPresence is null)
             {
                 App.Logger.WriteLine(LOG_IDENT, $"Presence is empty, clearing");
@@ -484,11 +502,31 @@ namespace Bloxstrap.Integrations
                 _rpcClient.SetPresence(_currentPresence);
         }
 
+        private bool _disposed = false;
+
         public void Dispose()
         {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
             App.Logger.WriteLine("DiscordRichPresence::Dispose", "Cleaning up Discord RPC and Presence");
-            _rpcClient.ClearPresence();
-            _rpcClient.Dispose();
+
+            _fetchThumbnailsToken?.Cancel();
+            _fetchThumbnailsToken?.Dispose();
+            _fetchThumbnailsToken = null;
+
+            // FIX: bersihkan presence lalu tutup koneksi di background thread —
+            // caller (shutdown path) tidak diblokir, dan exception apa pun saat
+            // menutup koneksi tidak menjatuhkan proses.
+            var client = _rpcClient;
+            Task.Run(() =>
+            {
+                try { client.ClearPresence(); } catch { }
+                try { client.Dispose(); } catch { }
+            });
+
             GC.SuppressFinalize(this);
         }
     }

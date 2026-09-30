@@ -21,7 +21,11 @@ namespace Bloxstrap.UI.Elements.ContextMenu
 
         private readonly Watcher _watcher;
 
-        private ActivityWatcher? _activityWatcher => _watcher.ActivityWatcher;
+        // FIX (audit tray): game eksternal (diluncurkan di luar BoneFish) membawa
+        // ActivityWatcher-nya sendiri yang dibuat-bongkar dinamis. Menu tidak lagi
+        // memegang referensi tetap — ia selalu bertanya ke Watcher siapa game yang
+        // sedang aktif (internal maupun eksternal) melalui FindActiveGameWatcher().
+        private ActivityWatcher? _activityWatcher => _watcher.FindActiveGameWatcher();
 
         private ServerInformation? _serverInformationWindow;
 
@@ -32,6 +36,11 @@ namespace Bloxstrap.UI.Elements.ContextMenu
             InitializeComponent();
 
             _watcher = watcher;
+
+            // ActivityWatcher bisa belum ada saat menu dibuat (log belum ketemu) dan
+            // watcher eksternal bisa muncul belakangan — daftarkan handler untuk
+            // keduanya; handler mengecek ulang _activityWatcher saat event terpicu.
+            _watcher.ActiveGameWatcherChanged += ActivityWatcherChangedHandler;
 
             if (_activityWatcher is not null)
             {
@@ -47,13 +56,90 @@ namespace Bloxstrap.UI.Elements.ContextMenu
                 RichPresenceMenuItem.Visibility = Visibility.Visible;
 
             VersionTextBlock.Text = $"{App.ProjectName} v{App.Version}";
+
+            // FIX (audit tray #4): status sesi pada item Restore diperbarui setiap kali
+            // menu dibuka — user langsung tahu ada berapa aplikasi yang sedang ditahan.
+            ContextMenu.Opened += (_, _) => RefreshSessionStatus();
+            RefreshSessionStatus();
+        }
+
+        private void RefreshSessionStatus()
+        {
+            int suspended = App.GameSession.Store.ReadActive()?.SuspendedProcesses.Count ?? 0;
+            GameSessionRestoreMenuItem.Header = BuildRestoreMenuHeader(suspended);
+        }
+
+        private static object BuildRestoreMenuHeader(int suspendedCount)
+        {
+            return new TextBlock
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                Text = suspendedCount > 0
+                    ? $"{Strings.ContextMenu_RestoreGameSession} ({suspendedCount})"
+                    : Strings.ContextMenu_RestoreGameSession
+            };
+        }
+
+        // Saat watcher game aktif berganti (eksternal attach/detach, log internal
+        // terbuka), pindahkan subscription ke watcher yang baru.
+        private void ActivityWatcherChangedHandler(object? sender, Watcher.ActiveGameWatcherChangedEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (e.Watcher is null)
+                {
+                    // Game eksternal lepas: sembunyikan menu terkait sesi (jangan panggil
+                    // ActivityWatcher_OnGameLeave — guard sender-nya menuntut watcher).
+                    InviteDeeplinkMenuItem.Visibility = Visibility.Collapsed;
+                    ServerDetailsMenuItem.Visibility = Visibility.Collapsed;
+                    _serverInformationWindow?.Close();
+
+                    if (!HasInternalActivityWatcher())
+                        GameHistoryMenuItem.Visibility = Visibility.Collapsed;
+
+                    return;
+                }
+
+                e.Watcher.OnLogOpen += ActivityWatcher_OnLogOpen;
+                e.Watcher.OnGameJoin += ActivityWatcher_OnGameJoin;
+                e.Watcher.OnGameLeave += ActivityWatcher_OnGameLeave;
+
+                if (!App.Settings.Prop.UseDisableAppPatch)
+                    GameHistoryMenuItem.Visibility = Visibility.Visible;
+
+                // Game eksternal bisa sudah in-game saat menempel (attachExisting melewati
+                // histori log → event join tidak akan terpicu lagi) — tampilkan menunya
+                // langsung.
+                if (e.Watcher.InGame)
+                {
+                    if (e.Watcher.Data.ServerType == ServerType.Public)
+                        InviteDeeplinkMenuItem.Visibility = Visibility.Visible;
+
+                    ServerDetailsMenuItem.Visibility = Visibility.Visible;
+                }
+            });
+        }
+
+        private bool HasInternalActivityWatcher() => _watcher.ActivityWatcher is not null;
+
+        /// <summary>
+        /// Tutup window yang menampilkan data sesi game (server info & riwayat) —
+        /// dipanggil saat game eksternal berakhir agar UI tidak menampilkan data lama.
+        /// </summary>
+        public void CloseServerDependentWindows()
+        {
+            _serverInformationWindow?.Close();
+            _gameHistoryWindow?.Close();
         }
 
         public void ShowServerInformationWindow()
         {
             if (_serverInformationWindow is null)
             {
-                _serverInformationWindow = new(_watcher);
+                if (_activityWatcher is null)
+                    return;
+
+                _serverInformationWindow = new(_activityWatcher);
                 _serverInformationWindow.Closed += (_, _) => _serverInformationWindow = null;
             }
 
@@ -68,10 +154,15 @@ namespace Bloxstrap.UI.Elements.ContextMenu
 
         public void ActivityWatcher_OnGameJoin(object? sender, EventArgs e)
         {
-            if (_activityWatcher is null)
+            // Handler bisa terpicu watcher mana pun (internal/eksternal); abaikan jika
+            // pemicunya bukan watcher game yang sedang aktif.
+            if (sender is not ActivityWatcher watcher || watcher != _activityWatcher)
                 return;
 
             Dispatcher.Invoke(() => {
+                if (_activityWatcher is null)
+                    return;
+
                 if (_activityWatcher.Data.ServerType == ServerType.Public)
                     InviteDeeplinkMenuItem.Visibility = Visibility.Visible;
 
@@ -81,6 +172,9 @@ namespace Bloxstrap.UI.Elements.ContextMenu
 
         public void ActivityWatcher_OnGameLeave(object? sender, EventArgs e)
         {
+            if (sender is not ActivityWatcher watcher || watcher != _activityWatcher)
+                return;
+
             Dispatcher.Invoke(() => {
                 InviteDeeplinkMenuItem.Visibility = Visibility.Collapsed;
                 ServerDetailsMenuItem.Visibility = Visibility.Collapsed;
@@ -106,7 +200,13 @@ namespace Bloxstrap.UI.Elements.ContextMenu
 
         private void RichPresenceMenuItem_Click(object sender, RoutedEventArgs e) => _watcher.RichPresence?.SetVisibility(((MenuItem)sender).IsChecked);
 
-        private void InviteDeeplinkMenuItem_Click(object sender, RoutedEventArgs e) => Clipboard.SetDataObject(_activityWatcher?.Data.GetInviteDeeplink());
+        private void InviteDeeplinkMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_activityWatcher is null)
+                return;
+
+            Clipboard.SetDataObject(_activityWatcher.Data.GetInviteDeeplink());
+        }
 
         private void ServerDetailsMenuItem_Click(object sender, RoutedEventArgs e) => ShowServerInformationWindow();
 
@@ -150,7 +250,7 @@ namespace Bloxstrap.UI.Elements.ContextMenu
         private void JoinLastServerMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (_activityWatcher is null)
-                throw new ArgumentNullException(nameof(_activityWatcher));
+                return;
 
             if (_gameHistoryWindow is null)
             {

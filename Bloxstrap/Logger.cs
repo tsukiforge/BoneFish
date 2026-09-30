@@ -8,6 +8,12 @@
         private FileStream? _filestream;
         private Mutex? _mutex;
 
+        // FIX (audit RAM): History dulu tumbuh tanpa batas — di mode system tray (watcher
+        // hidup berhari-hari, polling 2 detik) ini menumpuk ratusan ribu baris di memori.
+        // Cukup simpan TAIL untuk fitur ExceptionDialog/AsDocument; file log di disk
+        // tetap lengkap.
+        private const int MaxHistoryEntries = 2000;
+
         public readonly List<string> History = new();
         public bool Initialized = false;
         public bool NoWriteMode = false;
@@ -141,6 +147,9 @@
             WriteToLog(outlog);
 
             History.Add(outlog);
+
+            if (History.Count > MaxHistoryEntries)
+                History.RemoveRange(0, History.Count - MaxHistoryEntries);
         }
 
         public void WriteLine(string identifier, string message) => WriteLine($"[{identifier}] {message}");

@@ -22,9 +22,12 @@ namespace Bloxstrap.UI.Elements.ContextMenu
     /// </summary>
     public partial class ServerInformation
     {
-        public ServerInformation(Watcher watcher)
+        // FIX (audit tray): terima ActivityWatcher langsung agar window bisa menampilkan
+        // data game eksternal (diluncurkan di luar BoneFish) — bukan hanya watcher
+        // internal _watcher.ActivityWatcher.
+        public ServerInformation(ActivityWatcher activityWatcher)
         {
-            DataContext = new ServerInformationViewModel(watcher);
+            DataContext = new ServerInformationViewModel(activityWatcher);
             InitializeComponent();
         }
     }

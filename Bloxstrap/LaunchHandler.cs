@@ -199,10 +199,19 @@ namespace Bloxstrap
             {
                 App.Logger.WriteLine(LOG_IDENT, "Found an already existing menu window");
 
-                var process = Utilities.GetProcessesSafe().Where(x => x.MainWindowTitle == Strings.Menu_Title).FirstOrDefault();
+                var processes = Utilities.GetProcessesSafe();
+                var process = processes.Where(x => x.MainWindowTitle == Strings.Menu_Title).FirstOrDefault();
 
                 if (process is not null)
                     PInvoke.SetForegroundWindow((HWND)process.MainWindowHandle);
+
+                // FIX (audit RAM): dispose semua objek Process yang tidak terpakai.
+                foreach (var item in processes)
+                {
+                    if (!ReferenceEquals(item, process))
+                        item.Dispose();
+                }
+                process?.Dispose();
 
                 App.Terminate();
             }

@@ -130,33 +130,158 @@
             }
 
             OnLogOpen?.Invoke(this, EventArgs.Empty);
-            
-            var logFileStream = logFileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
-            if (_attachExisting)
+            // FIX (kualitas): Start() dipanggil sebagai async void — exception yang lolos
+            // dari sini (log dihapus saat Roblox self-update, IOException, akses ditolak)
+            // akan langsung menjatuhkan proses. Tangkap, catat ke log, dan biarkan watcher
+            // lain tetap hidup.
+            FileStream? logFileStream = null;
+            StreamReader? streamReader = null;
+
+            try
             {
-                // Skip ke END of log file — hanya proses entry BARU yang datang.
-                // Tanpa ini, log yang sudah berisi histori join/leave lama akan
-                // di-replay sebagai event baru → race condition BeginSession/EndSession.
-                long initialPosition = logFileStream.Length;
-                logFileStream.Seek(initialPosition, SeekOrigin.Begin);
-                App.Logger.WriteLine(LOG_IDENT, $"Opened {LogLocation} (attachExisting — skipped {initialPosition:N0} bytes of history)");
-            }
-            else
-            {
-                App.Logger.WriteLine(LOG_IDENT, $"Opened {LogLocation} (full replay from beginning)");
-            }
+                logFileStream = logFileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
-            using var streamReader = new StreamReader(logFileStream);
-
-            while (!IsDisposed)
-            {
-                string? log = await streamReader.ReadLineAsync();
-
-                if (log is null)
-                    await Task.Delay(1000);
+                if (_attachExisting)
+                {
+                    // Skip ke END of log file — hanya proses entry BARU yang datang.
+                    // Tanpa ini, log yang sudah berisi histori join/leave lama akan
+                    // di-replay sebagai event baru → race condition BeginSession/EndSession.
+                    long initialPosition = logFileStream.Length;
+                    logFileStream.Seek(initialPosition, SeekOrigin.Begin);
+                    App.Logger.WriteLine(LOG_IDENT, $"Opened {LogLocation} (attachExisting — skipped {initialPosition:N0} bytes of history)");
+                }
                 else
-                    ReadLogEntry(log);
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Opened {LogLocation} (full replay from beginning)");
+                }
+
+                streamReader = new StreamReader(logFileStream);
+
+                while (!IsDisposed)
+                {
+                    string? log = await streamReader.ReadLineAsync();
+
+                    if (log is null)
+                        await Task.Delay(1000);
+                    else
+                        ReadLogEntry(log);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException or UnauthorizedAccessException && !IsDisposed)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Log reader stopped unexpectedly (non-fatal): {ex.Message}");
+                App.Logger.WriteException(LOG_IDENT, ex);
+            }
+            finally
+            {
+                streamReader?.Dispose();
+                logFileStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// FIX (audit tray #2): mode attachExisting melewati seluruh histori log, sehingga
+        /// game eksternal yang SUDAH berada di dalam game saat watcher menempel tidak
+        /// pernah terdeteksi (InGame tetap false → menu Server Details tidak muncul dan
+        /// suspend tidak jalan sampai user join ulang). Method ini merekonstruksi state
+        /// terkini dari isi log yang sudah ada TANPA memicu event apa pun — caller yang
+        /// memutuskan tindakan lanjutan (suspend / notifikasi).
+        /// </summary>
+        public void ScanExistingGameState()
+        {
+            const string LOG_IDENT = "ActivityWatcher::ScanExistingGameState";
+
+            try
+            {
+                using var stream = new FileStream(LogLocation, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream);
+
+                bool inGame = false;
+                bool pendingJoin = false;
+                var scanned = new ActivityData();
+                string? joinMachineAddress = null;
+
+                while (reader.ReadLine() is { } line)
+                {
+                    int idx = line.IndexOf(' ');
+                    if (idx == -1)
+                        continue;
+
+                    string msg = line[(idx + 1)..];
+
+                    if (!inGame)
+                    {
+                        if (msg.StartsWith(GameJoiningPrivateServerEntry))
+                        {
+                            scanned.ServerType = ServerType.Private;
+
+                            Match match = Regex.Match(msg, GameJoiningPrivateServerPattern);
+                            if (match.Groups.Count == 2)
+                                scanned.AccessCode = match.Groups[1].Value;
+                        }
+                        else if (msg.StartsWith(GameJoiningReservedServerEntry))
+                        {
+                            scanned.ServerType = ServerType.Reserved;
+                        }
+                        else if (msg.StartsWith(GameJoiningEntry))
+                        {
+                            Match match = Regex.Match(msg, GameJoiningEntryPattern);
+                            if (match.Groups.Count == 4)
+                            {
+                                scanned.JobId = match.Groups[1].Value;
+                                scanned.PlaceId = long.Parse(match.Groups[2].Value);
+                                joinMachineAddress = match.Groups[3].Value;
+                                scanned.MachineAddress = joinMachineAddress;
+                                pendingJoin = true;
+                            }
+                        }
+                        else if (pendingJoin && msg.StartsWith(GameJoinedEntry))
+                        {
+                            Match match = Regex.Match(msg, GameJoinedEntryPattern);
+                            if (match.Groups.Count == 2 && match.Groups[1].Value == joinMachineAddress)
+                            {
+                                inGame = true;
+                                pendingJoin = false;
+                                scanned.TimeJoined = DateTime.Now;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (msg.StartsWith(GameDisconnectedEntry))
+                        {
+                            inGame = false;
+                            scanned = new ActivityData();
+                        }
+                        else if (msg.Contains(GameServerUptimeEntry))
+                        {
+                            Match match = Regex.Match(msg, GameServerUptimePattern);
+                            if (match.Groups.Count == 2
+                                && DateTime.TryParseExact(
+                                    match.Groups[1].Value,
+                                    "yyyyMMdd'T'HHmmss'Z'",
+                                    CultureInfo.InvariantCulture,
+                                    DateTimeStyles.AdjustToUniversal,
+                                    out DateTime start))
+                            {
+                                scanned.StartTime = start;
+                            }
+                        }
+                    }
+                }
+
+                if (!inGame || scanned.PlaceId == 0)
+                    return;
+
+                Data = scanned;
+                InGame = true;
+
+                App.Logger.WriteLine(LOG_IDENT, $"Game yang sudah berjalan terdeteksi dari log ({Data})");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Scan state log gagal (non-fatal): {ex.Message}");
             }
         }
 

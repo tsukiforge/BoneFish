@@ -22,9 +22,9 @@ namespace Bloxstrap.UI.ViewModels.ContextMenu
 
         public ICommand CopyInstanceIdCommand => new RelayCommand(CopyInstanceId);
 
-        public ServerInformationViewModel(Watcher watcher)
+        public ServerInformationViewModel(ActivityWatcher activityWatcher)
         {
-            _activityWatcher = watcher.ActivityWatcher!;
+            _activityWatcher = activityWatcher;
 
             if (ServerLocationVisibility == Visibility.Visible)
                 QueryServerLocation();

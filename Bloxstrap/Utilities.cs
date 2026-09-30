@@ -109,10 +109,19 @@ namespace Bloxstrap
 
         public static bool IsRobloxRunning()
         {
+            // FIX (audit RAM): dispose tiap objek Process — semuanya memegang handle OS.
             Process[] processes = GetProcessesSafe();
             string processName = Path.GetFileNameWithoutExtension(App.RobloxPlayerAppName);
 
-            return processes.Any(x => x.ProcessName == processName);
+            try
+            {
+                return processes.Any(x => x.ProcessName == processName);
+            }
+            finally
+            {
+                foreach (var process in processes)
+                    process.Dispose();
+            }
         }
 
         public static string GetRobloxVersionStr(IAppData data)
@@ -187,6 +196,7 @@ namespace Bloxstrap
 
             foreach (var process in GetProcessesSafe())
             {
+                // FIX (audit RAM): pastikan objek Process selalu di-dispose.
                 try
                 {
                     if (process.Id == currentPid)
@@ -209,6 +219,10 @@ namespace Bloxstrap
                 catch (Exception)
                 {
                     // Access denied or process exited, ignore
+                }
+                finally
+                {
+                    process.Dispose();
                 }
             }
         }

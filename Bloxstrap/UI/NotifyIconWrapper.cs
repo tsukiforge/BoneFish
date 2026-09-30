@@ -45,6 +45,64 @@ namespace Bloxstrap.UI
 
             _menuContainer = new(_watcher);
             _menuContainer.Show();
+
+            // FIX (audit tray): game eksternal mengganti ActivityWatcher aktif secara
+            // dinamis — tampilkan notifikasi lokasi server dari watcher mana pun yang
+            // sedang aktif (jika ShowServerDetails aktif).
+            _watcher.ActiveGameWatcherChanged += ActiveGameWatcherChangedHandler;
+        }
+
+        private void ActiveGameWatcherChangedHandler(object? sender, Watcher.ActiveGameWatcherChangedEventArgs e)
+        {
+            if (e.Watcher is null)
+                return; // teardown ditangani TeardownExternalActivityWatcher
+
+            if (e.IsExternal && App.Settings.Prop.ShowServerDetails)
+            {
+                // Guard dobel-subscribe: watcher eksternal juga disubscribe via
+                // SetupExternalActivityWatcher dari Watcher.AttachExternalGame.
+                e.Watcher.ShowNotif -= ShowNotif;
+                e.Watcher.ShowNotif += ShowNotif;
+
+                // Game eksternal bisa sudah in-game saat watcher menempel — tampilkan
+                // notifikasi lokasi server segera, tidak menunggu event join berikutnya.
+                if (e.Watcher.InGame)
+                    ShowNotif(e.Watcher, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>
+        /// Saat game eksternal menempel, jalankan ShowNotif untuk watcher-nya agar
+        /// detail server game eksternal ikut muncul (dipanggil dari Watcher).
+        /// </summary>
+        public void SetupExternalActivityWatcher(ActivityWatcher watcher)
+        {
+            if (App.Settings.Prop.ShowServerDetails)
+            {
+                watcher.ShowNotif -= ShowNotif;
+                watcher.ShowNotif += ShowNotif;
+
+                if (watcher.InGame)
+                    ShowNotif(watcher, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>
+        /// Lepaskan wiring game eksternal dan tutup window server yang masih menampilkan
+        /// datanya. endSession=true → game eksternal benar-benar berakhir (proses mati /
+        /// user exit); false → watcher eksternal dilepas sesaat (takeover watcher baru).
+        /// </summary>
+        public void TeardownExternalActivityWatcher(bool endSession)
+        {
+            // Hapus langganan ShowNotif milik watcher eksternal (handler terpasang di
+            // SetupExternalActivityWatcher / ActiveGameWatcherChangedHandler).
+            if (_watcher.ExternalActivityWatcher is { } external)
+            {
+                try { external.ShowNotif -= ShowNotif; } catch { }
+            }
+
+            if (endSession)
+                _menuContainer.Dispatcher.Invoke(_menuContainer.CloseServerDependentWindows);
         }
 
         #region Context menu
@@ -118,10 +176,20 @@ namespace Bloxstrap.UI
                 _notifyIcon.Icon = _updateIcon;
                 _notifyIcon.Text = $"BoneFish - Update {latest.Release.TagName} tersedia";
 
+                // Tampilkan balloon notification supaya update terlihat meski ikon tray
+                // masuk overflow area (tersembunyi) di taskbar Windows 11.
+                // Klik balloon atau klik kiri ikon tetap membuka halaman rilis.
+                ShowAlert(
+                    "BoneFish - Update tersedia",
+                    $"Pembaruan tersedia: {latest.Release.TagName}. Klik untuk membuka halaman rilis.",
+                    15,
+                    (_, _) => Utilities.ShellExecute(_updateReleaseUrl!)
+                );
+
                 App.Logger.WriteLine(
                     LOG_IDENT,
                     $"Update tersedia: {latest.Release.TagName} dari {latest.Repository}. " +
-                    "Indicator tray aktif; popup otomatis tidak ditampilkan.");
+                    "Balloon notification ditampilkan; klik membuka halaman rilis.");
             }
             catch (Exception ex)
             {
@@ -152,10 +220,17 @@ namespace Bloxstrap.UI
         #region Activity handlers
         public async void ShowNotif(object? sender, EventArgs e)
         {
-            if (_activityWatcher is null)
+            // FIX (audit tray #1): pakai watcher yang memicu event — kalau sender-nya
+            // watcher game eksternal, data yang ditampilkan harus milik game eksternal,
+            // bukan watcher internal. Fallback ke watcher aktif dari Watcher.
+            ActivityWatcher? watcher = sender as ActivityWatcher
+                ?? _watcher.FindActiveGameWatcher()
+                ?? _activityWatcher;
+
+            if (watcher is null)
                 return;
 
-            string title = _activityWatcher.Data.ServerType switch
+            string title = watcher.Data.ServerType switch
             {
                 ServerType.Public => Strings.ContextMenu_ServerInformation_Notification_Title_Public,
                 ServerType.Private => Strings.ContextMenu_ServerInformation_Notification_Title_Private,
@@ -163,10 +238,10 @@ namespace Bloxstrap.UI
                 _ => ""
             };
 
-            string? serverLocation = await _activityWatcher.Data.QueryServerLocation();
+            string? serverLocation = await watcher.Data.QueryServerLocation();
             string? serverUptime;
 
-            DateTime? serverTime = _activityWatcher.Data.StartTime;
+            DateTime? serverTime = watcher.Data.StartTime;
             if (serverTime is not null)
             {
                 TimeSpan _serverUptime = DateTime.UtcNow - serverTime.Value;
@@ -215,6 +290,7 @@ namespace Bloxstrap.UI
             _notifyIcon.BalloonTipClicked += clickHandler;
 
             _notifyIcon.ShowBalloonTip(duration);
+            UpdateTrayStatus();
 
             Task.Run(async () =>
             {
@@ -229,6 +305,25 @@ namespace Bloxstrap.UI
                 else
                     App.Logger.WriteLine(LOG_IDENT, "Click handler has been overridden by another alert");
             });
+        }
+
+        /// <summary>
+        /// FIX (audit tray #4): tooltip tray mencerminkan status Game Session aktif
+        /// (jumlah aplikasi yang ditahan), bukan sekadar nama aplikasi.
+        /// </summary>
+        private void UpdateTrayStatus()
+        {
+            try
+            {
+                int suspended = App.GameSession.Store.ReadActive()?.SuspendedProcesses.Count ?? 0;
+                _notifyIcon.Text = suspended > 0
+                    ? $"BoneFish — Game Session aktif ({suspended} aplikasi ditahan)"
+                    : "BoneFish";
+            }
+            catch
+            {
+                // tooltip bersifat kosmetik — jangan biarkan gagal memengaruhi alert
+            }
         }
 
         public void Dispose()

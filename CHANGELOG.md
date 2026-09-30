@@ -1,5 +1,40 @@
 # BoneFish Changelog
 
+## v7.7.1 — Discord RPC Update, Tray & Suspend Fixes, RAM Leak Fixes, Storage Detection v5
+
+Release date: 2026-09-30
+
+### 🔄 Discord Rich Presence (update & perbaikan)
+- **Paket `DiscordRichPresence` naik `1.2.1.24 → 1.6.1.70`** — fix ikon presence yang kadang hilang, avatar decorations, UriScheme validation.
+- **Presence kini di-set ulang saat koneksi Discord siap (`OnReady`)** — memperbaiki kasus RPC tidak muncul saat Roblox diluncurkan sebelum Discord terbuka (root cause presence "kadang ada kadang tidak").
+- Dispose lebih bersih: presence dibersihkan & koneksi ditutup di background thread; guard `_disposed` mencegah pemakaian client setelah shutdown; `CancellationTokenSource` thumbnail ikut di-dispose.
+
+### ✨ Tray & notifikasi
+- **Notifikasi update via balloon tray** — pembaruan tersedia kini muncul sebagai notifikasi (klik membuka halaman rilis), tidak hanya dot merah di ikon tray yang sering tersembunyi di overflow Windows 11.
+- **Game eksternal (diluncurkan di luar BoneFish) kini terwiring penuh ke tray**: menu **Server Details**, **Copy Invite Deeplink**, **Game History**, notifikasi lokasi server — semuanya aktif, dan window yang menampilkan data lama otomatis ditutup saat game berakhir.
+- **Game eksternal yang sudah berjalan lama langsung dikenali** — state in-game direkonstruksi dari isi log (`ScanExistingGameState`), jadi menu Server Details muncul dan suspend jalan tanpa menunggu user join ulang.
+- **Status Game Session terlihat langsung**: item *Restore Game Session* menampilkan jumlah aplikasi yang ditahan (diperbarui tiap menu dibuka), dan tooltip tray menampilkan "Game Session aktif (N aplikasi ditahan)".
+- Fix dobel notifikasi lokasi server saat game eksternal menempel (subscription ganda), dan notifikasi kini selalu menampilkan data game yang benar (watcher pemicu, bukan selalu watcher internal). Log Tracer & Game History tidak lagi hilang saat user berada di server browser.
+
+### 🛠 Suspend "kadang jalan kadang engga" (root cause)
+- Sesi yang gagal restore sebagian menyisakan record **Pending** yang memblokir sesi berikutnya ("previous Game Session still has processes pending restore") → suspend dibatalkan seluruhnya. Record Pending kini selalu diselesaikan (saat watcher start, saat exit, saat dispose) dan **tidak lagi diadopsi sebagai sesi baru**.
+- Klik **Exit** di tray kini selalu me-restore aplikasi yang masih ter-suspend — tidak ada lagi proses beku setelah BoneFish ditutup.
+
+### 🧠 RAM berkurang & tidak lagi merambat naik
+- `Logger.History` di-cap **2000 entri terakhir** (dulu semua baris log menumpuk di memori selamanya; di mode tray berhari-hari bisa ratusan MB).
+- Kebocoran handle `Process` di loop panas ditambal (polling 1–2 detik tanpa dispose): `WaitForRobloxTick`, monitor game eksternal, `FindUntrackedRobloxProcess`, `IsRobloxRunning`, `KillProcessesRunningFrom`, pemilih window `LaunchHandler`. Loop per-detik kini pakai lookup per-PID yang di-dispose.
+
+### 💾 Deteksi storage v5 (mengurangi "Unknown")
+- **USB/SD/eMMC dengan MediaType=0** → dikenali sebagai flash → hint HDD (fix Task Manager "Unknown" di laptop eMMC/USB bridge).
+- **NVMe kini bukti SSD kuat** — protokol NVMe tidak ada yang HDD; menutup kasus Unknown saat storage stack gagal melapor.
+- **SATA/RAID (Intel RST) + MediaType=0 + TRIM aktif + seek-penalty tidak didukung** → hint SSD (Windows tidak menyalakan TRIM di disk rotasional).
+- Detector version naik ke v5 → cache lama otomatis di-detect ulang. Engine tetap 3-state (tidak menebak untuk disk SATA biasa).
+
+### 🧹 Kualitas kode
+- `ServerInformation` menerima `ActivityWatcher` langsung; menu tray mengikuti watcher game aktif via `Watcher.ActiveGameWatcherChanged` / `FindActiveGameWatcher()`.
+- Exception-guard pada pembaca log Roblox (`ActivityWatcher.Start`) — log hilang/terkunci tidak lagi menjatuhkan proses (dipanggil sebagai async void).
+
+---
 ## v7.7.0 — Storage Detection Rewrite (3-State), Game Session Verification & Crosshair Roblox-Center Lock
 
 Release date: 2026-09-18
