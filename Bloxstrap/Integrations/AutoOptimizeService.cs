@@ -976,18 +976,30 @@ namespace Bloxstrap.Integrations
                     // saat boot (ClientAppSettings.json hanya berisi 4 flag dasar). Karena
                     // toggle ForceExtremeMode ADALAH ekspresi intent user untuk extreme,
                     // combo tidak boleh diam-diam di-skip oleh guard preset manual.
-                    bool hddCombo = App.Settings.Prop.ForceExtremeMode
+                    // ★ FIX (audit FPS Fase 3 — OPTION A): bypass guard preset manual
+                    // TIDAK LAGI bergantung pada jenis storage.
+                    //   - hddIoTweaks (tuning I/O HDD, mis. jobs=2) TETAP butuh storage
+                    //     TERKONFIRMASI HDD — Unknown TIDAK mengaktifkan tuning HDD.
+                    //   - bypassLowEndGuard mengikuti INTENT eksplisit user
+                    //     (ForceExtremeMode), supaya toggle tidak jadi silent no-op
+                    //     hanya karena storage Unknown.
+                    bool forceExtremeIntent = App.Settings.Prop.ForceExtremeMode;
+
+                    bool hddCombo = forceExtremeIntent
                         && GetStorageType() == StorageMediaType.Hdd
                         && (trueTier == SystemTier.LowEnd || trueTier == SystemTier.MidRange);
 
                     if (hddCombo)
                         App.Logger.WriteLine(LOG_IDENT,
                             $"ForceExtreme + HDD combo: tier asli {trueTier}, tier efektif ExtremePerformance — applying Extreme + HDD tweaks (bypass manual-preset guard)");
+                    else if (forceExtremeIntent)
+                        App.Logger.WriteLine(LOG_IDENT,
+                            $"ForceExtremeMode intent aktif (storage={GetStorageType()}, tier asli {trueTier}) — bypass guard preset manual, tuning HDD TIDAK diterapkan");
 
                     ApplyAggressiveOptimizations(
                         tier: tier,
                         hddIoTweaks: hddCombo,
-                        bypassLowEndGuard: hddCombo);
+                        bypassLowEndGuard: forceExtremeIntent);
                     return true;
                 }
 
@@ -1075,6 +1087,200 @@ namespace Bloxstrap.Integrations
             }
         }
 
+        /// <summary>
+        /// Diagnostik performa READ-ONLY (audit FPS Fase 6).
+        /// Dipanggil ON-DEMAND dari UI (tombol) — BUKAN background polling, tidak
+        /// menulis FastFlag / tidak Save apa pun, dan tidak mengubah konfigurasi user.
+        /// Hanya membaca: Settings, FastFlags, GlobalBasicSettings_13.xml, refresh rate,
+        /// dan satu query WMI GPU.
+        /// CATATAN: bila deteksi storage belum pernah jalan di sesi ini, pemanggilan
+        /// GetStorageType() bisa menulis cache hardware milik BoneFish sendiri
+        /// (HardwareCache.json) — cache internal, bukan konfigurasi Roblox/user.
+        /// </summary>
+        public static string GetPerformanceDiagnostics()
+        {
+            var sb = new StringBuilder();
+
+            void Line(string label, string value) => sb.AppendLine($"{label,-26}: {value}");
+
+            string Flag(string name)
+            {
+                try { return App.FastFlags.GetValue(name) ?? "(not set)"; }
+                catch { return "(error)"; }
+            }
+
+            try
+            {
+                sb.AppendLine("=== BoneFish Performance Diagnostics (READ-ONLY) ===");
+                sb.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                sb.AppendLine();
+
+                sb.AppendLine("-- Build --");
+                Line("BoneFish version", App.Version);
+                sb.AppendLine();
+
+                sb.AppendLine("-- Mode / preset --");
+                Line("Selected preset", App.Settings.Prop.SelectedPerformancePreset ?? "None");
+                Line("ForceExtremeMode", App.Settings.Prop.ForceExtremeMode ? "ON" : "OFF");
+                Line("OptimizeForLowEnd", App.Settings.Prop.OptimizeForLowEnd ? "ON" : "OFF");
+                Line("UserHasManualPreset", UserHasManualPreset() ? "yes" : "no");
+                Line("Guard bypass (intent)", App.Settings.Prop.ForceExtremeMode
+                    ? "armed — guard preset manual di-bypass"
+                    : "not armed");
+                sb.AppendLine();
+
+                sb.AppendLine("-- Hardware --");
+                Line("CPU cores", Environment.ProcessorCount.ToString());
+                Line("RAM tier (asli)", DetectSystemTier(ignoreForceExtreme: true).ToString());
+                Line("Tier efektif", DetectSystemTier().ToString());
+                Line("GPU", GetGpuName());
+                Line("Refresh rate", $"{FpsUnlockerService.GetPrimaryDisplayRefreshRate()} Hz");
+                sb.AppendLine();
+
+                sb.AppendLine("-- Storage (3-state, tidak menebak) --");
+                StorageDetectionResult storage = GetStorageDiagnostics();
+                Line("Storage type", GetStorageType().ToString());
+                Line("Confidence", String.IsNullOrWhiteSpace(storage.Confidence) ? "(none)" : storage.Confidence);
+                Line("Physical disk", String.IsNullOrWhiteSpace(storage.PhysicalDiskIndex) ? "?" : storage.PhysicalDiskIndex);
+                Line("Disk model", String.IsNullOrWhiteSpace(storage.DiskModel) ? "(unknown)" : storage.DiskModel);
+                Line("Bus type", String.IsNullOrWhiteSpace(storage.BusType) ? "(unknown)" : storage.BusType);
+                Line("Reason", String.IsNullOrWhiteSpace(storage.Reason) ? "(none)" : storage.Reason);
+                Line("HDD tuning applied", GetStorageType() == StorageMediaType.Hdd ? "yes (confirmed HDD)" : "no");
+                sb.AppendLine();
+
+                sb.AppendLine("-- LOD aktif --");
+                Line("LOD base / L12", $"{Flag("DFIntCSGLevelOfDetailSwitchingDistance")} / {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL12")}");
+                Line("LOD L23 / L34", $"{Flag("DFIntCSGLevelOfDetailSwitchingDistanceL23")} / {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL34")}");
+                Line("LOD rule (storage ini)", $"{GetExtremeLodValues().L23} / {GetExtremeLodValues().L34}");
+                Line("TextureCompositorJobs", Flag("DFIntTextureCompositorActiveJobs"));
+                sb.AppendLine();
+
+                sb.AppendLine("-- Toggle performa --");
+                Line("Fast Loading", App.Settings.Prop.EnableFastLoadingFlags ? "ON" : "OFF");
+                Line("TDR Mitigation", App.Settings.Prop.EnableTdrMitigation ? "ON" : "OFF");
+                Line("FPS Unlocker", App.Settings.Prop.FpsUnlockerEnabled ? "ON" : "OFF");
+                sb.AppendLine();
+
+                sb.AppendLine("-- FPS cap --");
+                if (!App.GlobalSettings.Loaded)
+                    App.GlobalSettings.Load();
+
+                bool gbsAvailable = App.GlobalSettings.Document is not null;
+                string? effectiveCap = gbsAvailable ? App.GlobalSettings.GetPreset("Rendering.FramerateCap") : null;
+                string? graphicsLevel = gbsAvailable ? App.GlobalSettings.GetPreset("Rendering.SavedQualityLevel") : null;
+
+                Line("Effective FramerateCap", String.IsNullOrWhiteSpace(effectiveCap) ? "(tidak ada / default Roblox)" : effectiveCap);
+                Line("Cap dikelola BoneFish", App.Settings.Prop.FpsUnlockerCapManaged ? "yes" : "no");
+                Line("Cap user sebelumnya", App.Settings.Prop.FpsUnlockerPreviousCap ?? "(none)");
+                Line("Roblox graphics level", String.IsNullOrWhiteSpace(graphicsLevel) ? "(unavailable)" : graphicsLevel);
+                sb.AppendLine();
+
+                sb.AppendLine("-- Runtime --");
+                Line("Roblox priority", GetRobloxPriority());
+            }
+            catch (Exception ex)
+            {
+                sb.AppendLine($"(diagnostics incomplete: {ex.Message})");
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// GPU name untuk diagnostik — satu query WMI, hanya saat dipanggil.
+        /// </summary>
+        private static string GetGpuName()
+        {
+            try
+            {
+                var names = new List<string>();
+                using var searcher = new ManagementObjectSearcher(
+                    "root\\cimv2",
+                    "SELECT Name FROM Win32_VideoController");
+
+                foreach (ManagementObject controller in searcher.Get().Cast<ManagementObject>())
+                {
+                    try
+                    {
+                        string? name = controller["Name"]?.ToString();
+                        if (!String.IsNullOrWhiteSpace(name))
+                            names.Add(name);
+                    }
+                    finally
+                    {
+                        controller.Dispose();
+                    }
+                }
+
+                return names.Count == 0 ? "(unknown)" : String.Join(" + ", names);
+            }
+            catch
+            {
+                return "(unavailable)";
+            }
+        }
+
+        /// <summary>
+        /// Priority proses Roblox yang sedang berjalan (diagnostik, read-only).
+        /// Process di-dispose agar tidak menambah handle leak.
+        /// </summary>
+        private static string GetRobloxPriority()
+        {
+            try
+            {
+                Process[] robloxProcesses = Process.GetProcessesByName("RobloxPlayerBeta");
+
+                if (robloxProcesses.Length == 0)
+                    return "(Roblox tidak berjalan)";
+
+                string result;
+                try
+                {
+                    result = $"PID {robloxProcesses[0].Id} -> {robloxProcesses[0].PriorityClass}";
+                }
+                catch
+                {
+                    result = $"PID {robloxProcesses[0].Id} -> (priority tidak bisa dibaca)";
+                }
+
+                foreach (Process process in robloxProcesses)
+                {
+                    try { process.Dispose(); } catch { }
+                }
+
+                return result;
+            }
+            catch
+            {
+                return "(unavailable)";
+            }
+        }
+
+        /// <summary>
+        /// Nilai LOD L23/L34 untuk jalur Extreme — SATU sumber kebenaran (boot path &
+        /// preset UI memakai ini supaya tidak drift).
+        ///
+        /// Nilai 500/750 membuat geometri high-poly bertahan lebih jauh (switch LOD
+        /// semakin jauh) = beban render lebih berat. Karena itu nilai ini HANYA dipakai
+        /// bila storage DIKONFIRMASI SSD.
+        ///
+        /// ★ FIX (audit FPS Fase 2): sebelumnya pengecualian hanya untuk confirmed HDD,
+        /// sehingga storage Unknown — yang sengaja TIDAK menebak — justru mendapat jalur
+        /// TERBERAT 500/750. Sekarang:
+        ///     Confirmed HDD -> 250/250 (HDD-aware)
+        ///     Unknown       -> 250/250 (safe low-end LOD)
+        ///     Confirmed SSD -> 500/750 (normal/general LOD)
+        /// Status storage tetap dilaporkan apa adanya (Unknown tetap Unknown); detektor
+        /// TIDAK diubah dan tuning HDD lain (thread limit / I/O / FPS cap / preset HDD /
+        /// telemetry) TIDAK ikut diaktifkan.
+        /// </summary>
+        public static (string L23, string L34) GetExtremeLodValues()
+        {
+            return GetStorageType() == StorageMediaType.Ssd
+                ? ("500", "750")
+                : ("250", "250");
+        }
+
         public static void ApplyAggressiveOptimizations(
             SystemTier? tier = null,
             bool hddIoTweaks = false,
@@ -1128,15 +1334,17 @@ tier ??= DetectSystemTier();
 
                 App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
                 App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-                // ── Konflik kombinasi Extreme + HDD pada LOD ────────────────────────
+                // ── LOD Extreme: HANYA untuk storage yang DIKONFIRMASI SSD ──────────
                 // Nilai Extreme 500/750 membuat geometri TETAP high-poly lebih jauh
                 // (switch LOD semakin jauh) = beban render lebih berat = FPS turun di
                 // perangkat 'potato' (bukti: LANGKAH 0 user — Extreme ON 36-40 FPS vs
-                // OFF 50-60). Saat dieksekusi bersamaan dengan HDD/LowEnd, LOD dipertahankan
-                // 250 (paling agresif) karena preset HDD sendiri TIDAK pernah jalan
-                // (CheckAndApply return duluan di cabang OptimizeForLowEnd).
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    isExtreme && !isHDD ? "500" : "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    isExtreme && !isHDD ? "750" : "250");
+                // OFF 50-60).
+                // ★ FIX (audit FPS Fase 2): pengecualian lama hanya confirmed HDD,
+                // sehingga storage Unknown justru mendapat jalur terberat. Sekarang
+                // 500/750 hanya untuk confirmed SSD — HDD & Unknown → 250.
+                (string lodL23, string lodL34) = GetExtremeLodValues();
+                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    lodL23);
+                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    lodL34);
                 App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
                 App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
 

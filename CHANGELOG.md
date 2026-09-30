@@ -1,5 +1,67 @@
 # BoneFish Changelog
 
+## v7.7.2 — FPS Audit Fase 2: LOD Aman saat Storage Unknown, ForceExtreme Tanpa Silent No-Op, FramerateCap Hardening
+
+Release date: 2026-09-30
+
+Latar: hasil *forensic audit* FPS (lihat `docs/FPS-FORENSIC-AUDIT.txt`) menemukan tiga
+kandidat regresi yang bisa diperbaiki TANPA mengembalikan FastFlag deprecated.
+**Belum ada benchmark terkontrol** — perubahan ini belum diklaim menaikkan FPS.
+
+### 🎯 Fix 1 — LOD tidak lagi memakai jalur terberat saat storage Unknown
+
+Dulu pengecualian LOD 500/750 hanya untuk `confirmed HDD` (`isHDD`), sehingga
+storage **Unknown** — yang sengaja TIDAK menebak — justru mendapat jalur TERBERAT.
+Sekarang satu sumber kebenaran `AutoOptimizeService.GetExtremeLodValues()`:
+
+| Storage | LOD L23 / L34 |
+|---------|---------------|
+| Confirmed SSD | 500 / 750 (general LOD) |
+| Confirmed HDD | 250 / 250 (HDD-aware) |
+| **Unknown** | **250 / 250 (safe low-end LOD)** |
+
+- Dipakai oleh **dua** jalur sekaligus (boot auto-optimize **dan** preset UI
+  Extreme/Anti Not-Responding) supaya tidak drift.
+- Detektor storage **tidak diubah**. Status tetap **Unknown** — tidak pernah
+dipaksa jadi HDD, dan `System Info` tetap menampilkan Unknown.
+- **HANYA LOD** yang berubah: thread limit, tuning I/O HDD, FPS cap, preset HDD,
+dan telemetry **tidak** ikut diaktifkan saat storage Unknown.
+
+### 🔔 Fix 2 — ForceExtremeMode tidak lagi bisa jadi silent no-op
+
+`bypassLowEndGuard` dulu bergantung pada `GetStorageType() == Hdd`, sehingga dengan
+storage Unknown guard preset manual bisa membatalkan intent user **tanpa pesan apa pun**.
+Sekarang dipisah tegas:
+
+- `bypassLowEndGuard` mengikuti **intent eksplisit** `ForceExtremeMode`.
+- `hddIoTweaks` (tuning I/O HDD) **tetap** butuh storage terkonfirmasi HDD.
+- Ada log eksplisit saat bypass aktif tanpa tuning HDD.
+
+### 🔒 Fix 3 — FramerateCap hardening (FPS Unlocker)
+
+- Nilai `FramerateCap` user dicatat (`FpsUnlockerPreviousCap`) **sebelum** ditimpa;
+  ditandai `FpsUnlockerCapManaged`.
+- Toggle OFF → nilai user **dipulihkan**, bukan dihapus.
+- Elemen hanya dihapus bila nilainya memang nilai tulisan BoneFish (240) —
+  konfigurasi yang bukan milik BoneFish **tidak** disentuh.
+- Logika refresh-rate **tidak** diubah.
+
+### 🔍 Fitur — Diagnostik Performa (READ-ONLY)
+
+Tombol **🔍 Diagnostik** di kartu System Info (halaman FastFlag New). On-demand,
+**bukan** background polling, dan tidak menulis apa pun: versi BoneFish, preset,
+ForceExtremeMode/OptimizeForLowEnd, tier asli vs efektif, CPU cores, GPU, refresh
+rate, storage type + confidence + model + bus, LOD aktif, Fast Loading/TDR/FPS
+Unlocker, `FramerateCap` efektif + nilai sebelumnya + graphics level Roblox, dan
+priority proses Roblox.
+
+### ✅ Yang TIDAK diubah
+
+Game Session + proteksi (Windows/security/audio/Realtek/mic/Voice Chat), verifikasi
+suspend, storage detection 3-state, Discord RPC, crosshair, RAM leak fix, Fast
+Loading (nilainya dipertahankan sampai ada benchmark). Tidak ada FastFlag
+deprecated/unsafe yang dikembalikan.
+
 ## v7.7.1 — Discord RPC Update, Tray & Suspend Fixes, RAM Leak Fixes, Storage Detection v5
 
 Release date: 2026-09-30

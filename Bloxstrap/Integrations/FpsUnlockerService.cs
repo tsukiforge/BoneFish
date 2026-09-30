@@ -80,6 +80,30 @@ namespace Bloxstrap.Integrations
                 return new FpsUnlockerResult(true, true, cap);
             }
 
+            // ★ HARDENING (audit FPS Fase 5): jangan hancurkan cap manual user tanpa jejak.
+            // Catat nilai FramerateCap yang ADA SEBELUM BoneFish menimpanya — hanya sekali,
+            // dan hanya bila nilainya bukan nilai yang kita tulis sendiri (240).
+            // Nilai ini dipakai Revert() untuk memulihkan konfigurasi user saat toggle OFF.
+            if (!App.Settings.Prop.FpsUnlockerCapManaged)
+            {
+                string? existing = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
+
+                if (!String.IsNullOrWhiteSpace(existing) && existing != cap.ToString())
+                {
+                    App.Settings.Prop.FpsUnlockerPreviousCap = existing;
+                    App.Logger.WriteLine(LOG_IDENT, $"FramerateCap user terdeteksi ({existing}) — disimpan untuk dipulihkan saat toggle OFF");
+                }
+                else
+                {
+                    // Tidak ada nilai user (atau sudah 240 tanpa kita) → jangan klaim
+                    // sebagai milik user supaya Revert() tidak "memulihkan" nilai asing.
+                    App.Settings.Prop.FpsUnlockerPreviousCap = null;
+                }
+
+                App.Settings.Prop.FpsUnlockerCapManaged = true;
+                try { App.Settings.Save(); } catch { }
+            }
+
             App.GlobalSettings.SetPreset("Rendering.FramerateCap", cap);
 
             bool applied = App.GlobalSettings.GetPreset("Rendering.FramerateCap") == cap.ToString();
@@ -93,16 +117,52 @@ namespace Bloxstrap.Integrations
 
         public static void Revert()
         {
-            App.Logger.WriteLine(LOG_IDENT, "Mematikan FPS Unlocker — menghapus FramerateCap (kembali ke default Roblox)");
-
             if (!App.GlobalSettings.Loaded)
                 App.GlobalSettings.Load();
 
             if (App.GlobalSettings.Document is null)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Mematikan FPS Unlocker — GlobalBasicSettings_13.xml tidak ada, tidak ada yang diubah");
+                ResetManagedState();
                 return;
+            }
 
-            App.GlobalSettings.RemovePreset("Rendering.FramerateCap");
-            App.GlobalSettings.Save();
+            string? previous = App.Settings.Prop.FpsUnlockerPreviousCap;
+            bool managed = App.Settings.Prop.FpsUnlockerCapManaged;
+
+            if (managed && !String.IsNullOrWhiteSpace(previous))
+            {
+                // Pulihkan cap milik user — JANGAN hapus konfigurasi yang bukan milik BoneFish.
+                App.GlobalSettings.SetPreset("Rendering.FramerateCap", previous);
+                App.GlobalSettings.Save();
+                App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap dipulihkan ke nilai sebelumnya ({previous})");
+            }
+            else
+            {
+                // Tidak ada nilai user yang tercatat. Hapus HANYA bila nilainya memang
+                // nilai tulisan BoneFish (240); selain itu jangan sentuh.
+                string? current = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
+
+                if (current == MaximumRobloxFramerateCap.ToString())
+                {
+                    App.GlobalSettings.RemovePreset("Rendering.FramerateCap");
+                    App.GlobalSettings.Save();
+                    App.Logger.WriteLine(LOG_IDENT, "Mematikan FPS Unlocker — FramerateCap tulisan BoneFish dihapus (kembali ke default Roblox)");
+                }
+                else
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap ({current ?? "<tidak ada>"}) bukan nilai tulisan BoneFish, tidak diubah");
+                }
+            }
+
+            ResetManagedState();
+        }
+
+        private static void ResetManagedState()
+        {
+            App.Settings.Prop.FpsUnlockerCapManaged = false;
+            App.Settings.Prop.FpsUnlockerPreviousCap = null;
+            try { App.Settings.Save(); } catch { }
         }
     }
 }

@@ -76,10 +76,17 @@
                                     <TextBlock FontSize="10" FontWeight="Bold" Foreground="#64FFDA" Text="READ-ONLY" />
                                 </Border>
                             </StackPanel>
-                            <ui:Button Grid.Column="2" VerticalAlignment="Center" Padding="8,3" FontSize="11"
-                                       Appearance="Secondary" Icon="ArrowClockwise24"
-                                       Content="{x:Static resources:Strings.FastFlags_SystemInfo_RedetectHardware}"
-                                       Command="{Binding RefreshHardwareDetectionCommand}" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Diagnostik READ-ONLY (audit FPS Fase 6) — on-demand, bukan polling -->
+                                <ui:Button Padding="8,3" FontSize="11"
+                                           Appearance="Secondary"
+                                           Content="🔍 Diagnostik"
+                                           Command="{Binding ShowPerformanceDiagnosticsCommand}" />
+                                <ui:Button Margin="6,0,0,0" Padding="8,3" FontSize="11"
+                                           Appearance="Secondary" Icon="ArrowClockwise24"
+                                           Content="{x:Static resources:Strings.FastFlags_SystemInfo_RedetectHardware}"
+                                           Command="{Binding RefreshHardwareDetectionCommand}" />
+                            </StackPanel>
                         </Grid>
                         <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    Text="{Binding SystemInfoText}" TextWrapping="Wrap" />

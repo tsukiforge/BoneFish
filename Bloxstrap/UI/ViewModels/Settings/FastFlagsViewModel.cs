@@ -333,6 +333,24 @@ namespace Bloxstrap.UI.ViewModels.Settings
             Notify(Strings.FastFlags_SystemInfo_HardwareRedetected);
         }
 
+        // ── Diagnostik Performa (audit FPS Fase 6) ─────────────────────────────────
+        // READ-ONLY & ON-DEMAND: hanya menyusun teks dari service lalu menampilkannya.
+        // Tidak ada background polling, tidak ada penulisan FastFlag/Settings.
+        public ICommand ShowPerformanceDiagnosticsCommand => new RelayCommand(ShowPerformanceDiagnostics);
+
+        private void ShowPerformanceDiagnostics()
+        {
+            try
+            {
+                string report = Integrations.AutoOptimizeService.GetPerformanceDiagnostics();
+                Frontend.ShowMessageBox(report, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Notify($"Diagnostik gagal: {ex.Message}");
+            }
+        }
+
         private static string LoadSystemInfo()
         {
             try
@@ -915,10 +933,15 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // Nilai 250 (bukan 0!) agar objek dekat tetap high-poly, tidak tembus/pop-in.
             // Nilai 0 menyebabkan semua objek jadi low-poly dari jarak 0 — itulah yang
             // bikin aset "tembus" saat didekati. 250 = switch ke low-poly mulai ~250 studs.
+            // ★ FIX (audit FPS Fase 2): L23/L34 TIDAK lagi hardcode 500/750. Nilai berat
+            // itu hanya untuk storage DIKONFIRMASI SSD; HDD & Unknown → 250/250 (safe
+            // low-end LOD). Satu sumber kebenaran: GetExtremeLodValues() — dipakai juga
+            // oleh boot path agar preset UI dan auto-optimize tidak drift.
             App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
             App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    "500");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "750");
+            (string extremeLodL23, string extremeLodL34) = Integrations.AutoOptimizeService.GetExtremeLodValues();
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    extremeLodL23);
+            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    extremeLodL34);
             App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
             App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
 

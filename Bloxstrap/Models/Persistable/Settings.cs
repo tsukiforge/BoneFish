@@ -141,6 +141,15 @@ namespace Bloxstrap.Models.Persistable
         // Terpisah dari preset potato/ExtremeMode yang bertujuan menurunkan beban.
         public bool FpsUnlockerEnabled { get; set; } = false;
 
+        // ★ Hardening FPS Unlocker (audit FPS Fase 5): BoneFish menandai nilai
+        // FramerateCap yang IA tulis, supaya cap manual user tidak dihancurkan
+        // diam-diam dan bisa dipulihkan saat toggle dimatikan.
+        //   FpsUnlockerCapManaged  : true bila FramerateCap saat ini ditulis BoneFish
+        //   FpsUnlockerPreviousCap : nilai FramerateCap milik user SEBELUM ditimpa
+        //                            (null bila tidak ada / nilainya sudah sama)
+        public bool FpsUnlockerCapManaged { get; set; } = false;
+        public string? FpsUnlockerPreviousCap { get; set; } = null;
+
         // TDR Mitigation — toggle independen untuk KURANGI freeze/layar putih
         // (Intel iGPU Driver TDR, Event ID 4101) dengan menurunkan beban GPU.
         // Bukan menghilangkan total — akar masalah di driver, bukan software.
