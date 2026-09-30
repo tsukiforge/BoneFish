@@ -35,7 +35,48 @@
                     </Grid>
                 </MenuItem.Header>
             </MenuItem>
+            <!-- ── Phase 8: STATUS HEADER ────────────────────────────────────────────
+                 Empat baris status (Roblox / Performance / Storage / Security),
+                 dirender sebagai teks non-interaktif. Di-refresh HANYA saat menu
+                 dibuka (ContextMenu.Opened) — tanpa timer, tanpa polling.
+                 Security state TIDAK PERNAH disembunyikan (Phase 11). -->
+            <MenuItem IsEnabled="False" x:Name="StatusHeaderMenuItem">
+                <MenuItem.Header>
+                    <StackPanel Margin="6,2,0,2">
+                        <TextBlock x:Name="StatusRobloxText" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Roblox: …" />
+                        <TextBlock x:Name="StatusPerformanceText" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Performance: …" />
+                        <TextBlock x:Name="StatusStorageText" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Storage: …" />
+                        <TextBlock x:Name="StatusSecurityText" FontSize="11" FontWeight="Bold" Text="Security: …" />
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
             <Separator />
+            <!-- Launch Roblox — hanya tampil saat Roblox TIDAK berjalan -->
+            <MenuItem x:Name="LaunchRobloxMenuItem" Visibility="Collapsed" Click="LaunchRobloxMenuItem_Click">
+                <MenuItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon Grid.Column="0" Symbol="Play24"/>
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0" Text="Launch Roblox" />
+                    </Grid>
+                </MenuItem.Header>
+            </MenuItem>
+            <!-- Diagnostics — membuka Diagnostic Center (Phase 6) -->
+            <MenuItem x:Name="DiagnosticsMenuItem" Click="DiagnosticsMenuItem_Click">
+                <MenuItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon Grid.Column="0" Symbol="Pulse24"/>
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0" Text="Diagnostics" />
+                    </Grid>
+                </MenuItem.Header>
+            </MenuItem>
             <MenuItem x:Name="RichPresenceMenuItem" Header="{x:Static resources:Strings.Common_DiscordRichPresence}" IsCheckable="True" IsChecked="True" Visibility="Collapsed" Click="RichPresenceMenuItem_Click" />
             <MenuItem x:Name="InviteDeeplinkMenuItem" Visibility="Collapsed" Click="InviteDeeplinkMenuItem_Click">
                 <MenuItem.Header>
@@ -73,18 +114,6 @@
                     </Grid>
                 </MenuItem.Header>
             </MenuItem>
-            <MenuItem Click="CloseRobloxMenuItem_Click">
-                <MenuItem.Header>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="24" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <ui:SymbolIcon Grid.Column="0" Symbol="WindowHeaderHorizontalOff20"/>
-                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0" Text="{x:Static resources:Strings.ContextMenu_CloseRoblox}" />
-                    </Grid>
-                </MenuItem.Header>
-            </MenuItem>
             <MenuItem x:Name="GameSessionRestoreMenuItem" Click="GameSessionRestoreMenuItem_Click">
                 <MenuItem.Header>
                     <Grid>
@@ -94,6 +123,19 @@
                         </Grid.ColumnDefinitions>
                         <ui:SymbolIcon Grid.Column="0" Symbol="ArrowSync24"/>
                         <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0" Text="{x:Static resources:Strings.ContextMenu_RestoreGameSession}" />
+                    </Grid>
+                </MenuItem.Header>
+            </MenuItem>
+            <!-- Close Roblox — hanya relevan (dan hanya tampil) saat Roblox berjalan -->
+            <MenuItem x:Name="CloseRobloxMenuItem" Click="CloseRobloxMenuItem_Click" Visibility="Collapsed">
+                <MenuItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon Grid.Column="0" Symbol="WindowHeaderHorizontalOff20"/>
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0" Text="{x:Static resources:Strings.ContextMenu_CloseRoblox}" />
                     </Grid>
                 </MenuItem.Header>
             </MenuItem>

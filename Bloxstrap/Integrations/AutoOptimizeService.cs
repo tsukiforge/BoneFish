@@ -120,6 +120,21 @@ namespace Bloxstrap.Integrations
             return 0;
         }
 
+        // ── HardwareProfileEngine accessors (Phase 3) ────────────────────────────
+        // Ringan: GlobalMemoryStatusEx = syscall kernel (±µs), bukan WMI. Dipublikasi
+        // agar mesin profil hardware bisa membaca total/available RAM tanpa duplikasi
+        // struct/P-Invoke, tanpa menambah sumber kebenaran baru.
+        public static ulong GetTotalPhysicalMemoryPublic() => GetTotalPhysicalMemory();
+
+        public static ulong GetAvailablePhysicalMemoryPublic()
+        {
+            var mem = new MEMORYSTATUSEX();
+            mem.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+            if (GlobalMemoryStatusEx(ref mem))
+                return mem.ullAvailPhys;
+            return 0;
+        }
+
         // ── HDD/SSD Detection (v7.7.0) ──────────────────────────────────────────────
         // Detail lengkap di komentar blok DetectStorageType() (multi-source 3-state,
         // physical-disk mapping, validasi descriptor, konsistensi).
@@ -1639,11 +1654,27 @@ tier ??= DetectSystemTier();
 
         private static void TrimBackgroundProcesses(int robloxPid)
         {
+            // ★ HARDENING (Phase 2 — Windows Security investigation): skip list dulu
+            // hanya proses inti Windows. Proses keamanan (SecurityHealthService dll.)
+            // SECARA TEORI bisa kerja-set-nya di-trim walau bukan protected process —
+            // sekarang seluruh set proses keamanan Windows + audio vendor di-skip
+            // eksplisit. DEFENSE IN DEPTH saja: Game Session sendiri TIDAK PERNAH
+            // menyentuh proses-proses ini (IsAlwaysProtected), trim ini jalur berbeda.
+            // MsMpEng sendiri adalah protected process (OpenProcess gagal) tapi tetap
+            // didaftarkan agar kebijakannya eksplisit dan tahan terhadap perubahan OS.
             var skipNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "System", "Idle", "smss", "csrss", "lsass", "services",
                 "winlogon", "wininit", "svchost", "dwm", "explorer",
-                "audiodg", "fontdrvhost", "spoolsv", "SearchIndexer"
+                "audiodg", "fontdrvhost", "spoolsv", "SearchIndexer",
+                // Windows security stack (Phase 2 rule: selalu dilindungi)
+                "MsMpEng", "MsSense", "NisSrv", "MsMpEngCP",
+                "SecurityHealthService", "SecurityHealthSystray", "wscsvc",
+                "WinDefend", "SenseIR", "SenseCncAgent", "SenseSampleUploader",
+                // Realtek/audio vendor companion (konsisten dengan ProcessClassifier)
+                "RAVBg64", "RAVCpl64", "RAVCpl", "RtkAudioService64",
+                "RtkAudUService64", "RtkAudUService", "RtkAudioService",
+                "RtkNGUI64", "RtkNGUI", "RtkBtManServ", "BthAudioAgent", "WsaAudioService"
             };
 
             string selfName = Process.GetCurrentProcess().ProcessName;

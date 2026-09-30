@@ -1,5 +1,80 @@
 # BoneFish Changelog
 
+## v7.7.3 — Adaptive System UI: Hardware Profile, Dashboard Adaptif, Diagnostic Center, Tray Status-Oriented
+
+Release date: 2026-09-30
+
+Overhaul UI/UX per spesifikasi 15 fase: hardware-aware adaptive UI, audit Windows
+Security, tray menu status-oriented, Diagnostic Center menggantikan MessageBox
+diagnostik. **Belum ada runtime testing di Windows** — build Linux Release sukses,
+0 error 0 warning.
+
+### 🧠 Hardware Profile Engine (baru — `Integrations/HardwareProfile.cs`)
+
+- Snapshot hardware read-only: CPU (nama, logical/physical cores), RAM (total,
+tersedia, tekanan), GPU (nama, dedicated/integrated), storage 3-state (delegasi
+penuh ke AutoOptimizeService — Unknown TIDAK pernah ditebak), display, OS build.
+- Tier UltraLow/Low/Balanced/Mid/High dari **kombinasi** karakteristik — bukan RAM
+saja. HDD membatasi tier maksimum ke Balanced. Alasan tier disertakan.
+- Query mahal (WMI GPU/CPU, registry OS) **maksimal sekali per proses**, hanya saat
+diminta. Tekanan RAM di-refresh per panggilan via 2 syscall (bukan WMI).
+
+### 📊 System Dashboard adaptif (halaman Fast Flags)
+
+- Kartu System Info lama diganti dashboard 5 seksi: DEVICE / PROFILE / HEALTH /
+OPTIMIZATION / SECURITY — data tier, mode performa, storage confidence, tekanan
+memori, status Roblox, Game Session, preset, FramerateCap, Fast Loading, TDR,
+memori, dan state security.
+- Render sekali per load/refresh manual — tanpa timer, tanpa polling, tanpa WMI
+berulang. Tombol "Deteksi Ulang Hardware" kini juga meng-invalidate cache profile.
+
+### 🔍 Diagnostic Center (baru — `UI/Elements/Settings/Pages/DiagnosticCenterWindow.*`)
+
+- Menggantikan MessageBox diagnostik. Window 560×620 merender 10 seksi sekali di
+saat dibuka: Hardware, Storage, Roblox, Performance, Security, Game Session,
+FastFlags, FPS, Warnings, Recommendations. Setiap entri berglyph ✓ / ⚠ / ✕ / ?.
+- Tanpa chart, tanpa WebView, tanpa animasi, tanpa polling — setelah render awal,
+window tidak memakan CPU. Tombol Copy Report + Close.
+- Seksi Security menjalankan `Detector.Refresh()` on-demand dan **tidak pernah**
+menyembunyikan peringatan: teks eksplisit "BoneFish will NOT automatically
+suppress or bypass this warning". Cek flag deprecated disertakan.
+
+### 🖥️ Tray menu status-oriented (`UI/Elements/ContextMenu/MenuContainer.*`)
+
+- Header status 4 baris non-interaktif: Roblox (PID / Not running), Performance
+(preset + catatan ForceExtremeMode), Storage (SSD/HDD/Unknown 3-state), Security
+(Protected/Degraded/Unknown — selalu tampil, bold, tidak pernah disembunyikan).
+- Item kontekstual: **Launch Roblox** hanya tampil saat Roblox tidak berjalan
+(via `LaunchHandler.LaunchRoblox(LaunchMode.Player)` — jalur patch/channel utama,
+bukan protokol mentah); **Close Roblox** hanya saat berjalan.
+- Item **Diagnostics** membuka Diagnostic Center yang sama dengan halaman settings.
+- Refresh HANYA saat menu dibuka (`ContextMenu.Opened`, pola yang sudah ada) —
+tanpa timer, tanpa rebuild menu, hanya toggle Visibility + set teks.
+
+### 🛡️ Hardening security & memori (`Integrations/AutoOptimizeService.cs`)
+
+- Skip list TrimBackgroundProcesses diperluas dengan stack security Windows
+(MsMpEng, MsSense, NisSrv, MsMpEngCP, SecurityHealthService, SecurityHealthSystray,
+wscsvc, WinDefend, Sense* — L5 CIM nullable-safe) + proses audio/Realtek —
+aditif, tidak mengubah logika trim yang ada.
+- Accessor memori publik dibuka untuk HardwareProfileEngine (tanpa duplikasi WMI).
+
+### ✅ Yang TIDAK diubah
+
+Proteksi Game Session (ProcessClassifier.IsAlwaysProtected berjalan sebelum rule
+user; kegagalan deteksi = fail-closed kecuali opt-in eksplisit, default OFF),
+deteksi storage 3-state + cache/versioning, FramerateCap handling FPS Unlocker,
+proteksi Realtek/audio/Voice Chat, crosshair centering, external watcher, cleanup
+FastFlag deprecated, TDR mitigation. Tidak ada polling baru, tidak ada WebView,
+tidak ada flag deprecated dikembalikan, tidak ada yang menonaktifkan Windows
+Security.
+
+### ⚠️ Keterbatasan
+
+Runtime testing (tray, GUI, Game Session, matriks HDD/SSD/Unknown, tier) belum
+dilakukan — lingkungan build Linux. MSB4011 pada submodule wpfui adalah warning
+pre-existing CentralPackageVersions di luar cakupan (tidak muncul di build ini).
+
 ## v7.7.2 — FPS Audit Fase 2: LOD Aman saat Storage Unknown, ForceExtreme Tanpa Silent No-Op, FramerateCap Hardening
 
 Release date: 2026-09-30

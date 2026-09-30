@@ -67,6 +67,40 @@ namespace Bloxstrap.UI.Elements.ContextMenu
         {
             int suspended = App.GameSession.Store.ReadActive()?.SuspendedProcesses.Count ?? 0;
             GameSessionRestoreMenuItem.Header = BuildRestoreMenuHeader(suspended);
+
+            // ── Phase 8: status-oriented tray ─────────────────────────────────────
+            // Empat baris status di header menu. Di-refresh HANYA saat menu dibuka
+            // (ContextMenu.Opened) — tanpa timer, tanpa polling. Semua builder
+            // guarded try/catch: kegagalan deteksi tidak boleh mematikan menu.
+
+            // Roblox: PID proses (1 syscall GetProcessesByName, di-dispose langsung)
+            bool robloxRunning;
+            int robloxPid = 0;
+            try
+            {
+                Process[] procs = Process.GetProcessesByName("RobloxPlayerBeta");
+                robloxRunning = procs.Length > 0;
+                if (robloxRunning)
+                    robloxPid = procs[0].Id;
+                foreach (Process p in procs) { try { p.Dispose(); } catch { } }
+            }
+            catch
+            {
+                robloxRunning = false;
+            }
+
+            StatusRobloxText.Text = robloxRunning
+                ? $"Roblox: Running (PID {robloxPid})"
+                : "Roblox: Not running";
+
+            // Item kontekstual: Launch hanya saat Roblox tidak berjalan, Close hanya
+            // saat berjalan — tidak ada rebuild menu, hanya toggle Visibility.
+            LaunchRobloxMenuItem.Visibility = robloxRunning ? Visibility.Collapsed : Visibility.Visible;
+            CloseRobloxMenuItem.Visibility = robloxRunning ? Visibility.Visible : Visibility.Collapsed;
+
+            StatusPerformanceText.Text = BuildPerformanceStatusText();
+            StatusStorageText.Text = BuildStorageStatusText();
+            StatusSecurityText.Text = BuildSecurityStatusText();
         }
 
         private static object BuildRestoreMenuHeader(int suspendedCount)
@@ -78,6 +112,85 @@ namespace Bloxstrap.UI.Elements.ContextMenu
                     ? $"{Strings.ContextMenu_RestoreGameSession} ({suspendedCount})"
                     : Strings.ContextMenu_RestoreGameSession
             };
+        }
+
+        // ── Phase 8: builder teks status (semua murah, on-demand, fail-soft) ──────
+
+        /// <summary>
+        /// Preset aktif + catatan ForceExtremeMode. Tidak ada query hardware di sini —
+        /// hanya baca Settings (in-memory).
+        /// </summary>
+        private static string BuildPerformanceStatusText()
+        {
+            try
+            {
+                string preset = App.Settings.Prop.SelectedPerformancePreset ?? "None";
+                return App.Settings.Prop.ForceExtremeMode
+                    ? $"Performance: {preset} (Extreme forced)"
+                    : $"Performance: {preset}";
+            }
+            catch
+            {
+                return "Performance: Unknown";
+            }
+        }
+
+        /// <summary>
+        /// Storage 3-state dari HardwareProfile (cache-once; GetProfile() tanpa refresh
+        /// statis = murah setelah panggilan pertama, tanpa WMI berulang).
+        /// Unknown TIDAK PERNAH ditebak menjadi SSD/HDD (fase 15 kriteria 4-5).
+        /// </summary>
+        private static string BuildStorageStatusText()
+        {
+            try
+            {
+                var profile = HardwareProfileEngine.GetProfile();
+                return $"Storage: {HardwareProfile.StorageDisplay(profile.StorageType)}";
+            }
+            catch
+            {
+                return "Storage: Unknown";
+            }
+        }
+
+        /// <summary>
+        /// State deteksi Windows Security (Phase 11): TIDAK PERNAH disembunyikan.
+        /// Degraded/Unknown tetap tampil apa adanya — fail-safe, bukan fail-silent.
+        /// </summary>
+        private static string BuildSecurityStatusText()
+        {
+            try
+            {
+                var detector = App.GameSession.Detector;
+                string state = detector.State switch
+                {
+                    GameSession.Models.SecurityDetectionState.Ok => "Protected",
+                    GameSession.Models.SecurityDetectionState.Degraded => "Degraded",
+                    _ => "Unknown"
+                };
+                return $"Security: {state}";
+            }
+            catch
+            {
+                // Kegagalan baca detektor → jangan pernah tampil "Protected".
+                return "Security: Unknown";
+            }
+        }
+
+        /// <summary>Cek proses Roblox murah (satu panggilan, langsung di-dispose).</summary>
+        private static bool ProcessIsRunning(string name)
+        {
+            try
+            {
+                Process[] procs = Process.GetProcessesByName(name);
+                bool running = procs.Length > 0;
+                foreach (Process p in procs) { try { p.Dispose(); } catch { } }
+                return running;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         // Saat watcher game aktif berganti (eksternal attach/detach, log internal
@@ -245,6 +358,21 @@ namespace Bloxstrap.UI.Elements.ContextMenu
             try { App.State.Save(); } catch { }
 
             Process.Start(Paths.Process, "-settings");
+        }
+
+        private void LaunchRobloxMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            // Jalur peluncuran yang sama dengan menu utama (LaunchHandler.LaunchRoblox)
+            // — BUKAN protokol roblox-player mentah, agar semua patch/channel handling
+            // BoneFish tetap berlaku.
+            LaunchHandler.LaunchRoblox(LaunchMode.Player);
+        }
+
+        private void DiagnosticsMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            // Phase 6/8: tray membuka Diagnostic Center yang sama dengan halaman
+            // Fast Flags — sumber data tunggal, tanpa MessageBox diagnostik lagi.
+            new DiagnosticCenterWindow().ShowDialog();
         }
 
         private void JoinLastServerMenuItem_Click(object sender, RoutedEventArgs e)

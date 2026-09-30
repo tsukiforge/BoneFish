@@ -59,6 +59,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private void OnRequestPageReload()
         {
             RefreshSystemInfo();
+            RefreshSystemDashboard();   // Phase 5: dashboard adaptif ikut segar tiap reload
             _requestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
@@ -329,21 +330,24 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private void RefreshHardwareDetection()
         {
             Integrations.AutoOptimizeService.ForceRefreshHardwareCache();
+            Integrations.HardwareProfileEngine.Invalidate();   // Phase 3: profil tier ikut dihitung ulang
             RefreshSystemInfo();
+            OnPropertyChanged(nameof(SystemDashboard));        // dashboard ikut refresh
             Notify(Strings.FastFlags_SystemInfo_HardwareRedetected);
         }
 
         // ── Diagnostik Performa (audit FPS Fase 6) ─────────────────────────────────
         // READ-ONLY & ON-DEMAND: hanya menyusun teks dari service lalu menampilkannya.
         // Tidak ada background polling, tidak ada penulisan FastFlag/Settings.
+        // ★ Phase 6: MessageBox teks diganti Diagnostic Center terstruktur
+        // (10 seksi, status ✓/⚠/✕/?, tanpa chart/WebView/polling — HDD+4GB safe).
         public ICommand ShowPerformanceDiagnosticsCommand => new RelayCommand(ShowPerformanceDiagnostics);
 
         private void ShowPerformanceDiagnostics()
         {
             try
             {
-                string report = Integrations.AutoOptimizeService.GetPerformanceDiagnostics();
-                Frontend.ShowMessageBox(report, MessageBoxImage.Information);
+                new UI.Elements.Settings.Pages.DiagnosticCenterWindow().ShowDialog();
             }
             catch (Exception ex)
             {
@@ -360,6 +364,144 @@ namespace Bloxstrap.UI.ViewModels.Settings
             catch
             {
                 return "System info unavailable";
+            }
+        }
+
+        // ── Adaptive Hardware Dashboard (Phase 5) ─────────────────────────────────
+        // Menggantikan satu baris SystemInfoText dengan dashboard ringkas:
+        // DEVICE / PROFILE / HEALTH / OPTIMIZATION / SECURITY — semua dari mesin profil
+        // hardware (cache per-proses, on-demand) + state Game Session yang sudah ada.
+        // Tidak ada polling: dashboard di-refresh HANYA saat page reload / tombol refresh.
+        public AdaptiveSystemDashboard SystemDashboard { get; private set; } = AdaptiveSystemDashboard.Load();
+
+        public void RefreshSystemDashboard()
+        {
+            SystemDashboard = AdaptiveSystemDashboard.Load();
+            OnPropertyChanged(nameof(SystemDashboard));
+        }
+
+        /// <summary>
+        /// Model tampilan ringkas untuk dashboard hardware adaptif (Phase 5).
+        /// Semua property berupa string siap-tampil — tanpa timer, tanpa live update.
+        /// </summary>
+        public sealed class AdaptiveSystemDashboard
+        {
+            public string Cpu { get; init; } = "";
+            public string Ram { get; init; } = "";
+            public string Gpu { get; init; } = "";
+            public string Storage { get; init; } = "";
+            public string Display { get; init; } = "";
+            public string Os { get; init; } = "";
+            public string Tier { get; init; } = "";
+            public string TierReason { get; init; } = "";
+            public string PerformanceMode { get; init; } = "";
+            public string StorageConfidence { get; init; } = "";
+            public string MemoryHealth { get; init; } = "";
+            public string RobloxStatus { get; init; } = "";
+            public string GameSessionStatus { get; init; } = "";
+            public string Preset { get; init; } = "";
+            public string FpsCap { get; init; } = "";
+            public string FastLoading { get; init; } = "";
+            public string TdrMitigation { get; init; } = "";
+            public string MemoryMode { get; init; } = "";
+            public string SecurityState { get; init; } = "";
+            public string SecurityDetail { get; init; } = "";
+            public string ProtectedProcessCount { get; init; } = "";
+
+            public static AdaptiveSystemDashboard Load()
+            {
+                Integrations.HardwareProfile profile;
+                try { profile = Integrations.HardwareProfileEngine.GetProfile(); }
+                catch { profile = new Integrations.HardwareProfile { CpuName = "(unavailable)" }; }
+
+                string preset = App.Settings.Prop.SelectedPerformancePreset ?? "None";
+                string performanceMode = App.Settings.Prop.ForceExtremeMode
+                    ? $"Extreme (forced — tier asli {profile.TierDisplay})"
+                    : App.Settings.Prop.OptimizeForLowEnd ? $"Low-end optimize ({profile.TierDisplay})" : "Default";
+
+                string robloxStatus;
+                try
+                {
+                    Process[] procs = Process.GetProcessesByName("RobloxPlayerBeta");
+                    robloxStatus = procs.Length > 0 ? $"Running (PID {procs[0].Id})" : "Not running";
+                    foreach (Process p in procs) { try { p.Dispose(); } catch { } }
+                }
+                catch { robloxStatus = "Unknown"; }
+
+                string gameSessionStatus;
+                try
+                {
+                    var record = App.GameSession.Store.ReadActive();
+                    gameSessionStatus = record is null
+                        ? "Idle"
+                        : $"Aktif — {record.SuspendedProcesses.Count} app ditahan";
+                }
+                catch { gameSessionStatus = "Unknown"; }
+
+                string securityState;
+                string securityDetail;
+                string protectedCount;
+                try
+                {
+                    var detector = App.GameSession.Detector;
+                    securityState = detector.State switch
+                    {
+                        GameSession.Models.SecurityDetectionState.Ok => "Protected",
+                        GameSession.Models.SecurityDetectionState.Degraded => "Degraded",
+                        _ => "Unknown"
+                    };
+                    securityDetail = detector.Message;
+                    protectedCount = $"{detector.KnownSecurityProcessNames.Count} nama + {detector.KnownSecurityExecutablePaths.Count} path";
+                }
+                catch
+                {
+                    securityState = "Unknown";
+                    securityDetail = "Security detection belum berjalan";
+                    protectedCount = "guard tetap aktif";
+                }
+
+                string fpsCap = "(default Roblox)";
+                try
+                {
+                    if (!App.GlobalSettings.Loaded)
+                        App.GlobalSettings.Load();
+                    string? cap = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
+                    if (!String.IsNullOrWhiteSpace(cap))
+                        fpsCap = $"{cap} FPS";
+                }
+                catch { }
+
+                string memoryMode =
+                    profile.StorageType == "SSD" && profile.TotalRamMb < 5120
+                        ? "Trim aktif (SSD + RAM <5GB)"
+                        : $"Trim tidak aktif (storage {Integrations.HardwareProfile.StorageDisplay(profile.StorageType)})";
+
+                return new AdaptiveSystemDashboard
+                {
+                    Cpu = $"{profile.CpuName} — {profile.LogicalProcessors} logical{(profile.PhysicalCores > 0 ? $" / {profile.PhysicalCores} physical" : "")}",
+                    Ram = $"{profile.TotalRamMb / 1024} GB total, {profile.AvailableRamMb / 1024} GB tersedia",
+                    Gpu = $"{profile.GpuName} ({(profile.GpuDetectionComplete ? (profile.HasDedicatedGpu ? "dedicated" : "integrated") : "tipe tidak pasti")})",
+                    Storage = $"{Integrations.HardwareProfile.StorageDisplay(profile.StorageType)} — {profile.SystemDrive} ({profile.StorageConfidence})",
+                    Display = String.IsNullOrEmpty(profile.DisplayResolution)
+                        ? "(tidak terbaca)"
+                        : $"{profile.DisplayResolution} @ {profile.DisplayRefreshRate} Hz",
+                    Os = profile.OsVersion,
+                    Tier = $"{profile.TierDisplay}",
+                    TierReason = profile.TierReason,
+                    PerformanceMode = performanceMode,
+                    StorageConfidence = profile.StorageConfidence,
+                    MemoryHealth = $"Tekanan memori {profile.MemoryPressure switch { Integrations.HardwareProfile.MemoryPressureLevel.High => "TINGGI", Integrations.HardwareProfile.MemoryPressureLevel.Moderate => "moderate", _ => "rendah" }}",
+                    RobloxStatus = robloxStatus,
+                    GameSessionStatus = gameSessionStatus,
+                    Preset = preset,
+                    FpsCap = fpsCap,
+                    FastLoading = App.Settings.Prop.EnableFastLoadingFlags ? "ON" : "OFF",
+                    TdrMitigation = App.Settings.Prop.EnableTdrMitigation ? "ON" : "OFF",
+                    MemoryMode = memoryMode,
+                    SecurityState = securityState,
+                    SecurityDetail = securityDetail,
+                    ProtectedProcessCount = protectedCount
+                };
             }
         }
 
