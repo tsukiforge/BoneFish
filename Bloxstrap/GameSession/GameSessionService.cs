@@ -272,11 +272,21 @@ namespace Bloxstrap.GameSession
 
         public SessionSummary EndSession(int? expectedGameProcessId = null)
         {
-            // EndSession synchronous — gunakan TryWait supaya tidak block caller.
-            // Kalau tidak bisa lock (opsi lain sedang jalan), tetap lanjut —
-            // endSession bersifat idempotent dan harus selalu bisa dipanggil
-            // (mis. proses Roblox mati → Watcher harus restore segera).
-            bool locked = _sessionLock.Wait(0);
+            if (!_sessionLock.Wait(SessionLockTimeout))
+            {
+                App.Logger.WriteLine(LOG_IDENT, "EndSession timeout — active session tetap tersimpan untuk recovery berikutnya.");
+                GameSessionRecord? session = Store.ReadActive();
+                return session is null
+                    ? new SessionSummary { EndedAtUtc = DateTime.UtcNow }
+                    : new SessionSummary
+                    {
+                        SessionId = session.SessionId,
+                        GameProcessId = session.GameProcessId,
+                        StartedAtUtc = session.StartedAtUtc,
+                        EndedAtUtc = DateTime.UtcNow,
+                        TotalSuspended = session.SuspendedProcesses.Count
+                    };
+            }
 
             try
             {
@@ -284,8 +294,7 @@ namespace Bloxstrap.GameSession
             }
             finally
             {
-                if (locked)
-                    _sessionLock.Release();
+                _sessionLock.Release();
             }
         }
 

@@ -7,7 +7,7 @@ namespace Bloxstrap.GameSession
         private static readonly HashSet<string> AutomaticUserApplicationNames = new(StringComparer.OrdinalIgnoreCase)
         {
             "chrome", "msedge", "firefox", "brave", "opera", "vivaldi",
-            "spotify", "discord", "steam", "steamwebhelper", "epicgameslauncher",
+            "spotify", "steam", "steamwebhelper", "epicgameslauncher",
             "battle.net", "riotclientservices", "slack", "teams", "telegram",
             "whatsapp", "vlc", "zoom", "notion", "obs64"
         };
@@ -17,7 +17,7 @@ namespace Bloxstrap.GameSession
             "System", "Idle", "MemCompression", "Registry", "smss", "csrss", "lsass",
             "services", "winlogon", "wininit", "svchost", "dwm", "explorer", "audiodg",
             "fontdrvhost", "spoolsv", "SearchIndexer", "SearchHost", "WmiPrvSE", "WmiApSrv",
-            "RuntimeBroker", "sihost", "ctfmon", "conhost", "dllhost", "sppsvc", "MsMpEng",
+            "RuntimeBroker", "sihost", "ctfmon", "conhost", "dllhost", "sppsvc", "discord", "MsMpEng",
             "MsSense", "NisSrv", "SecurityHealthService", "SecurityHealthSystray",
             "RobloxPlayerBeta", "RobloxStudioBeta", "RobloxCrashHandler",
 

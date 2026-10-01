@@ -999,22 +999,28 @@ namespace Bloxstrap.Integrations
                     //     (ForceExtremeMode), supaya toggle tidak jadi silent no-op
                     //     hanya karena storage Unknown.
                     bool forceExtremeIntent = App.Settings.Prop.ForceExtremeMode;
+                    bool manualExtremeAlreadySelected = forceExtremeIntent
+                        && String.Equals(App.Settings.Prop.SelectedPerformancePreset, "ExtremePerformance", StringComparison.Ordinal);
+                    bool bypassManualPresetGuard = forceExtremeIntent && !manualExtremeAlreadySelected;
 
-                    bool hddCombo = forceExtremeIntent
+                    bool hddCombo = bypassManualPresetGuard
                         && GetStorageType() == StorageMediaType.Hdd
                         && (trueTier == SystemTier.LowEnd || trueTier == SystemTier.MidRange);
 
                     if (hddCombo)
                         App.Logger.WriteLine(LOG_IDENT,
                             $"ForceExtreme + HDD combo: tier asli {trueTier}, tier efektif ExtremePerformance — applying Extreme + HDD tweaks (bypass manual-preset guard)");
-                    else if (forceExtremeIntent)
+                    else if (bypassManualPresetGuard)
                         App.Logger.WriteLine(LOG_IDENT,
                             $"ForceExtremeMode intent aktif (storage={GetStorageType()}, tier asli {trueTier}) — bypass guard preset manual, tuning HDD TIDAK diterapkan");
+                    else if (manualExtremeAlreadySelected)
+                        App.Logger.WriteLine(LOG_IDENT,
+                            "ExtremePerformance sudah dipilih manual — mempertahankan flags preset tanpa aggressive purge ulang");
 
                     ApplyAggressiveOptimizations(
                         tier: tier,
                         hddIoTweaks: hddCombo,
-                        bypassLowEndGuard: forceExtremeIntent);
+                        bypassLowEndGuard: bypassManualPresetGuard);
                     return true;
                 }
 
