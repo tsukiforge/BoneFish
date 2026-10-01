@@ -107,7 +107,14 @@ namespace Bloxstrap.Integrations
             var entries = new List<DiagnosticEntry>();
             AutoOptimizeService.StorageDetectionResult storage;
             try { storage = AutoOptimizeService.GetStorageDiagnostics(); }
-            catch { storage = new AutoOptimizeService.StorageDetectionResult(); }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Storage diagnostics failed: {ex.Message}");
+                storage = new AutoOptimizeService.StorageDetectionResult
+                {
+                    Reason = $"Storage diagnostics failed: {ex.Message}"
+                };
+            }
 
             switch (profile.StorageType)
             {
@@ -145,7 +152,12 @@ namespace Bloxstrap.Integrations
                 Text = $"Confidence: {(String.IsNullOrWhiteSpace(storage.Confidence) ? "None" : storage.Confidence)}"
             });
             if (!String.IsNullOrWhiteSpace(storage.Reason))
-                entries.Add(new DiagnosticEntry { Status = DiagnosticStatus.Unknown, Text = $"Alasan deteksi: {storage.Reason}" });
+                entries.Add(new DiagnosticEntry
+                {
+                    Status = DiagnosticStatus.Unknown,
+                    Text = $"Alasan deteksi: {storage.Reason}",
+                    Detail = String.Join("; ", storage.Diagnostics)
+                });
 
             if (profile.StorageType == "HDD")
                 warnings.Add(new DiagnosticEntry
@@ -456,7 +468,16 @@ namespace Bloxstrap.Integrations
                 Text = $"Cap dikelola BoneFish: {(App.Settings.Prop.FpsUnlockerCapManaged ? $"ya (unlocker {(App.Settings.Prop.FpsUnlockerEnabled ? "ON" : "OFF")})" : "tidak")}"
                     + (App.Settings.Prop.FpsUnlockerPreviousCap is { } prev ? $", cap user sebelumnya: {prev}" : "")
             });
-            entries.Add(new DiagnosticEntry { Status = DiagnosticStatus.Ok, Text = $"FPS Unlocker: {(App.Settings.Prop.FpsUnlockerEnabled ? "ON — FramerateCap 240 ditulis" : "OFF")}" });
+            int recommendedCap = FpsUnlockerService.GetRecommendedFramerateCap(profile.Tier, profile.DisplayRefreshRate);
+            entries.Add(new DiagnosticEntry
+            {
+                Status = App.Settings.Prop.FpsUnlockerEnabled && recommendedCap == 0
+                    ? DiagnosticStatus.Unknown
+                    : DiagnosticStatus.Ok,
+                Text = $"FPS Unlocker: {(App.Settings.Prop.FpsUnlockerEnabled
+                    ? recommendedCap > 0 ? $"ON — cap otomatis {recommendedCap} FPS" : "ON — menunggu refresh rate monitor terbaca"
+                    : "OFF")}"
+            });
 
             return new DiagnosticSection { Title = "FPS", Entries = entries };
         }

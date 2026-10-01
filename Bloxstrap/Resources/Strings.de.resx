@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>BoneFish konnte nicht automatisch auf die Version {0} aktualisieren. Bitte aktualisiere es manuell, indem du es von der Webseite herunterlädst und ausführst.</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Roblox ist gerade geöffnet und wird beim Starten eines neuen Fensters geschlossen. Bist du dir sicher, dass du fortfahren möchtest?</value>
   </data>
@@ -495,12 +492,6 @@ Möchtest du deine installierte Version aktualisieren?</value>
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>Aussehen</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>BoneFish wird automatisch beim Starten von Roblox nach neuen Versionen prüfen und sich gegebenenfalls aktualisieren.</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>BoneFish automatisch aktualisieren</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>Verhindere das Schließen deines geöffneten Spiels durch versehentliches Starten eines neuen Spiels.</value>
@@ -1220,9 +1211,6 @@ Bitte schließe alle Anwendungen, die möglicherweise auf die Dateien von Roblox
   </data>
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>Windows 7 und 8.1 werden von Roblox nicht mehr unterstützt. Um weiterhin Roblox zu spielen, müsstest du auf Windows 10 oder höher upgraden.</value>
-  </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>BoneFish wird aktualisiert...</value>
   </data>
   <data name="Menu.BoneFish.Description" xml:space="preserve">
     <value>Konfiguriere Optionen, welche sich auf das Verhalten von BoneFish auswirken.</value>

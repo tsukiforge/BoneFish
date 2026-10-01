@@ -69,32 +69,33 @@ namespace Bloxstrap.Integrations
 
         public static FeatureAdvice FpsUnlocker(HardwareProfile profile, bool currentlyEnabled, bool refreshRateKnown)
         {
-            if (!refreshRateKnown)
+            if (!refreshRateKnown || profile.DisplayRefreshRate <= 0)
             {
                 return new FeatureAdvice
                 {
                     Feature = "FPS Unlocker",
                     Availability = FeatureAvailability.Unavailable,
-                    Reason = "Refresh rate monitor tidak bisa dibaca (EnumDisplaySettings gagal), sehingga FramerateCap tidak bisa ditulis dengan aman.",
+                    Reason = "Refresh rate monitor tidak bisa dibaca, sehingga cap FPS otomatis tidak bisa dihitung dengan aman.",
                     Recommendation = "Recommended: tidak tersedia di konfigurasi display ini."
                 };
             }
 
             bool integrated = profile.GpuDetectionComplete && !profile.HasDedicatedGpu;
             bool lowEnd = profile.Tier is HardwareProfile.HardwareTier.UltraLow or HardwareProfile.HardwareTier.Low;
+            int cap = FpsUnlockerService.GetRecommendedFramerateCap(profile.Tier, profile.DisplayRefreshRate);
 
             string why = lowEnd
-                ? $"Hardware tier {profile.TierDisplay}{(integrated ? " dengan GPU integrated" : "")}. FPS di atas ~60 kebanyakan tidak tercapai di hardware ini; unlock tetap boleh dicoba karena FramerateCap hanya batas atas (tidak memaksa beban tambahan)."
+                ? $"Hardware tier {profile.TierDisplay}{(integrated ? " dengan GPU integrated" : "")}. Cap otomatis {cap} FPS membatasi beban agar lebih sesuai dengan kemampuan hardware dan refresh rate monitor."
                 : integrated
-                    ? $"GPU integrated ({profile.GpuName}). FramerateCap 240 adalah batas atas — FPS aktual mengikuti kemampuan GPU. Tidak berbahaya, manfaat tergantung game."
-                    : $"GPU dedicated terdeteksi ({profile.GpuName}). FramerateCap 240 memungkinkan FPS mengikuti refresh rate monitor ({profile.DisplayRefreshRate} Hz).";
+                    ? $"GPU integrated ({profile.GpuName}), tier {profile.TierDisplay}. Cap otomatis {cap} FPS mengikuti tier dan refresh rate monitor ({profile.DisplayRefreshRate} Hz)."
+                    : $"GPU dedicated terdeteksi ({profile.GpuName}), tier {profile.TierDisplay}. Cap otomatis {cap} FPS mengikuti tier dan refresh rate monitor ({profile.DisplayRefreshRate} Hz).";
 
             return new FeatureAdvice
             {
                 Feature = "FPS Unlocker",
-                Availability = lowEnd ? FeatureAvailability.Optional : FeatureAvailability.Recommended,
+                Availability = lowEnd || integrated ? FeatureAvailability.Optional : FeatureAvailability.Recommended,
                 Reason = why,
-                Recommendation = lowEnd ? "Recommended: optional — biarkan OFF jika FPS sudah stabil." : "Status: cocok untuk hardware ini."
+                Recommendation = lowEnd || integrated ? "Recommended: optional — biarkan OFF jika FPS sudah stabil." : "Status: cocok untuk hardware ini."
             };
         }
 

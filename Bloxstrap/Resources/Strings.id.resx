@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>BoneFish tidak dapat diperbarui secara otomatis ke versi {0}. Mohon perbarui secara manual dengan mengunduh dari website kemudian menjalankannya.</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Roblox sedang berjalan saat ini, dan menjalankan instansi Roblox baru akan menutup instansi Roblox yang sedang berjalan, apakah Anda yakin ingin tetap menjalankannya?</value>
   </data>
@@ -502,12 +499,6 @@ Apakah Anda ingin memperbarui versi yang sudah Anda install?</value>
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>Penampilan</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>BoneFish akan otomatis mengecek dan memperbarui saat memulai Roblox.</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>Perbarui BoneFish secara otomatis</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>Mencegah menutup sebuah game yang telah dibuka dari membuka game lagi secara tidak sengaja.</value>
@@ -1205,9 +1196,6 @@ Silakan tutup aplikasi apa pun yang dapat menggunakan berkas Roblox, lalu luncur
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>Roblox tidak lagi mendukung Windows 7 atau 8,1. Untuk terus memainkan Roblox, harap perbarui ke Windows 10 atau yang lebih baru.</value>
   </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>Mengunduh versi BoneFish terbaru...</value>
-  </data>
   <data name="Menu.BoneFish.Description" xml:space="preserve">
     <value>Atur opsi yang terkait dengan perilaku BoneFish itu sendiri.</value>
   </data>
@@ -1549,10 +1537,10 @@ Beralih ke {1}.</value>
     <value>Roblox crash terdeteksi! Klik notifikasi ini untuk menyambung ulang ke game terakhir.</value>
   </data>
   <data name="Menu.FastFlags.FpsUnlocker.Title" xml:space="preserve">
-    <value>FPS Unlocker (Hingga 240 FPS)</value>
+    <value>FPS Cap Otomatis (Menyesuaikan Hardware)</value>
   </data>
   <data name="Menu.FastFlags.FpsUnlocker.Description" xml:space="preserve">
-    <value>Naikkan batas FPS Roblox hingga 240 FPS melalui GlobalBasicSettings_13.xml. Toggle independen - bisa di-stack dengan preset apa pun. FPS aktual tetap bergantung pada kemampuan perangkat. Nonaktifkan untuk kembali ke cap default Roblox.</value>
+    <value>Atur cap FPS otomatis berdasarkan tier hardware dan refresh rate monitor. Hardware lebih kuat dapat memakai cap lebih tinggi (maksimal 120 FPS); cap tidak melebihi refresh rate monitor. Nonaktifkan untuk memulihkan cap sebelumnya.</value>
   </data>
   <data name="Watcher.CrashDetected.Message" xml:space="preserve">
     <value>Roblox mengalami crash. Apakah Anda ingin menyambung ulang ke game terakhir?</value>

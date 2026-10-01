@@ -1,5 +1,38 @@
 # BoneFish Changelog
 
+## v7.7.5 — Game Session Lifecycle, Adaptive FPS Cap, Update Checker Removal
+
+Release date: 2026-10-01
+
+### 🎮 Game Session reliability
+
+- Prevent duplicate Game Session start/restore handlers from racing on Roblox
+  join/leave events.
+- Keep join/leave log monitoring available to Game Session when optional Activity
+  Tracking is disabled, and start the watcher whenever Game Session is configured.
+- Scope leave-event restore to the Roblox process associated with that activity
+  watcher to avoid restoring a different active game session.
+
+### ⚙️ Adaptive performance and diagnostics
+
+- Add an adaptive FPS cap based on hardware tier and monitor refresh rate, with a
+  maximum cap of 120 FPS; the user's previous cap is restored when the feature is
+  turned off.
+- Improve storage detection diagnostics and use a native-aligned storage descriptor.
+- Do not raise Roblox process priority as part of low-end optimization.
+
+### 🔕 BoneFish update checks removed
+
+- Remove automatic BoneFish update checks from Roblox launch and system-tray
+  startup, along with the manual update-check controls in Channel settings.
+- Remove the associated release lookup and obsolete update-check resources.
+- Roblox client version checks and Roblox updates are unchanged.
+
+### ✅ Verification and limitation
+
+- Windows-targeted build succeeded with 0 warnings and 0 errors.
+- Game Session behavior has not yet been runtime-tested on Windows.
+
 ## v7.7.3 — Adaptive System UI: Hardware Profile, Dashboard Adaptif, Diagnostic Center, Tray Status-Oriented
 
 Release date: 2026-09-30

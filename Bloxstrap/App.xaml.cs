@@ -21,7 +21,6 @@ namespace Bloxstrap
 #endif
         public const string ProjectOwner = "faizinuha";
         public const string ProjectRepository = "tsukiforge/BoneFish";
-        public const string SecondaryProjectRepository = "BoneFishStudio/BoneFish";
         public const string ProjectDownloadLink = "https://github.com/tsukiforge/BoneFish/releases";
         public const string ProjectHelpLink = "https://github.com/bloxstraplabs/bloxstrap/wiki";
         public const string ProjectSupportLink = "https://github.com/faizinuha/BoneFish/issues/new";
@@ -164,35 +163,6 @@ namespace Bloxstrap
             Frontend.ShowExceptionDialog(ex);
 
             Terminate(ErrorCode.ERROR_INSTALL_FAILURE);
-        }
-
-        public static async Task<GithubRelease?> GetLatestRelease()
-            => await GetLatestRelease(ProjectRepository);
-
-        public static async Task<GithubRelease?> GetLatestRelease(string repository)
-        {
-            const string LOG_IDENT = "App::GetLatestRelease";
-
-            try
-            {
-                Uri githubReleasesUrl = new($"https://api.github.com/repos/{repository}/releases/latest");
-                var releaseInfo = await Http.GetJson<GithubRelease>(githubReleasesUrl);
-
-                if (releaseInfo is null || releaseInfo.Assets is null)
-                {
-                    Logger.WriteLine(LOG_IDENT, $"Encountered invalid data from {repository}");
-                    return null;
-                }
-
-                return releaseInfo;
-            }
-            catch (Exception ex)
-            {
-                Logger.WriteLine(LOG_IDENT, $"Failed to check {repository}");
-                Logger.WriteException(LOG_IDENT, ex);
-            }
-
-            return null;
         }
 
         public static void SendLog()

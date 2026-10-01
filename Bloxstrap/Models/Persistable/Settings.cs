@@ -19,7 +19,6 @@ namespace Bloxstrap.Models.Persistable
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public bool DeveloperMode { get; set; } = false;
         public bool ForceLocalData { get; set; } = false;
-        public bool CheckForUpdates { get; set; } = true;
         public bool MultiInstanceLaunching { get; set; } = false;
         public bool ConfirmLaunches { get; set; } = true;
         public string Locale { get; set; } = "nil";
@@ -137,7 +136,7 @@ namespace Bloxstrap.Models.Persistable
         public bool EnableFastLoadingFlags { get; set; } = false;
 
         // FPS Unlocker — toggle INDEPENDEN (bisa stack dengan preset apa pun):
-        // deteksi refresh rate monitor & tulis FramerateCap di GlobalBasicSettings_13.xml.
+        // cap otomatis berdasarkan tier hardware dan refresh rate monitor.
         // Terpisah dari preset potato/ExtremeMode yang bertujuan menurunkan beban.
         public bool FpsUnlockerEnabled { get; set; } = false;
 
@@ -146,9 +145,10 @@ namespace Bloxstrap.Models.Persistable
         // diam-diam dan bisa dipulihkan saat toggle dimatikan.
         //   FpsUnlockerCapManaged  : true bila FramerateCap saat ini ditulis BoneFish
         //   FpsUnlockerPreviousCap : nilai FramerateCap milik user SEBELUM ditimpa
-        //                            (null bila tidak ada / nilainya sudah sama)
+        //                            (null bila tidak ada nilai sebelumnya)
         public bool FpsUnlockerCapManaged { get; set; } = false;
         public string? FpsUnlockerPreviousCap { get; set; } = null;
+        public int? FpsUnlockerAppliedCap { get; set; } = null;
 
         // TDR Mitigation — toggle independen untuk KURANGI freeze/layar putih
         // (Intel iGPU Driver TDR, Event ID 4101) dengan menurunkan beban GPU.

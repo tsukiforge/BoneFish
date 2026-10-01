@@ -194,14 +194,17 @@ namespace Bloxstrap
                 App.Logger.WriteException(LOG_IDENT, ex);
             }
 
-            // Only start activity tracking if we actually have a valid log file.
-            // The tray icon below does not depend on this, so it will still appear
-            // even when Roblox self-updated and the log file couldn't be identified.
-            if (App.Settings.Prop.EnableActivityTracking && !String.IsNullOrEmpty(_watcherData.LogFile) && File.Exists(_watcherData.LogFile))
+            // Game Session needs Roblox join/leave log events even when optional
+            // activity tracking is disabled.
+            bool activityTrackingEnabled = App.Settings.Prop.EnableActivityTracking;
+            bool gameSessionEnabled = App.Settings.Prop.GameSessionEnabled;
+            if ((activityTrackingEnabled || gameSessionEnabled)
+                && !String.IsNullOrEmpty(_watcherData.LogFile)
+                && File.Exists(_watcherData.LogFile))
             {
                 ActivityWatcher = new(_watcherData.LogFile);
 
-                if (App.Settings.Prop.UseDisableAppPatch)
+                if (activityTrackingEnabled && App.Settings.Prop.UseDisableAppPatch)
                 {
                     ActivityWatcher.OnAppClose += delegate
                     {
@@ -211,30 +214,30 @@ namespace Bloxstrap
                     };
                 }
 
-                if (App.Settings.Prop.UseDiscordRichPresence && !App.State.Prop.WatcherRunning)
+                if (activityTrackingEnabled && App.Settings.Prop.UseDiscordRichPresence && !App.State.Prop.WatcherRunning)
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Running rpc");
                     RichPresence = new(ActivityWatcher);
                 }
 
-                if (App.Settings.Prop.EnableRobloxNotifications)
+                if (activityTrackingEnabled && App.Settings.Prop.EnableRobloxNotifications)
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Initializing Roblox notifications");
                     Notification = new(ActivityWatcher);
                 }
 
-                if (App.Settings.Prop.EnableFpsMonitor)
+                if (activityTrackingEnabled && App.Settings.Prop.EnableFpsMonitor)
                 {
                     App.Logger.WriteLine(LOG_IDENT, "Initializing FPS Monitor");
                     FpsMonitor = new(ActivityWatcher, _watcherData.ProcessId);
                 }
 
             }
-            else if (App.Settings.Prop.EnableActivityTracking)
+            else if (activityTrackingEnabled || gameSessionEnabled)
             {
-                // Activity tracking is enabled but the log file is missing (e.g. Roblox self-updated).
-                // The tray icon will still be created below; tracking-dependent features are skipped this session.
-                App.Logger.WriteLine(LOG_IDENT, "Activity tracking enabled but log file is unavailable; skipping tracking, tray icon will still appear");
+                // The tray will still appear; Roblox join/leave lifecycle handling is
+                // unavailable until a valid client log can be identified.
+                App.Logger.WriteLine(LOG_IDENT, "Roblox log file is unavailable; skipping activity and Game Session lifecycle tracking, tray icon will still appear");
             }
 
             // Crosshair & Hotkeys adalah fitur INDEPENDEN — tidak butuh ActivityTracking.
@@ -573,14 +576,11 @@ namespace Bloxstrap
             //     suspend ulang agar proteksi tetap aktif di sesi berikutnya.
             if (ActivityWatcher is not null)
             {
-                ActivityWatcher.OnGameLeave += OnGameLeaveHandler;
-                ActivityWatcher.OnGameJoin += OnGameJoinHandler;
-                // FIX (audit tray): handler notify — suspend/restore ikut berjalan untuk
-                // game eksternal (yang watcher internalnya tidak ada), dan datanya
-                // sekaligus menghidupkan menu tray (Server Details, riwayat, notif).
+                // Keep Game Session lifecycle on one join/leave handler each. The old
+                // duplicate handlers could race two BeginSession calls on every join.
                 ActivityWatcher.OnGameJoin += NotifyOnGameJoinAsync;
                 ActivityWatcher.OnGameLeave += NotifyOnGameLeave;
-                App.Logger.WriteLine(LOG_IDENT, "Game Session tied to game leave/join events (restore saat keluar game, re-suspend saat masuk)");
+                App.Logger.WriteLine(LOG_IDENT, "Game Session tied to game leave/join events (single lifecycle handler)");
             }
 
             ActivityWatcher?.Start();
@@ -853,75 +853,6 @@ namespace Bloxstrap
             }
         }
 
-        /// <summary>
-        /// Dipanggil saat user KELUAR dari game (log "Time to disconnect replication
-        /// data"), meskipun proses Roblox masih hidup di system tray. Restore segera —
-        /// inilah yang menjawab bug "Roblox di tray tapi aplikasi tetap beku".
-        /// Idempotent: kalau session sudah di-end (store kosong), jadi no-op.
-        /// </summary>
-        private void OnGameLeaveHandler(object? sender, EventArgs e)
-        {
-            const string LOG_IDENT = "Watcher::OnGameLeave";
-
-            try
-            {
-                if (App.GameSession.Store.ReadActive() is not { SuspendedProcesses.Count: > 0 } session)
-                    return;
-
-                App.Logger.WriteLine(LOG_IDENT,
-                    $"User keluar dari game (proses Roblox mungkin masih di tray) — restore {session.SuspendedProcesses.Count} proses");
-
-                SessionSummary summary = App.GameSession.EndSession(_watcherData!.ProcessId);
-                if (summary.TotalSuspended > 0)
-                    _notifyIcon?.ShowAlert("BoneFish", App.GameSession.FormatSummary(summary), 10, null);
-            }
-            catch (Exception ex)
-            {
-                App.Logger.WriteLine(LOG_IDENT, $"Restore on game leave failed (non-fatal): {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Dipanggil saat user MASUK game baru dalam proses Roblox yang sama
-        /// (sesi sebelumnya sudah di-end saat leave). Suspend ulang supaya
-        /// proteksi tetap jalan untuk sesi berikutnya.
-        /// </summary>
-        private async void OnGameJoinHandler(object? sender, EventArgs e)
-        {
-            const string LOG_IDENT = "Watcher::OnGameJoin";
-
-            try
-            {
-                if (!App.Settings.Prop.GameSessionEnabled)
-                    return;
-
-                if (App.GameSession.Store.ReadActive() is not null)
-                {
-                    App.Logger.WriteLine(LOG_IDENT, "Session masih aktif — tidak perlu re-suspend");
-                    return;
-                }
-
-                App.Logger.WriteLine(LOG_IDENT, "User masuk game baru — re-suspend background apps");
-                GameSessionRecord record = await App.GameSession.BeginSessionAsync();
-                App.GameSession.AttachGameProcess(_watcherData!.ProcessId);
-
-                if (record.SuspendedProcesses.Count > 0)
-                {
-                    string names = String.Join(", ", record.SuspendedProcesses.Select(process => process.ProcessName));
-                    _notifyIcon?.ShowAlert("BoneFish",
-                        String.Format(Strings.GameSession_SuspendNotification, record.SuspendedProcesses.Count, names), 10, null);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // watcher dimatikan — tidak masalah
-            }
-            catch (Exception ex)
-            {
-                App.Logger.WriteLine(LOG_IDENT, $"Re-suspend on game join failed (non-fatal): {ex.Message}");
-            }
-        }
-
         // ── FIX (audit "suspend kadang jalan kadang engga") ────────────────────
         // Ada dua celah yang membuat suspend/restore tidak konsisten:
         //
@@ -991,11 +922,14 @@ namespace Bloxstrap
 
             try
             {
+                if (sender is not ActivityWatcher watcher)
+                    return;
+
                 if (App.GameSession.Store.ReadActive() is not { SuspendedProcesses.Count: > 0 } session)
                     return;
 
                 App.Logger.WriteLine(LOG_IDENT, $"User keluar dari game — restore {session.SuspendedProcesses.Count} proses");
-                SessionSummary summary = App.GameSession.EndSession();
+                SessionSummary summary = App.GameSession.EndSession(ResolveGamePidFor(watcher));
                 if (summary.TotalSuspended > 0)
                     _notifyIcon?.ShowAlert("BoneFish", App.GameSession.FormatSummary(summary), 10, null);
             }

@@ -9,7 +9,8 @@ namespace Bloxstrap.Integrations
     public static class FpsUnlockerService
     {
         private const string LOG_IDENT = "FpsUnlocker";
-        private const int MaximumRobloxFramerateCap = 240;
+        private const int MaximumRobloxFramerateCap = 120;
+        private const int LegacyRobloxFramerateCap = 240;
 
         private const int ENUM_CURRENT_SETTINGS = -1;
 
@@ -56,6 +57,24 @@ namespace Bloxstrap.Integrations
             return devMode.dmDisplayFrequency;
         }
 
+        public static int GetRecommendedFramerateCap(HardwareProfile.HardwareTier tier, int refreshRate)
+        {
+            if (refreshRate <= 0)
+                return 0;
+
+            int tierCap = tier switch
+            {
+                HardwareProfile.HardwareTier.UltraLow => 30,
+                HardwareProfile.HardwareTier.Low => 45,
+                HardwareProfile.HardwareTier.Balanced => 60,
+                HardwareProfile.HardwareTier.Mid => 90,
+                HardwareProfile.HardwareTier.High => MaximumRobloxFramerateCap,
+                _ => 60
+            };
+
+            return Math.Min(tierCap, refreshRate);
+        }
+
         public static FpsUnlockerResult Apply()
         {
             int refreshRate = GetPrimaryDisplayRefreshRate();
@@ -66,9 +85,11 @@ namespace Bloxstrap.Integrations
                 return new FpsUnlockerResult(false, false, 0);
             }
 
-            int cap = MaximumRobloxFramerateCap;
+            HardwareProfile profile = HardwareProfileEngine.GetProfile();
+            int cap = GetRecommendedFramerateCap(profile.Tier, refreshRate);
 
-            App.Logger.WriteLine(LOG_IDENT, $"Menerapkan FramerateCap={cap} (refresh rate monitor: {refreshRate} Hz)");
+            App.Logger.WriteLine(LOG_IDENT,
+                $"Menerapkan FramerateCap={cap} (tier={profile.TierDisplay}, refresh rate monitor={refreshRate} Hz)");
 
             if (!App.GlobalSettings.Loaded)
                 App.GlobalSettings.Load();
@@ -81,22 +102,19 @@ namespace Bloxstrap.Integrations
             }
 
             // ★ HARDENING (audit FPS Fase 5): jangan hancurkan cap manual user tanpa jejak.
-            // Catat nilai FramerateCap yang ADA SEBELUM BoneFish menimpanya — hanya sekali,
-            // dan hanya bila nilainya bukan nilai yang kita tulis sendiri (240).
+            // Catat nilai FramerateCap yang ada sebelum BoneFish menimpanya — hanya sekali.
             // Nilai ini dipakai Revert() untuk memulihkan konfigurasi user saat toggle OFF.
             if (!App.Settings.Prop.FpsUnlockerCapManaged)
             {
                 string? existing = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
 
-                if (!String.IsNullOrWhiteSpace(existing) && existing != cap.ToString())
+                if (!String.IsNullOrWhiteSpace(existing))
                 {
                     App.Settings.Prop.FpsUnlockerPreviousCap = existing;
                     App.Logger.WriteLine(LOG_IDENT, $"FramerateCap user terdeteksi ({existing}) — disimpan untuk dipulihkan saat toggle OFF");
                 }
                 else
                 {
-                    // Tidak ada nilai user (atau sudah 240 tanpa kita) → jangan klaim
-                    // sebagai milik user supaya Revert() tidak "memulihkan" nilai asing.
                     App.Settings.Prop.FpsUnlockerPreviousCap = null;
                 }
 
@@ -108,7 +126,11 @@ namespace Bloxstrap.Integrations
 
             bool applied = App.GlobalSettings.GetPreset("Rendering.FramerateCap") == cap.ToString();
             if (applied)
+            {
                 App.GlobalSettings.Save();
+                App.Settings.Prop.FpsUnlockerAppliedCap = cap;
+                try { App.Settings.Save(); } catch { }
+            }
             else
                 App.Logger.WriteLine(LOG_IDENT, "Elemen FramerateCap tidak ditemukan di GlobalBasicSettings_13.xml — deferred ke launch berikutnya");
 
@@ -140,14 +162,19 @@ namespace Bloxstrap.Integrations
             else
             {
                 // Tidak ada nilai user yang tercatat. Hapus HANYA bila nilainya memang
-                // nilai tulisan BoneFish (240); selain itu jangan sentuh.
+                // nilai tulisan BoneFish; selain itu jangan sentuh.
                 string? current = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
+                int? appliedCap = App.Settings.Prop.FpsUnlockerAppliedCap;
 
-                if (current == MaximumRobloxFramerateCap.ToString())
+                bool isManagedValue = managed && (
+                    (appliedCap.HasValue && current == appliedCap.Value.ToString())
+                    || (!appliedCap.HasValue && current is "120" or "240"));
+
+                if (isManagedValue)
                 {
                     App.GlobalSettings.RemovePreset("Rendering.FramerateCap");
                     App.GlobalSettings.Save();
-                    App.Logger.WriteLine(LOG_IDENT, "Mematikan FPS Unlocker — FramerateCap tulisan BoneFish dihapus (kembali ke default Roblox)");
+                    App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap tulisan BoneFish ({current}) dihapus (kembali ke default Roblox)");
                 }
                 else
                 {
@@ -162,6 +189,7 @@ namespace Bloxstrap.Integrations
         {
             App.Settings.Prop.FpsUnlockerCapManaged = false;
             App.Settings.Prop.FpsUnlockerPreviousCap = null;
+            App.Settings.Prop.FpsUnlockerAppliedCap = null;
             try { App.Settings.Save(); } catch { }
         }
     }

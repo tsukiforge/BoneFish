@@ -170,15 +170,6 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to BoneFish was unable to automatically update to version {0}. Please update it manually by downloading and running it from the website..
-        /// </summary>
-        public static string Bootstrapper_AutoUpdateFailed {
-            get {
-                return ResourceManager.GetString("Bootstrapper.AutoUpdateFailed", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Roblox is attempting to set your channel to {0}, however your current preferred channel is {1}.
         ///
         ///
@@ -416,15 +407,6 @@ namespace Bloxstrap.Resources {
         public static string Bootstrapper_Status_Upgrading {
             get {
                 return ResourceManager.GetString("Bootstrapper.Status.Upgrading", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Getting the latest BoneFish....
-        /// </summary>
-        public static string Bootstrapper_Status_UpgradingBloxstrap {
-            get {
-                return ResourceManager.GetString("Bootstrapper.Status.UpgradingBloxstrap", resourceCulture);
             }
         }
         
@@ -3105,24 +3087,6 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to BoneFish will automatically check and update itself when launching Roblox..
-        /// </summary>
-        public static string Menu_Behaviour_AutoUpdate_Description {
-            get {
-                return ResourceManager.GetString("Menu.Behaviour.AutoUpdate.Description", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Automatically update BoneFish.
-        /// </summary>
-        public static string Menu_Behaviour_AutoUpdate_Title {
-            get {
-                return ResourceManager.GetString("Menu.Behaviour.AutoUpdate.Title", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Update Roblox in the background instead of waiting. Not recommended for slow networks. At least 3GB of free storage space is required for this feature to work..
         /// </summary>
         public static string Menu_Behaviour_BackgroundUpdates_Description {
@@ -3862,7 +3826,7 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to FPS Unlocker (Ikuti Refresh Rate Monitor).
+        ///   Looks up a localized string similar to FPS Cap Otomatis (Menyesuaikan Hardware).
         /// </summary>
         public static string Menu_FastFlags_FpsUnlocker_Title {
             get {
@@ -3871,7 +3835,7 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Unlock FPS otomatis: deteksi refresh rate monitor lalu set FramerateCap Roblox (GlobalBasicSettings_13.xml). Toggle independen — bisa di-stack dengan preset apa pun. Nonaktifkan untuk kembali ke cap default Roblox..
+        ///   Looks up a localized string similar to Atur cap FPS otomatis berdasarkan tier hardware dan refresh rate monitor. Hardware lebih kuat dapat memakai cap lebih tinggi (maksimal 120 FPS); cap tidak melebihi refresh rate monitor. Nonaktifkan untuk memulihkan cap sebelumnya..
         /// </summary>
         public static string Menu_FastFlags_FpsUnlocker_Description {
             get {

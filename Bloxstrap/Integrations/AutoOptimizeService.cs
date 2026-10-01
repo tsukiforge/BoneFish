@@ -65,9 +65,10 @@ namespace Bloxstrap.Integrations
         {
             public uint PropertyId;
             public uint QueryType;
+            public byte AdditionalParameters;
         }
 
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        [StructLayout(LayoutKind.Sequential)]
         private struct DEVICE_SEEK_PENALTY_DESCRIPTOR
         {
             public uint Version;
@@ -76,7 +77,7 @@ namespace Bloxstrap.Integrations
             public byte IncursSeekPenalty; // BOOLEAN: 0 = no seek penalty (SSD hint), 1 = seek penalty (HDD)
         }
 
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        [StructLayout(LayoutKind.Sequential)]
         private struct DEVICE_TRIM_DESCRIPTOR
         {
             public uint Version;
@@ -669,7 +670,8 @@ namespace Bloxstrap.Integrations
                     var query = new STORAGE_PROPERTY_QUERY
                     {
                         PropertyId = StorageDeviceSeekPenaltyProperty,
-                        QueryType = 0 // PropertyStandardQuery
+                        QueryType = 0, // PropertyStandardQuery
+                        AdditionalParameters = 0
                     };
 
                     int querySize = Marshal.SizeOf(typeof(STORAGE_PROPERTY_QUERY));
@@ -757,7 +759,8 @@ namespace Bloxstrap.Integrations
                     var query = new STORAGE_PROPERTY_QUERY
                     {
                         PropertyId = StorageDeviceTrimProperty,
-                        QueryType = 0
+                        QueryType = 0,
+                        AdditionalParameters = 0
                     };
 
                     int querySize = Marshal.SizeOf(typeof(STORAGE_PROPERTY_QUERY));
@@ -1612,17 +1615,6 @@ tier ??= DetectSystemTier();
         {
             if (!App.Settings.Prop.OptimizeForLowEnd)
                 return;
-
-            try
-            {
-                using var robloxProc = Process.GetProcessById(robloxPid);
-                robloxProc.PriorityClass = ProcessPriorityClass.AboveNormal;
-                App.Logger.WriteLine(LOG_IDENT, $"Set Roblox PID {robloxPid} priority → AboveNormal");
-            }
-            catch (Exception ex)
-            {
-                App.Logger.WriteLine(LOG_IDENT, $"Priority set failed (non-fatal): {ex.Message}");
-            }
 
             try
             {

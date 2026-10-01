@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>BoneFish was unable to automatically update to version {0}. Please update it manually by downloading and running it from the website.</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Roblox is currently running, and launching another instance will close it. Are you sure you want to continue launching?</value>
   </data>
@@ -512,12 +509,6 @@ Would you like to upgrade your currently installed version?</value>
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>Appearance</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>BoneFish will automatically check and update itself when launching Roblox.</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>Automatically update BoneFish</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>Prevent against closures of your existing game from accidentally launching another one.</value>
@@ -1415,9 +1406,6 @@ Would you like to switch your preferred channel to {0}?</value>
   <data name="Installer.InstallationNotFound" xml:space="preserve">
     <value>Bloxstrap installation was not found.</value>
   </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>Getting the latest BoneFish...</value>
-  </data>
   <data name="Menu.BoneFish.Description" xml:space="preserve">
     <value>Configure options related to BoneFish's behaviour itself.</value>
   </data>
@@ -1884,10 +1872,10 @@ Defaulting to {1}.</value>
     <value>Roblox crash terdeteksi! Klik notifikasi ini untuk menyambung ulang ke game terakhir.</value>
   </data>
   <data name="Menu.FastFlags.FpsUnlocker.Title" xml:space="preserve">
-    <value>FPS Unlocker (Hingga 240 FPS)</value>
+    <value>Automatic FPS Cap (Hardware Adaptive)</value>
   </data>
   <data name="Menu.FastFlags.FpsUnlocker.Description" xml:space="preserve">
-    <value>Naikkan batas FPS Roblox hingga 240 FPS melalui GlobalBasicSettings_13.xml. Toggle independen - bisa di-stack dengan preset apa pun. FPS aktual tetap bergantung pada kemampuan perangkat. Nonaktifkan untuk kembali ke cap default Roblox.</value>
+    <value>Set the FPS cap automatically from the hardware tier and monitor refresh rate. Stronger hardware can use a higher cap (up to 120 FPS); the cap never exceeds the monitor refresh rate. Turn it off to restore the previous cap.</value>
   </data>
   <data name="Watcher.CrashDetected.Message" xml:space="preserve">
     <value>Roblox mengalami crash. Apakah Anda ingin menyambung ulang ke game terakhir?</value>

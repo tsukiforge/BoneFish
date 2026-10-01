@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>بلاکسترپ نتوانست به‌طور خودکار به نسخه‌ی {0} به‌روزرسانی شود. لطفاً آن را به‌صورت دستی از طریق دانلود و اجرای فایل از وب‌سایت به‌روزرسانی کنید.</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>روبلاکس در حال اجرا شدن است؛ و باز کردن دوباره آن باعث می‌شود که بسته شود. آیا می خواهید به باز کردن ادامه بدهید؟</value>
   </data>
@@ -494,12 +491,6 @@
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>ظاهر</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>بلاکسترپ آپدیت های جدید را به صورت خودکار درهنگام باز کردن روبلاکس بررسی خواهد کرد.</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>بروزرسانی خودکار بلاکسترپ</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>از بسته شدن بازی فعلی هنگام باز شدن تصادفی بازی دیگر جلوگیری می‌کند.</value>
@@ -1197,9 +1188,6 @@
   </data>
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>روبلاکس دیگر بر روی ویندوز 7 و یا 8.1 پشتیبانی نمیشود. جهت ادامه دادن به بازی در روبلاکس، لطفا به ویندوز 10 یا جدیدتر بروزرسانی کنید.</value>
-  </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>در حال گرفتن آخرین بلاکسترپ...</value>
   </data>
   <data name="Menu.BoneFish.Description" xml:space="preserve">
     <value>پیکربندی تنظیماتی به رفتار خود بلاکسترپ ربط دارد.</value>

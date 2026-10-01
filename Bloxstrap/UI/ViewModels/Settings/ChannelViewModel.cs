@@ -8,8 +8,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
     public class ChannelViewModel : NotifyPropertyChangedViewModel
     {
         public event EventHandler<string>? RequestNotificationEvent;
-        public event EventHandler<string>? RequestUpdateAvailableEvent;
-        public event EventHandler? RequestHideUpdateAvailableEvent;
 
         public bool IsRobloxInstallationMissing => String.IsNullOrEmpty(App.RobloxState.Prop.Player.VersionGuid) && String.IsNullOrEmpty(App.RobloxState.Prop.Studio.VersionGuid);
         
@@ -102,16 +100,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        public bool UpdateCheckingEnabled
-        {
-            get => App.Settings.Prop.CheckForUpdates;
-            set => App.Settings.Prop.CheckForUpdates = value;
-        }
-
-        public ICommand CheckForUpdatesCommand => new RelayCommand(async () => await CheckForUpdates());
-
-        public ICommand OpenReleasePageCommand => new RelayCommand(() => Utilities.ShellExecute(App.ProjectDownloadLink));
-
         public bool StaticDirectory
         {
             get => App.Settings.Prop.StaticDirectory;
@@ -147,38 +135,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
         {
             get => App.State.Prop.ForceReinstall || IsRobloxInstallationMissing;
             set => App.State.Prop.ForceReinstall = value;
-        }
-
-        private async Task CheckForUpdates()
-        {
-            try
-            {
-                var releaseInfo = await App.GetLatestRelease();
-
-                if (releaseInfo is null)
-                {
-                    Notify("Tidak bisa memeriksa pembaruan saat ini.");
-                    RequestHideUpdateAvailableEvent?.Invoke(this, EventArgs.Empty);
-                    return;
-                }
-
-                var versionComparison = Utilities.CompareVersions(App.Version, releaseInfo.TagName);
-
-                if (App.IsProductionBuild && (versionComparison == VersionComparison.Equal || versionComparison == VersionComparison.GreaterThan))
-                {
-                    Notify("Fishstrap sudah versi terbaru.");
-                    RequestHideUpdateAvailableEvent?.Invoke(this, EventArgs.Empty);
-                    return;
-                }
-
-                RequestUpdateAvailableEvent?.Invoke(this, releaseInfo.TagName);
-                Notify($"Pembaruan tersedia: {releaseInfo.TagName}. Klik tombol di bawah untuk membuka halaman rilis.");
-            }
-            catch
-            {
-                Notify("Gagal memeriksa pembaruan. Periksa koneksi internet dan coba lagi.");
-                RequestHideUpdateAvailableEvent?.Invoke(this, EventArgs.Empty);
-            }
         }
 
         private void Notify(string message) => RequestNotificationEvent?.Invoke(this, message);

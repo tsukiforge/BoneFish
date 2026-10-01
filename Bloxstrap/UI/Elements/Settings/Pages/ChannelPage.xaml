@@ -34,29 +34,9 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- KOLOM KIRI: Fishstrap + Roblox settings -->
+            <!-- KOLOM KIRI: Roblox settings -->
             <StackPanel Grid.Column="0">
-                <TextBlock Text="Fishstrap" FontSize="16" FontWeight="Medium" Margin="0,0,0,0" />
-                <controls:OptionControl 
-                    Header="{x:Static resources:Strings.Menu_Behaviour_AutoUpdate_Title}"
-                    Description="{x:Static resources:Strings.Menu_Behaviour_AutoUpdate_Description}">
-                    <StackPanel>
-                        <ui:ToggleSwitch IsChecked="{Binding UpdateCheckingEnabled, Mode=TwoWay}" />
-                        <ui:Button Content="Periksa pembaruan sekarang" Margin="0,12,0,0" Command="{Binding CheckForUpdatesCommand}" />
-                    </StackPanel>
-                </controls:OptionControl>
-
-                <ui:CardAction x:Name="UpdateAvailableCard" Visibility="Collapsed" Margin="0,8,0,0" 
-                               Icon="ArrowCounterclockwise24" Command="{Binding OpenReleasePageCommand}">
-                    <StackPanel>
-                        <TextBlock FontSize="14" Text="Pembaruan tersedia" />
-                        <TextBlock x:Name="UpdateAvailableMessage" Margin="0,2,0,0" FontSize="12" 
-                                   Text="Klik untuk membuka halaman rilis." Padding="0,0,16,0" 
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                    </StackPanel>
-                </ui:CardAction>
-
-                <TextBlock Text="Roblox" FontSize="16" FontWeight="Medium" Margin="0,16,0,0" />
+                <TextBlock Text="Roblox" FontSize="16" FontWeight="Medium" Margin="0,0,0,0" />
 
                 <controls:OptionControl 
                     Header="{x:Static resources:Strings.Menu_Behaviour_ForceRobloxReinstall_Title}"

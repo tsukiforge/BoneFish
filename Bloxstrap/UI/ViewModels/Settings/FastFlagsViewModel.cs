@@ -635,7 +635,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 return;
 
             IsApplying = true;
-            ApplyingText = "⏳ Mendeteksi refresh rate monitor & menulis FramerateCap...";
+            ApplyingText = "⏳ Mendeteksi hardware & refresh rate monitor...";
 
             try
             {
@@ -658,11 +658,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     }
                     else if (result.Deferred)
                     {
-                        _fpsUnlockerStatus = $"Status: Siap — batas {result.Cap} FPS, diterapkan saat Roblox dijalankan";
+                        _fpsUnlockerStatus = $"Status: Siap — cap otomatis {result.Cap} FPS, diterapkan saat Roblox dijalankan";
                     }
                     else
                     {
-                        _fpsUnlockerStatus = $"Status: Aktif — batas hingga {result.Cap} FPS (FPS aktual bergantung perangkat)";
+                        _fpsUnlockerStatus = $"Status: Aktif — cap otomatis {result.Cap} FPS mengikuti hardware & refresh rate monitor";
                     }
                 }
 
