@@ -409,11 +409,24 @@ namespace Bloxstrap.Integrations
                 Text = $"TextureCompositorJobs: {Flag("DFIntTextureCompositorActiveJobs")}"
             });
 
-            string msaa = Flag("FIntDebugForceMSAASamples");
+            string[] rejectedFlags = FastFlagManager.FlagsRejectedByRobloxLogs.ToArray();
+            string[] stillConfiguredRejectedFlags = rejectedFlags
+                .Where(flag => App.FastFlags.GetValue(flag) is not null)
+                .ToArray();
             entries.Add(new DiagnosticEntry
             {
-                Status = msaa == "1" ? DiagnosticStatus.Ok : DiagnosticStatus.Ok,
-                Text = $"MSAA: {(msaa == "(not set)" ? "default Roblox" : $"force {msaa}x")} (TDR mitigation {(App.Settings.Prop.EnableTdrMitigation ? "ON" : "OFF")})"
+                Status = stillConfiguredRejectedFlags.Length == 0 ? DiagnosticStatus.Ok : DiagnosticStatus.Attention,
+                Text = stillConfiguredRejectedFlags.Length == 0
+                    ? $"BoneFish memblokir {rejectedFlags.Length} flag yang tercatat ditolak pada log Roblox 0.741; penerimaan flag lain hanya dapat dipastikan dari log Roblox."
+                    : $"Flag yang tercatat ditolak masih tersimpan: {string.Join(", ", stillConfiguredRejectedFlags)}"
+            });
+
+            string msaa = Flag("FIntDebugForceMSAASamples");
+            bool tdrMitigationEnabled = App.Settings.Prop.EnableTdrMitigation;
+            entries.Add(new DiagnosticEntry
+            {
+                Status = tdrMitigationEnabled && msaa != "1" ? DiagnosticStatus.Attention : DiagnosticStatus.Ok,
+                Text = $"MSAA configuration: {(msaa == "(not set)" ? "Roblox default" : $"force {msaa}x")} (TDR mitigation {(tdrMitigationEnabled ? "ON" : "OFF")}; Roblox acceptance must be confirmed from its log)"
             });
 
             bool deprecatedPresent = false;

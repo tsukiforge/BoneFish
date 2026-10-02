@@ -102,6 +102,36 @@ namespace Bloxstrap.GameSession
             ICollection<GameSessionRule> storedRules = _rulesSource();
             bool rulesChanged = false;
 
+            if (!App.Settings.Prop.GameSessionConservativeRulesApplied)
+            {
+                string[] rulesToDisable = { "SensorDBSynch", "esrv" };
+                int disabledRuleCount = 0;
+
+                foreach (GameSessionRule rule in storedRules)
+                {
+                    if (rule.SuspendDuringGame
+                        && rulesToDisable.Contains(rule.ProcessName, StringComparer.OrdinalIgnoreCase))
+                    {
+                        rule.SuspendDuringGame = false;
+                        rule.AutoSelectionDisabled = true;
+                        disabledRuleCount++;
+                    }
+                }
+
+                if (App.Settings.Prop.GameSessionAutoSelectSafeApps)
+                {
+                    App.Settings.Prop.GameSessionAutoSelectSafeApps = false;
+                    App.Logger.WriteLine(LOG_IDENT_LOCAL,
+                        "Disabled automatic safe-app selection; future Game Session suspensions require an enabled app rule");
+                }
+
+                App.Settings.Prop.GameSessionConservativeRulesApplied = true;
+                rulesChanged = true;
+
+                App.Logger.WriteLine(LOG_IDENT_LOCAL,
+                    $"Applied conservative Game Session defaults; disabled {disabledRuleCount} unverified process rule(s): SensorDBSynch, esrv");
+            }
+
             bool detectorSoftFail = App.Settings.Prop.GameSessionAllowSuspensionOnDetectorFailure
                 && detectorState != SecurityDetectionState.Ok;
             if (detectorSoftFail)
@@ -142,7 +172,8 @@ namespace Bloxstrap.GameSession
 
             if (rulesChanged)
             {
-                try { App.Settings.Save(); } catch { }
+                try { App.Settings.Save(); }
+                catch (Exception ex) { App.Logger.WriteException(LOG_IDENT_LOCAL, ex); }
             }
 
             Dictionary<string, GameSessionRule> rules = storedRules

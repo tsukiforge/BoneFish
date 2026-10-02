@@ -12,6 +12,9 @@ Release date: 2026-10-01
   Tracking is disabled, and start the watcher whenever Game Session is configured.
 - Scope leave-event restore to the Roblox process associated with that activity
   watcher to avoid restoring a different active game session.
+- On the next Game Session start, disable old `SensorDBSynch` and `esrv` rules once;
+  disable automatic safe-app selection, and require enabled app rules for future
+  suspensions. Existing app rules remain available for user review.
 
 ### ⚙️ Adaptive performance and diagnostics
 
@@ -20,6 +23,11 @@ Release date: 2026-10-01
   turned off.
 - Improve storage detection diagnostics and use a native-aligned storage descriptor.
 - Do not raise Roblox process priority as part of low-end optimization.
+- Block and clean 19 FastFlags explicitly reported as denied in the supplied Roblox
+  0.741 log; migrate mesh-quality UI state away from a denied flag; and remove the
+  ineffective animation and low-memory controls.
+- Clarify that saving local FastFlags does not prove Roblox applied them, and that
+  matchmaking preferences do not reduce ping.
 
 ### 🔕 BoneFish update checks removed
 

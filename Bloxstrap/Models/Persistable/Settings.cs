@@ -52,6 +52,9 @@ namespace Bloxstrap.Models.Persistable
         // Game Session Manager rules. New applications are persisted disabled.
         public ObservableCollection<GameSessionRule> GameSessionRules { get; set; } = new();
         public bool GameSessionAutoSelectSafeApps { get; set; } = false;
+        public bool GameSessionConservativeRulesApplied { get; set; } = false;
+
+        public int FastFlagMeshQualityPreset { get; set; } = -1;
 
         // Master toggle Game Session Manager — default OFF (opt-in).
         // Saat false, BeginSessionAsync() tidak pernah dipanggil di bootstrapper,

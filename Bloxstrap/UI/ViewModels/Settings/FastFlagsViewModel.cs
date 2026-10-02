@@ -205,7 +205,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public bool MeshQualityEnabled
         {
-            get => App.FastFlags.GetPreset("Geometry.MeshLOD.Static") != null;
+            get => App.Settings.Prop.FastFlagMeshQualityPreset >= 0;
             set
             {
                 if (value)
@@ -218,22 +218,24 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     foreach (string level in LODLevels)
                         App.FastFlags.SetPreset($"Geometry.MeshLOD.{level}", null);
 
-                    App.FastFlags.SetPreset("Geometry.MeshLOD.Static", null);
+                    App.Settings.Prop.FastFlagMeshQualityPreset = -1;
                 }
 
                 OnPropertyChanged(nameof(MeshQualityEnabled));
                 // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
                 try { App.FastFlags.Save(); } catch { }
+                try { App.Settings.Save(); } catch { }
             }
         }
 
         public int MeshQuality
         {
-            get => int.TryParse(App.FastFlags.GetPreset("Geometry.MeshLOD.Static"), out var x) ? x : 0;
+            get => Math.Max(0, App.Settings.Prop.FastFlagMeshQualityPreset);
             set
             {
                 // holy..
                 int clamped = Math.Clamp(value, 0, LODLevels.Length - 1);
+                App.Settings.Prop.FastFlagMeshQualityPreset = clamped;
 
                 for (int i = 0; i < LODLevels.Length; i++)
                 {
@@ -243,11 +245,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     App.FastFlags.SetPreset($"Geometry.MeshLOD.{lodLevel}", lodValue);
                 }
 
-                App.FastFlags.SetPreset("Geometry.MeshLOD.Static", clamped);
                 OnPropertyChanged(nameof(MeshQuality));
                 OnPropertyChanged(nameof(MeshQualityEnabled));
                 // ★ FIX: simpan seketika agar nilai slider bertahan setelah restart.
                 try { App.FastFlags.Save(); } catch { }
+                try { App.Settings.Save(); } catch { }
             }
         }
 
@@ -277,11 +279,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
             get => App.Settings.Prop.DisableRobloxAnimations;
             set
             {
-                App.Settings.Prop.DisableRobloxAnimations = value;
                 if (value)
-                    Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
-                else
-                    Integrations.AutoOptimizeService.RemoveDisableRobloxAnimations();
+                {
+                    Notify("Roblox menolak flag animasi lokal pada log yang dianalisis. Toggle ini tidak dapat diterapkan dan tetap nonaktif.");
+                    App.Settings.Prop.DisableRobloxAnimations = false;
+                    OnPropertyChanged(nameof(DisableRobloxAnimations));
+                    return;
+                }
+
+                App.Settings.Prop.DisableRobloxAnimations = value;
+                Integrations.AutoOptimizeService.RemoveDisableRobloxAnimations();
                 OnPropertyChanged(nameof(DisableRobloxAnimations));
                 // ★ FIX: simpan seketika — state toggle disimpan TERPISAH di Settings
                 // (bukan cuma dibaca dari FastFlags) supaya survive PurgeAllKnownFlags
@@ -296,11 +303,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
             get => App.Settings.Prop.EnableLowMemoryMode;
             set
             {
-                App.Settings.Prop.EnableLowMemoryMode = value;
                 if (value)
-                    Integrations.AutoOptimizeService.ApplyLowMemoryMode();
-                else
-                    Integrations.AutoOptimizeService.RemoveLowMemoryMode();
+                {
+                    Notify("Roblox menolak flag Low Memory lokal pada log yang dianalisis. Toggle ini tidak dapat diterapkan dan tetap nonaktif.");
+                    App.Settings.Prop.EnableLowMemoryMode = false;
+                    OnPropertyChanged(nameof(EnableLowMemoryMode));
+                    return;
+                }
+
+                App.Settings.Prop.EnableLowMemoryMode = value;
+                Integrations.AutoOptimizeService.RemoveLowMemoryMode();
                 OnPropertyChanged(nameof(EnableLowMemoryMode));
                 // ★ FIX: simpan seketika — state toggle disimpan TERPISAH di Settings.
                 try { App.Settings.Save(); } catch { }
@@ -560,7 +572,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.Settings.Prop.EnableFastLoadingFlags = value;
                 if (value)
+                {
                     Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
+                    if (!App.Settings.Prop.EnableFastLoadingFlags)
+                        Notify("Fast Loading tidak memiliki flag yang dapat diterapkan pada jumlah core CPU ini dan flag compositor ditolak Roblox; toggle tetap nonaktif.");
+                }
                 else
                     Integrations.AutoOptimizeService.RemoveFastLoadingFlags();
                 OnPropertyChanged(nameof(EnableFastLoadingFlags));
@@ -744,7 +760,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
-            Notify("Auto-optimize jaringan & No Delay telah diterapkan.");
+            Notify("Preferensi matchmaking disimpan. Flag jaringan lokal ditolak oleh Roblox dan ping tidak diubah.");
             OnRequestPageReload();
         }
 
@@ -1174,30 +1190,27 @@ namespace Bloxstrap.UI.ViewModels.Settings
         // ── Flag Verification ──────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Verifikasi bahwa semua FastFlag benar-benar tertulis ke disk.
-        /// Membaca kembali ClientAppSettings.json dan menghitung jumlah flag.
-        /// Memberikan notifikasi detail ke user agar yakin flag sudah diterapkan.
+        /// Report how many local settings were saved without implying that Roblox accepted them.
         /// </summary>
         private void VerifyAndNotify(string presetName)
         {
             try
             {
                 string filePath = Path.Combine(Paths.Modifications, "ClientSettings", "ClientAppSettings.json");
+                int count = App.FastFlags.Prop.Count;
+                int blockedCount = FastFlagManager.FlagsRejectedByRobloxLogs.Count;
                 if (File.Exists(filePath))
                 {
-                    string json = File.ReadAllText(filePath);
-                    var flags = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
-                    int count = flags?.Count ?? 0;
-                    Notify($"✅ {presetName} aktif — {count} FastFlag berhasil ditulis ke disk.");
+                    Notify($"{presetName} tersimpan ({count} entri konfigurasi). {blockedCount} flag yang terbukti ditolak Roblox diblokir; Roblox tetap menentukan konfigurasi yang diterapkan.");
                 }
                 else
                 {
-                    Notify($"✅ {presetName} aktif — file ClientAppSettings.json akan dibuat saat Roblox launch.");
+                    Notify($"{presetName} tersimpan. File konfigurasi dibuat saat Roblox dijalankan; penerapan flag ditentukan oleh Roblox.");
                 }
             }
             catch (Exception ex)
             {
-                Notify($"✅ {presetName} aktif — (verifikasi gagal: {ex.Message})");
+                Notify($"{presetName} tersimpan, tetapi file konfigurasi tidak dapat diverifikasi: {ex.Message}");
             }
         }
 

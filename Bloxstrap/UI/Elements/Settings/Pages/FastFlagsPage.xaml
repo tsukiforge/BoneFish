@@ -226,7 +226,7 @@
                 <ui:CardAction Margin="0,4,0,0" Icon="Settings28" Command="{Binding ApplyRecommendedFastFlagsCommand}">
                     <StackPanel>
                         <TextBlock FontSize="14" Text="Auto-optimize FastFlags" />
-                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Set recommended performance flags for lower-end systems." 
+                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Save a recommended performance preset; Roblox may ignore local flags."
                                    Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                         <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
                                    Text="[ ACTIVE ]" Visibility="{Binding IsAutoOptimizeActive, Converter={StaticResource BoolToVis}}" />
@@ -237,7 +237,7 @@
                     <StackPanel>
                         <TextBlock FontSize="14" Text="Apply stable low-spec preset" />
                         <TextBlock Margin="0,2,0,0" FontSize="12" 
-                                   Text="Combine low-spec rendering and stable network settings in one click." 
+                                   Text="Apply low-spec rendering and matchmaking preferences. This does not change ping or network quality."
                                    Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                         <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
                                    Text="[ ACTIVE ]" Visibility="{Binding IsStableActive, Converter={StaticResource BoolToVis}}" />
@@ -246,8 +246,8 @@
 
                 <ui:CardAction Margin="0,4,0,0" Icon="AppsAddIn28" Command="{Binding ApplyBalancedPresetCommand}">
                     <StackPanel>
-                        <TextBlock FontSize="14" Text="Balanced (optimal)" />
-                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Keseimbangan visual dan performa. Termasuk No Delay Network." 
+                        <TextBlock FontSize="14" Text="Balanced" />
+                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Keseimbangan visual dan performa; preferensi matchmaking tidak menurunkan ping."
                                    Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                         <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
                                    Text="[ ACTIVE ]" Visibility="{Binding IsBalancedActive, Converter={StaticResource BoolToVis}}" />
@@ -258,16 +258,16 @@
                                Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock FontSize="14" FontWeight="SemiBold" Text="🥔 Anti Not-Responding (Long Session)" />
+                            <TextBlock FontSize="14" FontWeight="SemiBold" Text="🥔 Extreme Performance (Potato Mode)" />
                             <Border Margin="8,0,0,0" Padding="6,2" Background="#CC3300" CornerRadius="4">
                                 <TextBlock FontSize="10" FontWeight="Bold" Foreground="White" Text="PALING AGRESIF" />
                             </Border>
                         </StackPanel>
                         <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Untuk laptop kentang: dual-core, RAM &lt;4GB. Mencegah Roblox freeze/not-responding setelah main lama." />
+                                   Text="Untuk perangkat lama: pengaturan visual sangat rendah. Tidak menjamin mencegah freeze atau Not Responding." />
                         <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="Orange"
-                                   Text="[ ACTIVE — ANTI NOT-RESPONDING 🥔 ]"
+                                   Text="[ EXTREME VISUAL SETTINGS 🥔 ]"
                                    Visibility="{Binding IsExtremePerformanceActive, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
                 </ui:CardAction>
@@ -302,7 +302,7 @@
                 <!-- FAST LOADING TOGGLE -->
                 <controls:OptionControl
                     Header="Fast Loading (Percepat Muncul Aset)"
-                    Description="Optimasi loading: texture &amp; mesh muncul lebih cepat. Stack dengan preset apa pun. Aktif otomatis berdasarkan jumlah core CPU.">
+                    Description="Pada CPU 8+ logical processor menulis thread flag yang penerimaannya belum terverifikasi; Roblox menolak flag texture-compositor pada log yang dianalisis. Tidak menjamin loading lebih cepat.">
                     <ui:ToggleSwitch IsChecked="{Binding EnableFastLoadingFlags, Mode=TwoWay}" />
                 </controls:OptionControl>
 
@@ -332,18 +332,6 @@
                 <controls:OptionControl 
                     Header="{x:Static resources:Strings.Menu_FastFlags_Reset_Title}">
                     <ui:ToggleSwitch IsChecked="{Binding ResetConfiguration, Mode=TwoWay}" />
-                </controls:OptionControl>
-
-                <controls:OptionControl 
-                    Header="Nonaktifkan Animasi UI Roblox"
-                    Description="Menonaktifkan animasi menu ESC dan transisi UI untuk memperingan game.">
-                    <ui:ToggleSwitch IsChecked="{Binding DisableRobloxAnimations, Mode=TwoWay}" />
-                </controls:OptionControl>
-
-                <controls:OptionControl 
-                    Header="Mode Memori Rendah Roblox"
-                    Description="Mengoptimalkan penggunaan RAM Roblox agar lebih ringan di PC spek rendah.">
-                    <ui:ToggleSwitch IsChecked="{Binding EnableLowMemoryMode, Mode=TwoWay}" />
                 </controls:OptionControl>
 
                 <!-- GEOMETRY -->
