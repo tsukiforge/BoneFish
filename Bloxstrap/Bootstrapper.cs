@@ -304,10 +304,12 @@ namespace Bloxstrap
                 {
                     // Bersihkan flag lama dari path Roblox standar — cegah kontaminasi antar versi
                     Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+                    Integrations.AutoOptimizeService.PurgeAllKnownFlags();
 
-                    if (App.Settings.Prop.UseFastFlagManager && Integrations.AutoOptimizeService.CheckAndApply())
+                    if (App.Settings.Prop.UseFastFlagManager)
                     {
-                        App.Logger.WriteLine(LOG_IDENT, "Auto-optimize: low-end performance FastFlags applied");
+                        if (Integrations.AutoOptimizeService.CheckAndApply())
+                            App.Logger.WriteLine(LOG_IDENT, "Auto-optimize: conservative graphics quality applied and legacy renderer flags cleared");
 
                         if (App.FastFlags.Changed)
                             App.FastFlags.Save();
@@ -883,32 +885,7 @@ namespace Bloxstrap
 
             var autoclosePids = new List<int>();
 
-            // Game Session Manager is opt-in. Unless the user explicitly enabled it
-            // AND actually has something to suspend (a checked rule or auto-select),
-            // skip BeginSessionAsync() entirely — no WMI query, no process scan,
-            // no file write. Zero overhead for users who don't use this feature.
-            bool gameSessionShouldRun = _launchMode == LaunchMode.Player
-                && App.Settings.Prop.GameSessionEnabled
-                && (App.Settings.Prop.GameSessionAutoSelectSafeApps
-                    || App.Settings.Prop.GameSessionRules.Any(rule => rule.SuspendDuringGame));
 
-            GameSessionRecord? gameSession = null;
-            if (gameSessionShouldRun)
-            {
-                try
-                {
-                    gameSession = await App.GameSession.BeginSessionAsync(_cancelTokenSource.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    // Session management must never prevent Roblox from launching.
-                    App.Logger.WriteLine(LOG_IDENT, $"Game Session start failed (non-fatal): {ex.Message}");
-                }
-            }
 
             // the code you're gonna read ahead is horrible. sorry for the hack, but it works ¯\_(ツ)_/¯
             // check if prelaunch is checked
@@ -954,18 +931,6 @@ namespace Bloxstrap
                 _appPid = process.Id;
                 _appWindowHandle = process.MainWindowHandle;
 
-                if (gameSession is not null)
-                {
-                    try
-                    {
-                        App.GameSession.AttachGameProcess(_appPid);
-                    }
-                    catch (Exception ex)
-                    {
-                        App.Logger.WriteLine(LOG_IDENT, $"Game Session PID attach failed (non-fatal): {ex.Message}");
-                    }
-                }
-
                 // Optional memory trim for eligible low-memory SSD systems.
                 // Hanya aktif saat OptimizeForLowEnd = true.
                 if (App.Settings.Prop.OptimizeForLowEnd && _launchMode == LaunchMode.Player)
@@ -978,18 +943,12 @@ namespace Bloxstrap
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
                 // 1223 = ERROR_CANCELLED, gets thrown if a UAC prompt is cancelled
-                if (gameSession is not null)
-                    App.GameSession.EndSession();
-
                 return;
             }
             catch (Exception)
             {
                 // attempt a reinstall on next launch
                 File.Delete(AppData.ExecutablePath);
-
-                if (gameSession is not null)
-                    App.GameSession.EndSession();
 
                 throw;
             }
@@ -1055,9 +1014,7 @@ namespace Bloxstrap
 
             if (App.Settings.Prop.EnableActivityTracking
                 || App.LaunchSettings.TestModeFlag.Active
-                || autoclosePids.Any()
-                || gameSessionShouldRun
-                || gameSession is { SuspendedProcesses.Count: > 0 })
+                || autoclosePids.Any())
             {
                 var watcherData = new WatcherData
                 {
@@ -1081,9 +1038,6 @@ namespace Bloxstrap
                 // for stale instances). Holding it from the bootstrapper made the freshly
                 // spawned watcher fail to acquire the lock and abort before creating the tray icon.
                 Process.Start(Paths.Process, args);
-
-                if (gameSession is { SuspendedProcesses.Count: > 0 })
-                    App.GameSession.MarkHandedOffToWatcher();
             }
 
             // allow for window to show, since the log is created pretty far beforehand

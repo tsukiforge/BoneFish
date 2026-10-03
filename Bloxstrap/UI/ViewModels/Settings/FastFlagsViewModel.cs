@@ -17,6 +17,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private Dictionary<string, object>? _preResetFlags;
 
         private bool _isApplying;
+        private bool _presetGraphicsQualityWarning;
         public bool IsApplying
         {
             get => _isApplying;
@@ -381,8 +382,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         // ── Adaptive Hardware Dashboard (Phase 5) ─────────────────────────────────
         // Menggantikan satu baris SystemInfoText dengan dashboard ringkas:
-        // DEVICE / PROFILE / HEALTH / OPTIMIZATION / SECURITY — semua dari mesin profil
-        // hardware (cache per-proses, on-demand) + state Game Session yang sudah ada.
+        // DEVICE / PROFILE / HEALTH / OPTIMIZATION / SECURITY — all data is on-demand.
         // Tidak ada polling: dashboard di-refresh HANYA saat page reload / tombol refresh.
         public AdaptiveSystemDashboard SystemDashboard { get; private set; } = AdaptiveSystemDashboard.Load();
 
@@ -410,7 +410,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
             public string StorageConfidence { get; init; } = "";
             public string MemoryHealth { get; init; } = "";
             public string RobloxStatus { get; init; } = "";
-            public string GameSessionStatus { get; init; } = "";
             public string Preset { get; init; } = "";
             public string FpsCap { get; init; } = "";
             public string FastLoading { get; init; } = "";
@@ -439,16 +438,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     foreach (Process p in procs) { try { p.Dispose(); } catch { } }
                 }
                 catch { robloxStatus = "Unknown"; }
-
-                string gameSessionStatus;
-                try
-                {
-                    var record = App.GameSession.Store.ReadActive();
-                    gameSessionStatus = record is null
-                        ? "Idle"
-                        : $"Aktif — {record.SuspendedProcesses.Count} app ditahan";
-                }
-                catch { gameSessionStatus = "Unknown"; }
 
                 string securityState;
                 string securityDetail;
@@ -504,7 +493,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     StorageConfidence = profile.StorageConfidence,
                     MemoryHealth = $"Tekanan memori {profile.MemoryPressure switch { Integrations.HardwareProfile.MemoryPressureLevel.High => "TINGGI", Integrations.HardwareProfile.MemoryPressureLevel.Moderate => "moderate", _ => "rendah" }}",
                     RobloxStatus = robloxStatus,
-                    GameSessionStatus = gameSessionStatus,
                     Preset = preset,
                     FpsCap = fpsCap,
                     FastLoading = App.Settings.Prop.EnableFastLoadingFlags ? "ON" : "OFF",
@@ -549,6 +537,26 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.Settings.Prop.ForceExtremeMode = value;
                 OnPropertyChanged(nameof(ForceExtremeMode));
+
+                if (value)
+                {
+                    ApplyPresetGraphicsQuality(1);
+                }
+                else
+                {
+                    int? selectedPresetQuality = App.Settings.Prop.SelectedPerformancePreset switch
+                    {
+                        "Balanced" => 5,
+                        "AutoOptimize" or "Stable" or "UltraLow" or "ExtremePerformance" => 1,
+                        _ => null
+                    };
+
+                    if (selectedPresetQuality.HasValue)
+                        ApplyPresetGraphicsQuality(selectedPresetQuality.Value);
+                    else
+                        RestorePresetGraphicsQuality();
+                }
+
                 try { App.Settings.Save(); } catch { }
             }
         }
@@ -586,11 +594,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
 
         /// <summary>
-        /// TDR Mitigation — toggle independen untuk KURANGI freeze/layar putih pada
-        /// GPU legacy (Intel iGPU TDR, Event ID 4101). Menurunkan beban render GPU
-        /// (MSAA off, FRM rendah, texture rendah, FPS cap konsisten) — di luar itu
-        /// BUKAN menghilangkan total: akar masalah ada di driver GPU legacy yang
-        /// tidak punya update lagi. Stack dengan preset visual apa pun.
+        /// TDR Mitigation lowers Roblox's saved graphics quality and removes the old
+        /// MSAA renderer FastFlag. It can reduce render load but cannot guarantee that
+        /// driver/device hangs stop.
         /// </summary>
         public bool EnableTdrMitigation
         {
@@ -691,6 +697,38 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        private void ApplyPresetGraphicsQuality(int qualityLevel)
+        {
+            try
+            {
+                if (!Integrations.AutoOptimizeService.ApplySafeRobloxGraphicsQuality(qualityLevel))
+                {
+                    _presetGraphicsQualityWarning = true;
+                    Notify("Kualitas grafis Roblox belum bisa diubah. Buka Roblox sekali, lalu terapkan ulang preset.");
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("FastFlagsViewModel::ApplyPresetGraphicsQuality", ex);
+                _presetGraphicsQualityWarning = true;
+                Notify("Kualitas grafis gagal disimpan. Perubahan preset lainnya tetap diterapkan.");
+            }
+        }
+
+        private void RestorePresetGraphicsQuality()
+        {
+            try
+            {
+                Integrations.AutoOptimizeService.RestoreSafeRobloxGraphicsQuality();
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("FastFlagsViewModel::RestorePresetGraphicsQuality", ex);
+                _presetGraphicsQualityWarning = true;
+                Notify("Kualitas grafis Roblox gagal dipulihkan.");
+            }
+        }
+
         private async Task ApplyRecommendedFastFlags()
         {
             // ── Re-entrancy guard ──────────────────────────────────────────────
@@ -718,13 +756,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x1;
-            SelectedTextureQuality = TextureQuality.Level0;
-            MeshQualityEnabled = true;
-            MeshQuality = 0;
-            FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 21;
+            ApplyPresetGraphicsQuality(1);
             // Manual flags ditulis langsung (bukan via toggle property) supaya preset
             // TIDAK membalik state manual user di Settings — flag manual & preset
             // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
@@ -785,13 +817,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // ── AutoOptimize base ────────────────────────────────────────────────────────
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x1;
-            SelectedTextureQuality = TextureQuality.Level0;
-            MeshQualityEnabled = true;
-            MeshQuality = 0;
-            FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 21;
+            ApplyPresetGraphicsQuality(1);
             // Manual flags ditulis langsung (bukan via toggle property) supaya preset
             // TIDAK membalik state manual user di Settings — flag manual & preset
             // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
@@ -848,31 +874,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x1;
-            // Texture Level1 (bukan Level0) sejak rombak v7.2.7: texture paksa 0
-            // (DFIntTextureQualityOverride=0) terbukti merusak render di iGPU tua
-            // (audit layar-putih 8/18/2026). Level1 tetap rendah tapi aman.
-            SelectedTextureQuality = TextureQuality.Level1;
-            MeshQualityEnabled = true;
-            MeshQuality = 0;
-            // FRMQualityOverride TIDAK dipaksa di preset sejak rombak v7.2.7 —
-            // render quality override (DFIntDebugFRMQualityLevelOverride) adalah
-            // komponen kombinasi layar-putih; user bisa set manual di dropdown Rendering.
-            FRMQualityOverrideEnabled = false;
-            FRMQualityOverride = 1;
-
-            // LOD — semua level 250 sesuai ultra low-spec.json
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
-
-            // Anti-crash: batasi texture compositor jobs.
-            // (DFIntTaskSchedulerTargetFps & FIntRenderLocalLightUpdatesMax/Min
-            // DIBUANG di rombak v7.2.7 — tidak di allowlist / di-deny client 0.734.)
-            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
+            ApplyPresetGraphicsQuality(1);
 
             // Manual flags ditulis langsung (bukan via toggle property) supaya preset
             // TIDAK membalik state manual user di Settings — flag manual & preset
@@ -887,9 +889,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
-            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif (priority
-            // HIGHEST) — override nilai MSAA/FRM/texture/FPS-cap dari preset di atas
-            // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
+            // Re-apply the independent MSAA mitigation after clearing preset flags.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
 
@@ -902,11 +902,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
 
-            // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
-            // Agar value "UltraLow" tertulis ke disk. Saat bootstrapper restart,
-            // AutoOptimizeService.CheckAndApply() baca SelectedPerformancePreset dari disk.
-            // Jika "UltraLow" tidak ada di disk, service ini OVERWRITE semua flag
-            // dengan FRM=1 + shadow=0 + voxelizer=True → game GELAP.
+            // Save the selected preset so diagnostics and boot-time policy stay in sync.
             SelectedPreset = "UltraLow";
 
             // Save semua flag ke disk SEBELUM page reload agar tidak ada flag yang hilang
@@ -942,17 +938,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x2;
-            SelectedTextureQuality = TextureQuality.Level1;
-            MeshQualityEnabled = true;
-            MeshQuality = 1;
-            FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 15;
-
-            // Balanced lighting
-            App.FastFlags.SetPreset("Rendering.LightingMode", "Default");
-            App.FastFlags.SetPreset("Terrain.GridV2", "False");
+            ApplyPresetGraphicsQuality(5);
 
             // Network flags — panggil method reusable (ApplyNetworkOptimizations tidak trigger reload)
             Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
@@ -961,9 +947,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
-            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif (priority
-            // HIGHEST) — override nilai MSAA/FRM/texture/FPS-cap dari preset di atas
-            // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
+            // Re-apply the independent MSAA mitigation after clearing preset flags.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
 
@@ -986,54 +970,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
 
         /// <summary>
-        /// Preset "ExtremePerformance" (Potato Mode).
-        ///
-        /// Filosofi: SAMA dengan UltraLow sebagai base, ditambah:
-        ///  - Anti not-responding (telemetry off, animation tracks, light fade)
-        ///  - FPS cap yang bisa dikonfigurasi user (default 30, min 24)
-        ///  - Rendering asset lebih cepat muncul (LOD distance diperbesar, bukan 0)
-        ///    sehingga objek dekat tidak tembus/pop-in
-        ///
-        /// Yang TIDAK dilakukan (beda dari versi sebelumnya yang bermasalah):
-        ///  - TIDAK paksa Voxel lighting → layar hitam di game ShadowMap/Future
-        ///  - TIDAK disable PostFx → visual game rusak
-        ///  - TIDAK SkyGray → atmosphere game berubah
-        ///  - TIDAK ubah LightAttenuation → model lighting game berubah
-        ///
-        /// ═══════════════════════════════════════════════════════════════════
-        /// ★ AUDIT: Anti Not-Responding (Long Session) — Laporan Lengkap
-        /// ═══════════════════════════════════════════════════════════════════
-        ///
-        /// 1. STATUS ACTIVE:
-        ///    - Hanya aktif melalui klik manual user (button "Anti Not-Responding").
-        ///    - TIDAK auto-activated oleh CheckAndApply()/DetectSystemTier().
-        ///    - Dapat juga aktif via ForceExtremeMode toggle + launch restart.
-        ///
-        /// 2. FLAG VISUAL (sengaja disertakan, tidak dipisah jadi toggle):
-        ///    - FFlagDebugSSAOForce=False   — SSAO dimatikan
-        ///    - FIntSSAOMipLevels=0         — SSAO kualitas 0
-        ///    - FIntRobloxGuiBlurIntensity=0 — Blur UI mati
-        ///    Alasan: Preset ini didesain untuk device dual-core, RAM <4GB,
-        ///    di mana SEMUA post-processing ringan pun membebani CPU/GPU.
-        ///    Label "PALING AGRESIF" sudah memperingatkan user.
-        ///    Visual yang dimatikan hanya efek kosmetik (blur, SSAO)
-        ///    — TIDAK memengaruhi gameplay, lighting, atau shadow.
-        ///    (FIntRenderGrainScale dihapus dari preset di rombak v7.2.7 —
-        ///    di-deny client Roblox 0.734.)
-        ///
-        /// 3. FLAG ANTI-FREEZE/STABILITY:
-        ///    ★ AUDIT v7.x: DFIntMaxActiveAnimationTracks, FIntRenderLocalLightFadeInMs
-        ///    dan 7 flag telemetry off TIDAK ADA di Fast Flag Allowlist resmi Roblox
-        ///    (aktif sejak 2025-09-29; devforum 3966569) → client mengabaikannya.
-        ///    Flag-flag itu TIDAK LAGI ditulis oleh preset (nilai lama dibersihkan
-        ///    oleh purge AllKnownManagedFlags).
-        ///
-        /// 4. KEPUTUSAN FINAL:
-        ///    - Tidak dibuat toggle EnableAntiFreezeMode terpisah.
-        ///    - Preset tetap sebagai SATU PAKET untuk target pengguna
-        ///      spesifik (low-end extreme).
-        ///    - Dokumentasi ini untuk transparansi — bukan dead code.
-        /// ═══════════════════════════════════════════════════════════════════
+        /// Applies the lowest Roblox graphics quality without renderer FastFlag overrides.
         /// </summary>
         private async Task ApplyExtremePerformancePreset()
         {
@@ -1053,87 +990,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x1;
-            // Texture Level1 (bukan Level0) sejak rombak v7.2.7: texture paksa 0
-            // (DFIntTextureQualityOverride=0) terbukti merusak render di iGPU tua
-            // (audit layar-putih 8/18/2026). Level1 tetap rendah tapi aman.
-            SelectedTextureQuality = TextureQuality.Level1;
-            MeshQualityEnabled = true;
-            MeshQuality = 0;
-            // FRMQualityOverride TIDAK dipaksa di preset sejak rombak v7.2.7 —
-            // DFIntDebugFRMQualityLevelOverride adalah komponen kombinasi layar-putih
-            // di iGPU tua; user bisa set manual di dropdown Rendering.
-            FRMQualityOverrideEnabled = false;
-            FRMQualityOverride = 1;
-
-            // ── Shadow: TIDAK dimatikan sepenuhnya ──────────────────────────────────────
-            // CATATAN SEBELUMNYA (PENYEBAB GAME GELAP):
-            // FIntRenderShadowIntensity=0 + DFFlagDebugPauseVoxelizer=True + FRM=1
-            // menghapus SEMUA bayangan dan lighting baked → game jadi HITAM.
-            // Terutama parah di game ShadowMap/Future (Phasmophobia, horror games).
-            //
-            // FIX: FRM override dihapus (rombak v7.2.7) — lighting pipeline default.
-            // Shadow intensity DIHAPUS (biarkan default Roblox), voxelizer TIDAK dipause.
-            //
-            // Light updates Max/Min (FIntRenderLocalLightUpdates*) DIBUANG — di-deny
-            // client 0.734 ("Denied local configuration"), menulisnya sia-sia.
-
-            // ── Post-processing ringan: hanya yang tidak merusak visual game ────────────
-            App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
-            App.FastFlags.SetValue("FIntSSAOMipLevels", "0");
-            App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
-            // FIntRenderGrainScale DIBUANG di rombak v7.2.7 — di-deny client 0.734.
-
-            // ── Grass & wind: dibiarkan default — tidak memengaruhi rendering speed ──────
-
-            // ── LOD / Asset rendering cepat ───────────────────────────────────────────────
-            // Nilai 250 (bukan 0!) agar objek dekat tetap high-poly, tidak tembus/pop-in.
-            // Nilai 0 menyebabkan semua objek jadi low-poly dari jarak 0 — itulah yang
-            // bikin aset "tembus" saat didekati. 250 = switch ke low-poly mulai ~250 studs.
-            // ★ FIX (audit FPS Fase 2): L23/L34 TIDAK lagi hardcode 500/750. Nilai berat
-            // itu hanya untuk storage DIKONFIRMASI SSD; HDD & Unknown → 250/250 (safe
-            // low-end LOD). Satu sumber kebenaran: GetExtremeLodValues() — dipakai juga
-            // oleh boot path agar preset UI dan auto-optimize tidak drift.
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-            (string extremeLodL23, string extremeLodL34) = Integrations.AutoOptimizeService.GetExtremeLodValues();
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    extremeLodL23);
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    extremeLodL34);
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
-            App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
-
-            // ── Texture & terrain ────────────────────────────────────────────────────────
-            App.FastFlags.SetValue("FIntTerrainArraySliceSize", "0");
-            // FIntTextureCompositorLowResFactor DIBUANG di rombak v7.2.7 — komponen
-            // kombinasi layar-putih di iGPU tua.
-            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
-
-            // ── Render batch: kurangi draw-call overhead ─────────────────────────────────
-            App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
-            App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
-
-            // ── Rendering speed: percepat render aset ────────────────────────────────────
-            // DFIntMaxFrameBufferSize & FIntRuntimeMaxNumOfThreads DIBUANG di rombak
-            // v7.2.7 — frame buffer 4 + thread render dibatasi terbukti memicu artefak/
-            // layar putih di iGPU tua; manfaatnya tidak terukur pada dual/quad core.
-
-            // DFFlagEnableRequestAsyncCompression=True: aktifkan kompresi async untuk
-            // request aset ke server Roblox — aset lebih cepat di-download saat join game,
-            // mengurangi delay "tembus/pop-in" saat aset belum selesai load.
-            // Sumber: Firebladedoge229 gist (confirmed 2026).
-            App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
-
-            // ── Anti Not-Responding ───────────────────────────────────────────────────────
-            // ★ AUDIT v7.x: DFIntMaxActiveAnimationTracks dan 7 flag telemetry
-            // (FFlagDebugDisableTelemetry*) TIDAK ADA di Fast Flag Allowlist resmi Roblox
-            // yang aktif sejak 29 Sep 2025 → client mengabaikannya. Tidak ditulis lagi;
-            // nilai lama tetap dihapus lewat purge (AllKnownManagedFlags).
-
-            // ── FPS Cap DIBUANG di rombak v7.2.7 ─────────────────────────────────────────
-            // DFIntTaskSchedulerTargetFps TIDAK ada di allowlist sejak 2025-09-29 — client
-            // mengabaikannya. FPS cap manual di-set user di pengaturan Roblox
-            // (GlobalBasicSettings FramerateCap), bukan lewat FastFlag.
+            ApplyPresetGraphicsQuality(1);
 
             // ── BoneFish settings ────────────────────────────────────────────────────────
             // CATATAN: ForceExtremeMode TIDAK di-hardcode true di sini.
@@ -1158,9 +1015,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
-            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif (priority
-            // HIGHEST) — override nilai MSAA/FRM/texture/FPS-cap dari preset di atas
-            // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
+            // Re-apply the independent MSAA mitigation after clearing preset flags.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
 
@@ -1170,8 +1025,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableLowMemoryMode)
                 Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
-            // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
-            // Agar value "ExtremePerformance" tertulis ke disk. Lihat komentar di ApplyUltraLowSpecPreset.
+            // Save the selected preset so diagnostics and boot-time policy stay in sync.
             SelectedPreset = "ExtremePerformance";
 
             // Save semua flag ke disk SEBELUM page reload agar tidak ada flag yang hilang
@@ -1201,12 +1055,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 int blockedCount = FastFlagManager.FlagsRejectedByRobloxLogs.Count;
                 if (File.Exists(filePath))
                 {
-                    Notify($"{presetName} tersimpan ({count} entri konfigurasi). {blockedCount} flag yang terbukti ditolak Roblox diblokir; Roblox tetap menentukan konfigurasi yang diterapkan.");
+                    Notify($"{presetName} tersimpan ({count} entri konfigurasi). {blockedCount} flag yang terbukti ditolak Roblox diblokir; Roblox tetap menentukan konfigurasi yang diterapkan.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil diubah." : "")}");
                 }
                 else
                 {
-                    Notify($"{presetName} tersimpan. File konfigurasi dibuat saat Roblox dijalankan; penerapan flag ditentukan oleh Roblox.");
+                    Notify($"{presetName} tersimpan. File konfigurasi dibuat saat Roblox dijalankan; penerapan flag ditentukan oleh Roblox.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil diubah." : "")}");
                 }
+                _presetGraphicsQualityWarning = false;
             }
             catch (Exception ex)
             {
@@ -1365,10 +1220,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
             SelectedPreset = "None";
+            RestorePresetGraphicsQuality();
 
             try { App.Settings.Save(); } catch { }
 
-            Notify("✅ ClientAppSettings berhasil dibersihkan. Pilih preset untuk memulai ulang.");
+            Notify($"✅ ClientAppSettings berhasil dibersihkan. Pilih preset untuk memulai ulang.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil dipulihkan." : "")}");
+            _presetGraphicsQualityWarning = false;
             OnRequestPageReload();
         }
 

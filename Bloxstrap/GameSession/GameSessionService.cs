@@ -6,274 +6,26 @@ namespace Bloxstrap.GameSession
     {
         private const string LOG_IDENT = "GameSession";
 
-        // ── Serialisasi Session Lifecycle (FIX race condition v7.3.1) ─────────────
-        // ActivityWatcher dapat me-replay puluhan join/leave saat reattach ke proses
-        // Roblox eksternal yang sudah lama berjalan — menyebabkan BeginSession/
-        // EndSession overlap/bersamaan, file I/O race di active.json.tmp, dan
-        // notifikasi tray duplikat. SemaphoreSlim memastikan HANYA SATU operasi
-        // session yang berjalan; operasi berikutnya menunggu (await) yang sebelumnya
-        // selesai. Deadline 30s mencegah deadlock jika sesi sebelumnya terjebak.
+        // Serialize recovery attempts so the same saved session cannot be restored twice.
         private readonly SemaphoreSlim _sessionLock = new(1, 1);
         private static readonly TimeSpan SessionLockTimeout = TimeSpan.FromSeconds(30);
 
-        private readonly Func<IEnumerable<ProcessSnapshot>> _processSource;
         private readonly Func<int, bool> _isProcessAlive;
-        private readonly Func<ICollection<GameSessionRule>> _rulesSource;
 
         public SecuritySoftwareDetector Detector { get; }
-        public ProcessSuspensionService Suspension { get; }
+        private ProcessSuspensionService Suspension { get; }
         public GameSessionStore Store { get; }
-        public GameSessionRecord? ActiveSession { get; private set; }
 
         public GameSessionService(
             SecuritySoftwareDetector? detector = null,
             ProcessSuspensionService? suspension = null,
             GameSessionStore? store = null,
-            Func<IEnumerable<ProcessSnapshot>>? processSource = null,
-            Func<int, bool>? isProcessAlive = null,
-            Func<ICollection<GameSessionRule>>? rulesSource = null)
+            Func<int, bool>? isProcessAlive = null)
         {
             Detector = detector ?? new SecuritySoftwareDetector();
             Suspension = suspension ?? new ProcessSuspensionService();
             Store = store ?? new GameSessionStore();
-            _processSource = processSource ?? ScanProcesses;
             _isProcessAlive = isProcessAlive ?? IsProcessAlive;
-            _rulesSource = rulesSource ?? (() => App.Settings.Prop.GameSessionRules);
-        }
-
-        public async Task<GameSessionRecord> BeginSessionAsync(CancellationToken cancellationToken = default)
-        {
-            const string LOG_IDENT_LOCAL = "GameSession::BeginSession";
-
-            if (!await _sessionLock.WaitAsync(SessionLockTimeout, cancellationToken))
-            {
-                App.Logger.WriteLine(LOG_IDENT_LOCAL, "BeginSession timeout — sebelumnya masih berjalan?");
-                throw new TimeoutException("BeginSession timeout: operasi session sebelumnya belum selesai dalam 30 detik.");
-            }
-
-            try
-            {
-                return await BeginSessionCoreAsync(cancellationToken);
-            }
-            finally
-            {
-                _sessionLock.Release();
-            }
-        }
-
-        private async Task<GameSessionRecord> BeginSessionCoreAsync(CancellationToken cancellationToken)
-        {
-            const string LOG_IDENT_LOCAL = "GameSession::BeginSession";
-
-            if (Store.ReadActive() is { } existing)
-            {
-                if (ShouldRestoreStale(existing))
-                    EndSessionCore(null);
-
-                if (Store.ReadActive() is not null)
-                    throw new InvalidOperationException("A previous Game Session still has processes pending restore.");
-            }
-
-            SecurityDetectionState detectorState = await Detector.RefreshAsync(cancellationToken);
-            List<ProcessSnapshot> processes = _processSource().ToList();
-
-            // ── FIX v7.7.0: lifecycle logging (spec §6) ──────────────────────
-            App.Logger.WriteLine(LOG_IDENT_LOCAL, $"Game Session Started (detector={detectorState}, processes={processes.Count})");
-
-            // PID semua Windows service (SCM). Service = komponen sistem/vendor —
-            // sinyal CRITICAL tambahan di classifier supaya audio stack, driver
-            // companion, dan sync service (bahkan yang jalan di session user,
-            // mis. OneDrive.Sync.Service) tidak pernah ter-suspend.
-            IReadOnlySet<int> serviceProcessIds = ServiceProcessDetector.GetServiceProcessIds(cancellationToken);
-            if (serviceProcessIds.Count > 0)
-                App.Logger.WriteLine(LOG_IDENT_LOCAL, $"{serviceProcessIds.Count} Windows service PID terdaftar sebagai protected");
-
-            var session = new GameSessionRecord
-            {
-                CoordinatorProcessId = Environment.ProcessId,
-                DetectorState = detectorState,
-                DetectorMessage = Detector.Message
-            };
-
-            // Persist before the first mutation so an interruption still leaves a recovery record.
-            ActiveSession = session;
-            Store.WriteActive(session);
-
-            ICollection<GameSessionRule> storedRules = _rulesSource();
-            bool rulesChanged = false;
-
-            if (!App.Settings.Prop.GameSessionConservativeRulesApplied)
-            {
-                string[] rulesToDisable = { "SensorDBSynch", "esrv" };
-                int disabledRuleCount = 0;
-
-                foreach (GameSessionRule rule in storedRules)
-                {
-                    if (rule.SuspendDuringGame
-                        && rulesToDisable.Contains(rule.ProcessName, StringComparer.OrdinalIgnoreCase))
-                    {
-                        rule.SuspendDuringGame = false;
-                        rule.AutoSelectionDisabled = true;
-                        disabledRuleCount++;
-                    }
-                }
-
-                if (App.Settings.Prop.GameSessionAutoSelectSafeApps)
-                {
-                    App.Settings.Prop.GameSessionAutoSelectSafeApps = false;
-                    App.Logger.WriteLine(LOG_IDENT_LOCAL,
-                        "Disabled automatic safe-app selection; future Game Session suspensions require an enabled app rule");
-                }
-
-                App.Settings.Prop.GameSessionConservativeRulesApplied = true;
-                rulesChanged = true;
-
-                App.Logger.WriteLine(LOG_IDENT_LOCAL,
-                    $"Applied conservative Game Session defaults; disabled {disabledRuleCount} unverified process rule(s): SensorDBSynch, esrv");
-            }
-
-            bool detectorSoftFail = App.Settings.Prop.GameSessionAllowSuspensionOnDetectorFailure
-                && detectorState != SecurityDetectionState.Ok;
-            if (detectorSoftFail)
-            {
-                App.Logger.WriteLine(LOG_IDENT_LOCAL,
-                    $"Detector={detectorState} tapi opt-in suspension-on-detector-failure aktif — suspend lanjut untuk proses yang disetujui user (guard IsAlwaysProtected tetap penuh)");
-            }
-
-            if (App.Settings.Prop.GameSessionAutoSelectSafeApps && detectorState == SecurityDetectionState.Ok)
-            {
-                foreach (ProcessSnapshot process in processes)
-                {
-                    if (!ProcessClassifier.IsAutomaticCandidate(process, Detector, Environment.ProcessId, 0, serviceProcessIds))
-                        continue;
-
-                    GameSessionRule? existingRule = FindRule(process, storedRules
-                        .Where(rule => true)
-                        .GroupBy(RuleKey)
-                        .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase));
-
-                    if (existingRule is null)
-                    {
-                        storedRules.Add(new GameSessionRule
-                        {
-                            ProcessName = process.ProcessName,
-                            ExecutablePath = process.ExecutablePath,
-                            SuspendDuringGame = true
-                        });
-                        rulesChanged = true;
-                    }
-                    else if (!existingRule.AutoSelectionDisabled && !existingRule.SuspendDuringGame)
-                    {
-                        existingRule.SuspendDuringGame = true;
-                        rulesChanged = true;
-                    }
-                }
-            }
-
-            if (rulesChanged)
-            {
-                try { App.Settings.Save(); }
-                catch (Exception ex) { App.Logger.WriteException(LOG_IDENT_LOCAL, ex); }
-            }
-
-            Dictionary<string, GameSessionRule> rules = storedRules
-                .Where(rule => rule.SuspendDuringGame)
-                .GroupBy(rule => RuleKey(rule))
-                .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
-
-            try
-            {
-                foreach (ProcessSnapshot process in processes)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    GameSessionRule? rule = FindRule(process, rules);
-                    if (rule is null || !rule.SuspendDuringGame)
-                        continue;
-
-                    ProcessClassification classification = ProcessClassifier.Classify(
-                        process,
-                        Detector,
-                        Environment.ProcessId,
-                        0,
-                        rule,
-                        serviceProcessIds);
-
-                    if (classification != ProcessClassification.Safe)
-                    {
-                        App.Logger.WriteLine(LOG_IDENT_LOCAL,
-                            $"Skip PID={process.ProcessId} ({process.ProcessName}): classified {classification}; detector={detectorState}");
-                        continue;
-                    }
-
-                    App.Logger.WriteLine(LOG_IDENT_LOCAL,
-                        $"Rule matched: {process.ProcessName} → target PID={process.ProcessId}");
-
-                    ProcessSuspendResult result = Suspension.SuspendProcess(process.ProcessId, cancellationToken);
-
-                    // ── FIX v7.7.0: VERIFIKASI post-suspend, jangan percaya API call ──
-                    // Spec: "Never silently report success if suspension did not
-                    // actually happen." 0 thread tersuspend = GAGAL — proses tetap
-                    // berjalan, TIDAK boleh masuk record (kalau masuk, restore nanti
-                    // percaya proses ini suspended padahal tidak).
-                    if (result.SuspendedThreadIds.Count == 0)
-                    {
-                        string failReason = result.TotalThreadCount == 0
-                            ? "no accessible threads (elevated or protected process)"
-                            : $"all {result.FailedThreadCount} thread OpenThread/SuspendThread gagal (elevated/protected)";
-
-                        App.Logger.WriteLine(LOG_IDENT_LOCAL,
-                            $"Suspend FAILED: PID={process.ProcessId} ({process.ProcessName}) — Status: FAILED, Reason: {failReason}. " +
-                            "Proses TIDAK masuk sesi dan tetap berjalan.");
-                        continue;
-                    }
-
-                    App.Logger.WriteLine(LOG_IDENT_LOCAL,
-                        $"Suspend OK: PID={process.ProcessId} ({process.ProcessName}) — threads {result.SuspendedThreadIds.Count}/{result.TotalThreadCount}, failed={result.FailedThreadCount}, passes={result.SweepPasses}, Status: SUSPENDED{(result.PartiallySuspended ? " (PARTIAL)" : "")}");
-
-                    session.AppliedRules.Add(RuleKey(rule));
-                    session.SuspendedProcesses.Add(new SuspendedProcessRecord
-                    {
-                        ProcessId = process.ProcessId,
-                        SessionId = process.SessionId,
-                        ProcessName = process.ProcessName,
-                        ExecutablePath = process.ExecutablePath,
-                        StartTimeUtc = process.StartTimeUtc,
-                        AppliedRule = RuleKey(rule),
-                        ThreadIds = result.SuspendedThreadIds,
-                        TotalThreadCount = result.TotalThreadCount,
-                        SuspendedThreadCount = result.SuspendedThreadIds.Count,
-                        FailedThreadCount = result.FailedThreadCount,
-                        PartiallySuspended = result.PartiallySuspended
-                    });
-
-                    Store.WriteActive(session);
-                    App.Logger.WriteLine(
-                        LOG_IDENT_LOCAL,
-                        $"{process.ProcessName} ter-suspend {result.SuspendedThreadIds.Count}/{result.TotalThreadCount} thread" +
-                        (result.PartiallySuspended ? " (PartiallySuspended)" : ""));
-                }
-            }
-            catch
-            {
-                EndSessionCore(null);
-                throw;
-            }
-
-            if (session.SuspendedProcesses.Count > 0)
-                Store.WriteActive(session);
-            else
-            {
-                Store.ClearActive();
-                ActiveSession = null;
-            }
-
-            App.Logger.WriteLine(
-                LOG_IDENT_LOCAL,
-                $"detector={session.DetectorState}; suspended={session.SuspendedProcesses.Count}; " +
-                "unapproved processes were not touched");
-
-            return session;
         }
 
         public IReadOnlyList<RescuedProcess> RescueSuspendedProcesses()
@@ -281,25 +33,6 @@ namespace Bloxstrap.GameSession
             return Suspension.RescueSuspendedProcesses();
         }
 
-
-        public void AttachGameProcess(int processId)
-        {
-            if (ActiveSession is null)
-                return;
-
-            ActiveSession.GameProcessId = processId;
-            if (ActiveSession.SuspendedProcesses.Count > 0)
-                Store.WriteActive(ActiveSession);
-        }
-
-        public void MarkHandedOffToWatcher()
-        {
-            if (ActiveSession is null || ActiveSession.SuspendedProcesses.Count == 0)
-                return;
-
-            ActiveSession.HandedOffToWatcher = true;
-            Store.WriteActive(ActiveSession);
-        }
 
         public SessionSummary EndSession(int? expectedGameProcessId = null)
         {
@@ -332,7 +65,7 @@ namespace Bloxstrap.GameSession
         private SessionSummary EndSessionCore(int? expectedGameProcessId)
         {
             const string LOG_IDENT_LOCAL = "GameSession::EndSession";
-            GameSessionRecord? session = ActiveSession ?? Store.ReadActive();
+            GameSessionRecord? session = Store.ReadActive();
 
             if (session is null)
                 return new SessionSummary { EndedAtUtc = DateTime.UtcNow };
@@ -395,8 +128,6 @@ namespace Bloxstrap.GameSession
                 Store.ClearActive();
             }
 
-            ActiveSession = null;
-
             App.Logger.WriteLine(LOG_IDENT_LOCAL, FormatSummary(summary));
             return summary;
         }
@@ -438,84 +169,6 @@ namespace Bloxstrap.GameSession
             return String.Format(Strings.GameSession_RestoredPartial, summary.RestoredCount, summary.TotalSuspended, failed).Trim();
         }
 
-        public IReadOnlyList<ProcessSnapshot> ScanForUi()
-        {
-            // ★ FIX v7.6.3: filter pakai IsAlwaysProtected, bukan IsCritical.
-            // IsCritical juga menolak proses dengan path/start-time tidak terbaca
-            // (proses elevated dari proses non-admin) — akibatnya aplikasi elevated
-            // TIDAK PERNAH muncul di daftar dan tidak bisa dipilih user. Guard
-            // proteksi sebenarnya tetap penuh lewat IsAlwaysProtected.
-            return _processSource()
-                .Where(process => process.ProcessId != Environment.ProcessId)
-                .Where(process => !String.IsNullOrWhiteSpace(process.ProcessName))
-                .Where(process => !ProcessClassifier.IsAlwaysProtected(process, Detector, Environment.ProcessId, 0))
-                .GroupBy(process => RuleKey(process), StringComparer.OrdinalIgnoreCase)
-                .Select(group => group.First())
-                .ToList();
-        }
-
-        private static IEnumerable<ProcessSnapshot> ScanProcesses()
-        {
-            var snapshots = new List<ProcessSnapshot>();
-
-            foreach (Process process in Utilities.GetProcessesSafe())
-            {
-                try
-                {
-                    string? executablePath = null;
-                    DateTime? startTime = null;
-
-                    try { executablePath = process.MainModule?.FileName; } catch { }
-                    try { startTime = process.StartTime.ToUniversalTime(); } catch { }
-
-                    snapshots.Add(new ProcessSnapshot
-                    {
-                        ProcessId = process.Id,
-                        SessionId = TryGetSessionId(process),
-                        ProcessName = process.ProcessName,
-                        ExecutablePath = executablePath,
-                        StartTimeUtc = startTime
-                    });
-                }
-                catch
-                {
-                    // Process exited or is protected between enumeration and inspection.
-                }
-                finally
-                {
-                    process.Dispose();
-                }
-            }
-
-            return snapshots;
-        }
-
-        private static GameSessionRule? FindRule(ProcessSnapshot process, IReadOnlyDictionary<string, GameSessionRule> rules)
-        {
-            if (!String.IsNullOrWhiteSpace(process.ExecutablePath)
-                && rules.TryGetValue(process.ExecutablePath, out GameSessionRule? pathRule))
-            {
-                return pathRule;
-            }
-
-            rules.TryGetValue(process.ProcessName, out GameSessionRule? nameRule);
-            return nameRule;
-        }
-
-        private static string RuleKey(GameSessionRule rule)
-        {
-            return !String.IsNullOrWhiteSpace(rule.ExecutablePath)
-                ? rule.ExecutablePath
-                : rule.ProcessName;
-        }
-
-        private static string RuleKey(ProcessSnapshot process)
-        {
-            return !String.IsNullOrWhiteSpace(process.ExecutablePath)
-                ? process.ExecutablePath
-                : process.ProcessName;
-        }
-
         private static bool IsProcessAlive(int processId)
         {
             try
@@ -529,10 +182,5 @@ namespace Bloxstrap.GameSession
             }
         }
 
-        private static int TryGetSessionId(Process process)
-        {
-            try { return process.SessionId; }
-            catch { return -1; }
-        }
     }
 }

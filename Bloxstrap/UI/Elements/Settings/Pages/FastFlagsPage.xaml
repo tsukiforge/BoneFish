@@ -146,9 +146,6 @@
                                    Text="{Binding SystemDashboard.MemoryHealth, StringFormat='• {0}'}" />
                         <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"
                                    Text="{Binding SystemDashboard.RobloxStatus, StringFormat='• Roblox: {0}'}" />
-                        <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"
-                                   Text="{Binding SystemDashboard.GameSessionStatus, StringFormat='• Game Session: {0}'}" />
-
                         <!-- OPTIMIZATION -->
                         <TextBlock Margin="0,8,0,2" FontSize="11" FontWeight="Bold"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="OPTIMIZATION" />
@@ -226,7 +223,7 @@
                 <ui:CardAction Margin="0,4,0,0" Icon="Settings28" Command="{Binding ApplyRecommendedFastFlagsCommand}">
                     <StackPanel>
                         <TextBlock FontSize="14" Text="Auto-optimize FastFlags" />
-                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Save a recommended performance preset; Roblox may ignore local flags."
+                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Set Roblox's saved graphics quality to low and clear legacy renderer overrides."
                                    Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                         <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
                                    Text="[ ACTIVE ]" Visibility="{Binding IsAutoOptimizeActive, Converter={StaticResource BoolToVis}}" />
@@ -237,7 +234,7 @@
                     <StackPanel>
                         <TextBlock FontSize="14" Text="Apply stable low-spec preset" />
                         <TextBlock Margin="0,2,0,0" FontSize="12" 
-                                   Text="Apply low-spec rendering and matchmaking preferences. This does not change ping or network quality."
+                                   Text="Set Roblox's saved graphics quality to low and clear legacy renderer overrides. Matchmaking preferences do not change ping."
                                    Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                         <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
                                    Text="[ ACTIVE ]" Visibility="{Binding IsStableActive, Converter={StaticResource BoolToVis}}" />
@@ -265,9 +262,9 @@
                         </StackPanel>
                         <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Untuk perangkat lama: pengaturan visual sangat rendah. Tidak menjamin mencegah freeze atau Not Responding." />
+                                   Text="Sets Roblox's saved graphics quality to the lowest level and removes legacy renderer overrides. This cannot guarantee that freezes will stop." />
                         <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="Orange"
-                                   Text="[ EXTREME VISUAL SETTINGS 🥔 ]"
+                                   Text="[ LOW ROBLOX GRAPHICS ]"
                                    Visibility="{Binding IsExtremePerformanceActive, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
                 </ui:CardAction>
@@ -295,7 +292,7 @@
                 <!-- FORCE EXTREME MODE -->
                 <controls:OptionControl
                     Header="Force Extreme Mode (Potato Mode Override)"
-                    Description="Paksa preset ExtremePerformance walau hardware terdeteksi MidRange/HighEnd.">
+                    Description="Gunakan kualitas grafis Roblox rendah dan bersihkan renderer FastFlags lama, tanpa memaksa override render eksperimental.">
                     <ui:ToggleSwitch IsChecked="{Binding ForceExtremeMode, Mode=TwoWay}" />
                 </controls:OptionControl>
 

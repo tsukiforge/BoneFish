@@ -49,24 +49,18 @@ namespace Bloxstrap.Models.Persistable
         public bool ShowServerDetails { get; set; } = false;
         public ObservableCollection<CustomIntegration> CustomIntegrations { get; set; } = new();
 
-        // Game Session Manager rules. New applications are persisted disabled.
+        // Legacy Game Session settings are retained for config compatibility and
+        // restoring data from v7.7.5. Current versions never start suspension.
         public ObservableCollection<GameSessionRule> GameSessionRules { get; set; } = new();
         public bool GameSessionAutoSelectSafeApps { get; set; } = false;
         public bool GameSessionConservativeRulesApplied { get; set; } = false;
 
         public int FastFlagMeshQualityPreset { get; set; } = -1;
 
-        // Master toggle Game Session Manager — default OFF (opt-in).
-        // Saat false, BeginSessionAsync() tidak pernah dipanggil di bootstrapper,
-        // jadi nol overhead WMI/process-scan/file-write untuk user yang tidak memakai
-        // fitur ini. Rules yang sudah dicentang TETAP tersimpan, hanya tidak dieksekusi.
+        // Retained only to deserialize settings created by older versions.
         public bool GameSessionEnabled { get; set; } = false;
 
-        // ★ FIX v7.6.3: saat detector keamanan gagal (Security Center mati/disable —
-        // umum di Windows debloat), suspend dulu selalu fail-closed: NOL proses pernah
-        // ter-suspend walau user sudah mencentangnya. Opt-in ini melanjutkan suspend
-        // untuk proses yang DISETUJUI USER dengan guard IsAlwaysProtected tetap penuh
-        // (daftar proses kritik, service SCM, session 0, Windows path, security vendor).
+        // Retained only to deserialize settings created by older versions.
         public bool GameSessionAllowSuspensionOnDetectorFailure { get; set; } = false;
 
         // mod preset configuration
@@ -87,6 +81,9 @@ namespace Bloxstrap.Models.Persistable
 
         // performance preset
         public string SelectedPerformancePreset { get; set; } = "None";
+        public bool PerformancePresetGraphicsQualityManaged { get; set; }
+        public string? PerformancePresetPreviousGraphicsQuality { get; set; }
+        public string? PerformancePresetAppliedGraphicsQuality { get; set; }
 
         // ExtremePerformance (Potato Mode) — override manual agar user bisa paksa mode ini
         // walau auto-detect tidak mendeteksi perangkat sebagai UltraLow

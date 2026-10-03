@@ -1050,20 +1050,11 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Restore Suspended Apps.
+        ///   Looks up a localized string similar to restoring apps left suspended by an older BoneFish version.
         /// </summary>
         public static string ContextMenu_RestoreGameSession {
             get {
                 return ResourceManager.GetString("ContextMenu.RestoreGameSession", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Game Session Settings.
-        /// </summary>
-        public static string ContextMenu_OpenGameSessionSettings {
-            get {
-                return ResourceManager.GetString("ContextMenu.OpenGameSessionSettings", resourceCulture);
             }
         }
         

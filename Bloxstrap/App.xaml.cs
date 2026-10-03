@@ -508,9 +508,9 @@ namespace Bloxstrap
         {
             try
             {
-                if (App.GameSession.ActiveSession is { HandedOffToWatcher: false })
+                if (App.GameSession.Store.ReadActive() is not null)
                 {
-                    Logger.WriteLine("App::CleanupServices", "Restoring Game Session before process exit");
+                    Logger.WriteLine("App::CleanupServices", "Restoring suspended applications before process exit");
                     App.GameSession.EndSession();
                 }
             }

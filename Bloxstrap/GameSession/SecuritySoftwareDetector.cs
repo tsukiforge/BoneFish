@@ -4,23 +4,7 @@ using Bloxstrap.GameSession.Models;
 namespace Bloxstrap.GameSession
 {
     /// <summary>
-    /// Detects security software before any user-approved process can be touched.
-    ///
-    /// ★ FIX v7.6.3 — perubahan semantik failure:
-    /// Dulu SEMUA kegagalan infrastruktur deteksi (Security Center service mati,
-    /// WMI diblokir, WMI repository rusak) menghasilkan state Unavailable, dan
-    /// ProcessClassifier mem-fail-closed: NOL proses di-suspend selamanya tanpa
-    /// penjelasan. Di PC yang Security Center-nya di-disable (Windows debloat,
-    /// group policy, OOShutUp, dsb.) fitur suspend jadi "tidak pernah bekerja
-    /// sama sekali" padahal user sudah mencentang aplikasinya.
-    ///
-    /// Sekarang kegagalan infrastruktur menghasilkan Degraded: nama-nama proses
-    /// keamanan yang diketahui (Defender + daftar vendor statis + path yang berhasil
-    /// terbaca) tetap dilindungi penuh, tapi proses yang sudah disetujui USER secara
-    /// eksplisit boleh di-suspend. Kombinasi Unavailable tetap dipakai HANYA sebagai
-    /// hard-stop ketika user belum mengaktifkan GameSessionAllowSuspensionOnDetectorFailure.
-    /// Produk keamanan pihak ketiga yang TERDETEKSI (mapped) tetap membuat suspend
-    /// dihentikan total — itu jalur IsAlwaysProtected, bukan jalur state ini.
+    /// Detects registered security software for read-only diagnostics.
     /// </summary>
     public class SecuritySoftwareDetector
     {

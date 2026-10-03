@@ -31,11 +31,11 @@ namespace Bloxstrap.Integrations
     /// Replaces the old MessageBox text dump. READ-ONLY, ON-DEMAND: called once when
     /// the user opens the Diagnostic Center. Reuses the already-cached storage engine
     /// and hardware profile; the only potentially-new WMI queries are the security
-    /// detector's (also cached per Game Session refresh, 3s WMI timeout) — none of
+    /// detector's (cached for the diagnostic refresh, with a 3s WMI timeout) — none of
     /// this runs on a timer.
     ///
-    /// Sections: Hardware, Storage, Roblox, Performance, Security, Game Session,
-    /// FastFlags, FPS, Warnings, Recommendations.
+    /// Sections: Hardware, Storage, Roblox, Performance, Security, FastFlags, FPS,
+    /// Warnings, Recommendations.
     /// </summary>
     public static class DiagnosticReportBuilder
     {
@@ -60,7 +60,6 @@ namespace Bloxstrap.Integrations
             sections.Add(BuildRoblox(warnings, recommendations));
             sections.Add(BuildPerformance(profile, warnings, recommendations));
             sections.Add(BuildSecurity(warnings, recommendations));
-            sections.Add(BuildGameSession(profile, warnings, recommendations));
             sections.Add(BuildFastFlags(warnings, recommendations));
             sections.Add(BuildFps(profile, warnings, recommendations));
 
@@ -238,11 +237,11 @@ namespace Bloxstrap.Integrations
                 recommendations.Add(new DiagnosticEntry
                 {
                     Status = DiagnosticStatus.Attention,
-                    Text = "Disable Fast Loading bila Roblox loading menyebabkan disk usage tetap mendekati 100%. (HDD terdeteksi; paralelisme texture compositor menambah antrean I/O.)"
+                    Text = "Matikan Fast Loading jika Roblox loading membuat disk usage tetap mendekati 100%; manfaat flag thread lokal belum terverifikasi."
                 });
             }
 
-            entries.Add(new DiagnosticEntry { Status = DiagnosticStatus.Ok, Text = $"TDR Mitigation: {(App.Settings.Prop.EnableTdrMitigation ? "ON (MSAA diturunkan)" : "OFF")}" });
+            entries.Add(new DiagnosticEntry { Status = DiagnosticStatus.Ok, Text = $"TDR Mitigation: {(App.Settings.Prop.EnableTdrMitigation ? "ON (Roblox graphics quality set low)" : "OFF")}" });
             entries.Add(new DiagnosticEntry
             {
                 Status = DiagnosticStatus.Ok,
@@ -315,20 +314,6 @@ namespace Bloxstrap.Integrations
                 });
             }
 
-            bool optIn = App.Settings.Prop.GameSessionAllowSuspensionOnDetectorFailure;
-            entries.Add(new DiagnosticEntry
-            {
-                Status = state == SecurityDetectionState.Ok ? DiagnosticStatus.Ok :
-                         optIn ? DiagnosticStatus.Attention : DiagnosticStatus.Ok,
-                Text = state switch
-                {
-                    SecurityDetectionState.Ok => "Game Session safety: penuh — suspend hanya untuk aplikasi yang disetujui user",
-                    _ => optIn
-                        ? "Game Session safety: fail-safe + opt-in user — proses yang DISETUJUI USER boleh di-suspend, semua proses keamanan tetap dilindungi penuh"
-                        : "Game Session safety: fail-closed — TIDAK ADA proses yang di-suspend selama deteksi tidak Ok"
-                }
-            });
-
             entries.Add(new DiagnosticEntry
             {
                 Status = DiagnosticStatus.Ok,
@@ -345,49 +330,6 @@ namespace Bloxstrap.Integrations
             return new DiagnosticSection { Title = "Security", Entries = entries };
         }
 
-        private static DiagnosticSection BuildGameSession(HardwareProfile profile, List<DiagnosticEntry> warnings, List<DiagnosticEntry> recommendations)
-        {
-            var entries = new List<DiagnosticEntry>();
-            bool enabled = App.Settings.Prop.GameSessionEnabled;
-
-            entries.Add(new DiagnosticEntry
-            {
-                Status = enabled ? DiagnosticStatus.Ok : DiagnosticStatus.Unknown,
-                Text = enabled ? "Game Session: ON (opt-in)" : "Game Session: OFF — tidak ada proses yang akan disuspend"
-            });
-
-            try
-            {
-                var record = App.GameSession.Store.ReadActive();
-                if (record is null)
-                {
-                    entries.Add(new DiagnosticEntry { Status = DiagnosticStatus.Ok, Text = "Tidak ada sesi aktif — semua aplikasi berjalan normal" });
-                }
-                else
-                {
-                    entries.Add(new DiagnosticEntry
-                    {
-                        Status = record.SuspendedProcesses.Count > 0 ? DiagnosticStatus.Attention : DiagnosticStatus.Ok,
-                        Text = $"Sesi aktif: {record.SuspendedProcesses.Count} aplikasi ditahan (detector saat mulai: {record.DetectorState})",
-                        Detail = String.Join(", ", record.SuspendedProcesses.Select(p => p.ProcessName))
-                    });
-                    entries.Add(new DiagnosticEntry { Status = DiagnosticStatus.Ok, Text = "Restore tersedia kapan pun dari tray (Restore) — exit BoneFish juga me-restore otomatis" });
-                }
-            }
-            catch (Exception ex)
-            {
-                entries.Add(new DiagnosticEntry { Status = DiagnosticStatus.Unknown, Text = $"Status sesi tidak terbaca: {ex.Message}" });
-            }
-
-            entries.Add(new DiagnosticEntry
-            {
-                Status = DiagnosticStatus.Ok,
-                Text = "Realtek/audio, Voice Chat (RtkNGUI64, BthAudioAgent, dll.), Windows service, dan proses security berada di daftar proteksi permanen"
-            });
-
-            return new DiagnosticSection { Title = "Game Session", Entries = entries };
-        }
-
         private static DiagnosticSection BuildFastFlags(List<DiagnosticEntry> warnings, List<DiagnosticEntry> recommendations)
         {
             var entries = new List<DiagnosticEntry>();
@@ -401,7 +343,7 @@ namespace Bloxstrap.Integrations
             entries.Add(new DiagnosticEntry
             {
                 Status = DiagnosticStatus.Ok,
-                Text = $"LOD aktif: CSG {Flag("DFIntCSGLevelOfDetailSwitchingDistance")} / L12 {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL12")} / L23 {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL23")} / L34 {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL34")}"
+                Text = $"LOD dalam konfigurasi lokal: CSG {Flag("DFIntCSGLevelOfDetailSwitchingDistance")} / L12 {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL12")} / L23 {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL23")} / L34 {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL34")}"
             });
             entries.Add(new DiagnosticEntry
             {

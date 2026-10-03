@@ -202,8 +202,7 @@ namespace Bloxstrap.UI
         }
 
         /// <summary>
-        /// FIX (audit tray #4): tooltip tray mencerminkan status Game Session aktif
-        /// (jumlah aplikasi yang ditahan), bukan sekadar nama aplikasi.
+        /// Indicate when a previous BoneFish version left applications suspended.
         /// </summary>
         private void UpdateTrayStatus()
         {
@@ -211,7 +210,7 @@ namespace Bloxstrap.UI
             {
                 int suspended = App.GameSession.Store.ReadActive()?.SuspendedProcesses.Count ?? 0;
                 _notifyIcon.Text = suspended > 0
-                    ? $"BoneFish — Game Session aktif ({suspended} aplikasi ditahan)"
+                    ? $"BoneFish — pemulihan diperlukan ({suspended} aplikasi tertahan)"
                     : "BoneFish";
             }
             catch

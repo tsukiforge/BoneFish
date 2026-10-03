@@ -7,11 +7,9 @@ namespace Bloxstrap.GameSession
         int ProcessId { get; }
         bool IsAlive { get; }
         IReadOnlyCollection<int> GetThreadIds();
-        bool TrySuspendThread(int threadId);
         bool TryResumeThread(int threadId);
         bool IsThreadSuspended(int threadId);
         DateTime? GetStartTimeUtc();
-        long GetProcessorTimeTicks();
     }
 
     internal sealed class Win32ProcessAccessor : IProcessAccessor
@@ -48,22 +46,6 @@ namespace Bloxstrap.GameSession
             catch
             {
                 return Array.Empty<int>();
-            }
-        }
-
-        public bool TrySuspendThread(int threadId)
-        {
-            IntPtr handle = OpenThread(THREAD_SUSPEND_RESUME, false, (uint)threadId);
-            if (handle == IntPtr.Zero)
-                return false;
-
-            try
-            {
-                return SuspendThread(handle) != uint.MaxValue;
-            }
-            finally
-            {
-                CloseHandle(handle);
             }
         }
 
@@ -120,12 +102,6 @@ namespace Bloxstrap.GameSession
         {
             try { return _process.StartTime.ToUniversalTime(); }
             catch { return null; }
-        }
-
-        public long GetProcessorTimeTicks()
-        {
-            try { return _process.TotalProcessorTime.Ticks; }
-            catch { return -1; }
         }
 
         public void Dispose() => _process.Dispose();

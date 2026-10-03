@@ -57,8 +57,7 @@ namespace Bloxstrap.UI.Elements.ContextMenu
 
             VersionTextBlock.Text = $"{App.ProjectName} v{App.Version}";
 
-            // FIX (audit tray #4): status sesi pada item Restore diperbarui setiap kali
-            // menu dibuka — user langsung tahu ada berapa aplikasi yang sedang ditahan.
+            // Keep the legacy recovery action visible and show how many apps it can restore.
             ContextMenu.Opened += (_, _) => RefreshSessionStatus();
             RefreshSessionStatus();
         }
@@ -350,16 +349,6 @@ namespace Bloxstrap.UI.Elements.ContextMenu
             _watcher.RestoreGameSessionNow();
         }
 
-        private void GameSessionSettingsMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            // Arahkan settings window langsung ke halaman Game Session pada
-            // peluncuran berikutnya, lalu buka settings window-nya.
-            App.State.Prop.LastPage = typeof(GameSessionPage).FullName!;
-            try { App.State.Save(); } catch { }
-
-            Process.Start(Paths.Process, "-settings");
-        }
-
         private void LaunchRobloxMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Jalur peluncuran yang sama dengan menu utama (LaunchHandler.LaunchRoblox)
@@ -394,10 +383,7 @@ namespace Bloxstrap.UI.Elements.ContextMenu
 
         private void ExitBoneFishMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // Pulihkan sesi Game Session apa pun yang masih aktif SEBELUM BoneFish
-            // mati — termasuk sesi game eksternal (diluncurkan di luar BoneFish)
-            // yang dipantau watcher dari system tray (v7.2.7). Tanpa ini, proses
-            // yang disuspend tetap beku setelah app ditutup.
+            // Restore any processes left suspended by an older BoneFish version.
             try
             {
                 var summary = App.GameSession.EndSession();

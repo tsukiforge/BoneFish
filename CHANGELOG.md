@@ -1,5 +1,17 @@
 # BoneFish Changelog
 
+## Unreleased — Game Session removal
+
+### Removed
+
+- Remove Game Session process suspension, its settings page, tray settings shortcut,
+  and related diagnostic status. New versions no longer suspend background apps.
+- Keep a tray recovery action and startup recovery for sessions left suspended by
+  older versions. This is recovery-only and does not start new suspension sessions.
+- Game Session remains available in the older v7.7.5 version for users who explicitly
+  want to try it; it may suspend selected background applications and is not supported
+  by this removal update.
+
 ## v7.7.5 — Game Session Lifecycle, Adaptive FPS Cap, Update Checker Removal
 
 Release date: 2026-10-01
@@ -28,6 +40,17 @@ Release date: 2026-10-01
   ineffective animation and low-memory controls.
 - Clarify that saving local FastFlags does not prove Roblox applied them, and that
   matchmaking preferences do not reduce ping.
+- Populate storage diagnostic details from a valid cached result so the hardware
+  profile and dashboard no longer show `Unknown` when the detector has a cached HDD
+  or SSD result.
+- Replace preset-driven renderer FastFlags (including forced LOD, texture, and
+  compositor settings) with Roblox's saved graphics-quality setting; preserve and
+  restore the previous quality when clearing the preset.
+- Keep legacy renderer FastFlags purged during automatic optimization instead of
+  rewriting them at launch.
+- Change TDR mitigation to use Roblox's saved graphics quality rather than forcing
+  the MSAA FastFlag; migrate existing performance presets to the equivalent quality
+  level while preserving user changes.
 
 ### 🔕 BoneFish update checks removed
 

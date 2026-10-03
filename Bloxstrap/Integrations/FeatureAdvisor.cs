@@ -116,21 +116,6 @@ namespace Bloxstrap.Integrations
             };
         }
 
-        public static FeatureAdvice GameSession(HardwareProfile profile)
-        {
-            bool lowRam = profile.TotalRamMb < 6200;
-
-            return new FeatureAdvice
-            {
-                Feature = "Game Session",
-                Availability = FeatureAvailability.Recommended,
-                Reason = lowRam
-                    ? $"RAM {profile.TotalRamMb / 1024}GB — menahan aplikasi latar belakang selama main memberi manfaat memori nyata di hardware ini. Proses Windows/security TIDAK PERNAH disentuh (guard IsAlwaysProtected)."
-                    : "Proteksi proses Windows/security selalu aktif terlepas dari hardware; suspend hanya menyentuh aplikasi yang Anda setujui.",
-                Recommendation = "Recommended: ON (opt-in) dengan auto-select aplikasi aman."
-            };
-        }
-
         public static FeatureAdvice MemoryOptimization(HardwareProfile profile)
         {
             bool ssd = profile.StorageType == "SSD";

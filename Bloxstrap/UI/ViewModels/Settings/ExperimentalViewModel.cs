@@ -476,19 +476,39 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
                 if (value)
                 {
-                    // Turbo Mode ON: force extreme optimizations
+                    // Turbo Mode ON: use Roblox's lowest graphics quality and clear
+                    // legacy renderer FastFlags.
                     App.Settings.Prop.OptimizeForLowEnd = true;
                     App.Settings.Prop.ForceExtremeMode = true;
                     OnPropertyChanged(nameof(OptimizeForLowEnd));
 
-                    AutoOptimizeService.ApplyAggressiveOptimizations(AutoOptimizeService.SystemTier.ExtremePerformance);
+                    AutoOptimizeService.ApplyAggressiveOptimizations(bypassLowEndGuard: true);
                 }
                 else
                 {
-                    // Turbo Mode OFF: restore normal settings
+                    // Turbo Mode OFF: restore the selected preset or the original quality.
                     App.Settings.Prop.OptimizeForLowEnd = false;
                     App.Settings.Prop.ForceExtremeMode = false;
                     OnPropertyChanged(nameof(OptimizeForLowEnd));
+
+                    int? selectedPresetQuality = App.Settings.Prop.SelectedPerformancePreset switch
+                    {
+                        "Balanced" => 5,
+                        "AutoOptimize" or "Stable" or "UltraLow" or "ExtremePerformance" => 1,
+                        _ => null
+                    };
+
+                    try
+                    {
+                        if (selectedPresetQuality.HasValue)
+                            AutoOptimizeService.ApplySafeRobloxGraphicsQuality(selectedPresetQuality.Value);
+                        else
+                            AutoOptimizeService.RestoreSafeRobloxGraphicsQuality();
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Logger.WriteException("ExperimentalViewModel::EnableTurboMode", ex);
+                    }
 
                     AutoOptimizeService.RemoveOptimizations();
                 }
