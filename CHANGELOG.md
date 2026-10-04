@@ -12,6 +12,17 @@
   want to try it; it may suspend selected background applications and is not supported
   by this removal update.
 
+### Performance configuration migration
+
+- Preserve user settings and FastFlags that are not retired renderer overrides or
+  rejected by Roblox. Startup and preset cleanup no longer erase every BoneFish-managed
+  FastFlag.
+- Remove legacy renderer overrides previously written by BoneFish presets and rely on
+  Roblox's saved graphics-quality setting instead. Supported options such as the FPS
+  cap and unrelated client settings remain intact.
+- Remove the Mesh LOD, MSAA, FRM-quality, and texture-quality FastFlag controls so the
+  settings page no longer offers overrides that are cleared during launch migration.
+
 ## v7.7.5 — Game Session Lifecycle, Adaptive FPS Cap, Update Checker Removal
 
 Release date: 2026-10-01

@@ -51,22 +51,10 @@ namespace Bloxstrap
             // Presets and stuff
             { "Rendering.ManualFullscreen", "FFlagHandleAltEnterFullscreenManually" },
             { "Rendering.DisableScaling", "DFFlagDisableDPIScale" },
-            { "Rendering.MSAA", "FIntDebugForceMSAASamples" },
-            { "Rendering.FRMQualityOverride", "DFIntDebugFRMQualityLevelOverride" },
 
             // Rendering engines
             { "Rendering.Mode.D3D11", "FFlagDebugGraphicsPreferD3D11" },
             { "Rendering.Mode.Vulkan", "FFlagDebugGraphicsPreferVulkan" },
-
-            // Geometry
-            { "Geometry.MeshLOD.L0", "DFIntCSGLevelOfDetailSwitchingDistance" },
-            { "Geometry.MeshLOD.L12", "DFIntCSGLevelOfDetailSwitchingDistanceL12" },
-            { "Geometry.MeshLOD.L23", "DFIntCSGLevelOfDetailSwitchingDistanceL23" },
-            { "Geometry.MeshLOD.L34", "DFIntCSGLevelOfDetailSwitchingDistanceL34" },
-
-            // Texture quality
-            { "Rendering.TextureQuality.OverrideEnabled", "DFFlagTextureQualityOverrideEnabled" },
-            { "Rendering.TextureQuality.Level", "DFIntTextureQualityOverride" },
         };
 
         public static IReadOnlyDictionary<RenderingMode, string> RenderingModes => new Dictionary<RenderingMode, string>
@@ -74,23 +62,6 @@ namespace Bloxstrap
             { RenderingMode.Default, "None" },
             { RenderingMode.Vulkan, "Vulkan" },
             { RenderingMode.D3D11, "D3D11" },
-        };
-
-        public static IReadOnlyDictionary<MSAAMode, string?> MSAAModes => new Dictionary<MSAAMode, string?>
-        {
-            { MSAAMode.Default, null },
-            { MSAAMode.x1, "1" },
-            { MSAAMode.x2, "2" },
-            { MSAAMode.x4, "4" }
-        };
-
-        public static IReadOnlyDictionary<TextureQuality, string?> TextureQualityLevels => new Dictionary<TextureQuality, string?>
-        {
-            { TextureQuality.Default, null },
-            { TextureQuality.Level0, "0" },
-            { TextureQuality.Level1, "1" },
-            { TextureQuality.Level2, "2" },
-            { TextureQuality.Level3, "3" },
         };
 
         // all fflags are stored as strings
@@ -219,12 +190,6 @@ namespace Bloxstrap
 
             bool fastFlagsChanged = false;
             bool settingsChanged = false;
-            if (App.Settings.Prop.FastFlagMeshQualityPreset < 0
-                && int.TryParse(GetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic"), out int oldMeshQuality))
-            {
-                App.Settings.Prop.FastFlagMeshQualityPreset = Math.Clamp(oldMeshQuality, 0, 3);
-                settingsChanged = true;
-            }
 
             if (App.Settings.Prop.DisableRobloxAnimations || App.Settings.Prop.EnableLowMemoryMode)
             {

@@ -331,58 +331,9 @@
                     <ui:ToggleSwitch IsChecked="{Binding ResetConfiguration, Mode=TwoWay}" />
                 </controls:OptionControl>
 
-                <!-- GEOMETRY -->
-                <TextBlock Text="{x:Static resources:Strings.Common_Presets}" FontSize="20" FontWeight="Medium" Margin="0,16,0,4" />
-                <TextBlock Text="{x:Static resources:Strings.Common_Geometry}" FontSize="16" FontWeight="Medium" Margin="0,4,0,0" />
-
-                <ui:CardExpander Margin="0,4,0,0" IsExpanded="{Binding Path=MeshQualityEnabled, Mode=OneWay}" 
-                                 Style="{StaticResource NoUserExpansionCardExpanderStyle}">
-                    <ui:CardExpander.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock FontSize="14" Text="{x:Static resources:Strings.Menu_FastFlags_MeshDetail_Header}" />
-                                <TextBlock FontSize="12" Text="{x:Static resources:Strings.Menu_FastFlags_MeshDetail_Description}" 
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                            </StackPanel>
-                            <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding MeshQualityEnabled, Mode=TwoWay}" />
-                        </Grid>
-                    </ui:CardExpander.Header>
-                    <StackPanel Margin="0,8,0,0">
-                        <TextBlock Padding="8" Text="{x:Static resources:Strings.Menu_FastFlags_MeshDetail_LowQualityWarning}" 
-                                   TextAlignment="Center" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="{x:Static resources:Strings.Common_LowestQuality}" Grid.Column="0" />
-                            <Slider Grid.Column="1" Margin="8,0,8,0" Minimum="0" Maximum="3" 
-                                    TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding MeshQuality, Mode=TwoWay}" />
-                            <TextBlock Text="{x:Static resources:Strings.Common_HighestQuality}" Grid.Column="2" />
-                        </Grid>
-                    </StackPanel>
-                </ui:CardExpander>
-
                 <!-- RENDERING -->
                 <TextBlock Text="{x:Static resources:Strings.Menu_FastFlags_Presets_Categories_Rendering}" 
                            FontSize="16" FontWeight="Medium" Margin="0,16,0,0" />
-
-                <controls:OptionControl Header="{x:Static resources:Strings.Menu_FastFlags_Presets_MSAA_Title}">
-                    <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" 
-                              ItemsSource="{Binding MSAALevels.Keys, Mode=OneTime}" 
-                              SelectedItem="{Binding SelectedMSAALevel, Mode=TwoWay}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Path=., Converter={StaticResource EnumNameConverter}}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </controls:OptionControl>
 
                 <controls:OptionControl 
                     Header="{x:Static resources:Strings.Menu_FastFlags_Presets_FixDisplayScaling_Title}" 
@@ -390,43 +341,6 @@
                     HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/A-guide-to-FastFlags#dpi-scaling-fixes">
                     <ui:ToggleSwitch IsChecked="{Binding FixDisplayScaling, Mode=TwoWay}" />
                 </controls:OptionControl>
-
-                <ui:CardExpander Margin="0,4,0,0" IsExpanded="{Binding FRMQualityOverrideEnabled, Mode=OneWay}" 
-                                 Style="{StaticResource NoUserExpansionCardExpanderStyle}">
-                    <ui:CardExpander.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock FontSize="14" Text="{x:Static resources:Strings.Menu_FastFlags_FRMQualityOverride_Title}" />
-                                <TextBlock FontSize="12" Text="{x:Static resources:Strings.Menu_FastFlags_FRMQualityOverride_Description}" 
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                            </StackPanel>
-                            <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding FRMQualityOverrideEnabled, Mode=TwoWay}" />
-                        </Grid>
-                    </ui:CardExpander.Header>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{x:Static resources:Strings.Common_LowestQuality}" Grid.Column="0" />
-                        <Slider Grid.Column="1" Margin="8,0,8,0" Minimum="1" Maximum="21" 
-                                TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FRMQualityOverride, Mode=TwoWay}" />
-                        <TextBlock Text="{x:Static resources:Strings.Common_HighestQuality}" Grid.Column="2" />
-                        <Border Margin="8,-4,0,0" Grid.Column="3" Width="30" 
-                                BorderBrush="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}" 
-                                Background="{ui:ThemeResource SolidBackgroundFillColorSecondarybrush}" 
-                                BorderThickness="1" CornerRadius="4">
-                            <TextBlock HorizontalAlignment="Center" Padding="4" VerticalAlignment="Center" 
-                                       TextAlignment="Center" Text="{Binding FRMQualityOverride, Mode=TwoWay}" />
-                        </Border>
-                    </Grid>
-                </ui:CardExpander>
 
                 <controls:OptionControl Header="{x:Static resources:Strings.Menu_FastFlags_Presets_RenderingMode_Title}">
                     <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" 
@@ -440,17 +354,6 @@
                     </ComboBox>
                 </controls:OptionControl>
 
-                <controls:OptionControl Header="{x:Static resources:Strings.Menu_FastFlags_Presets_TextureQuality_Title}">
-                    <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" 
-                              ItemsSource="{Binding TextureQualities.Keys, Mode=OneTime}" 
-                              SelectedItem="{Binding SelectedTextureQuality, Mode=TwoWay}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Path=., Converter={StaticResource EnumNameConverter}}" />
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </controls:OptionControl>
             </StackPanel>
         </Grid>
     </Grid>

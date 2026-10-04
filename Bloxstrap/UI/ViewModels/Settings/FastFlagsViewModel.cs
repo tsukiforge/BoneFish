@@ -111,19 +111,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        public IReadOnlyDictionary<MSAAMode, string?> MSAALevels => FastFlagManager.MSAAModes;
-
-        public MSAAMode SelectedMSAALevel
-        {
-            get => MSAALevels.FirstOrDefault(x => x.Value == App.FastFlags.GetPreset("Rendering.MSAA")).Key;
-            set
-            {
-                App.FastFlags.SetPreset("Rendering.MSAA", MSAALevels[value]);
-                // ★ FIX: simpan seketika agar pilihan bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
         public IReadOnlyDictionary<RenderingMode, string> RenderingModes => FastFlagManager.RenderingModes;
 
         public RenderingMode SelectedRenderingMode
@@ -148,109 +135,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.FastFlags.SetPreset("Rendering.DisableScaling", value ? "True" : null);
                 // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
                 try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
-        public IReadOnlyDictionary<TextureQuality, string?> TextureQualities => FastFlagManager.TextureQualityLevels;
-
-        public TextureQuality SelectedTextureQuality
-        {
-            get => TextureQualities.Where(x => x.Value == App.FastFlags.GetPreset("Rendering.TextureQuality.Level")).FirstOrDefault().Key;
-            set
-            {
-                if (value == TextureQuality.Default)
-                {
-                    App.FastFlags.SetPreset("Rendering.TextureQuality", null);
-                }
-                else
-                {
-                    App.FastFlags.SetPreset("Rendering.TextureQuality.OverrideEnabled", "True");
-                    App.FastFlags.SetPreset("Rendering.TextureQuality.Level", TextureQualities[value]);
-                }
-                // ★ FIX: simpan seketika agar pilihan bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
-        private static readonly string[] LODLevels = { "L0", "L12", "L23", "L34" };
-
-        public bool FRMQualityOverrideEnabled
-        {
-            get => App.FastFlags.GetPreset("Rendering.FRMQualityOverride") != null;
-            set
-            {
-                if (value)
-                    FRMQualityOverride = 21;
-                else
-                    App.FastFlags.SetPreset("Rendering.FRMQualityOverride", null);
-
-                OnPropertyChanged(nameof(FRMQualityOverride));
-                OnPropertyChanged(nameof(FRMQualityOverrideEnabled));
-                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
-        public int FRMQualityOverride
-        {
-            get => int.TryParse(App.FastFlags.GetPreset("Rendering.FRMQualityOverride"), out var x) ? x : 21;
-            set
-            {
-                App.FastFlags.SetPreset("Rendering.FRMQualityOverride", value);
-
-                OnPropertyChanged(nameof(FRMQualityOverride));
-                // ★ FIX: simpan seketika agar nilai slider bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
-        public bool MeshQualityEnabled
-        {
-            get => App.Settings.Prop.FastFlagMeshQualityPreset >= 0;
-            set
-            {
-                if (value)
-                {
-                    // we enable level 3 by default
-                    MeshQuality = 3;
-                }
-                else
-                {
-                    foreach (string level in LODLevels)
-                        App.FastFlags.SetPreset($"Geometry.MeshLOD.{level}", null);
-
-                    App.Settings.Prop.FastFlagMeshQualityPreset = -1;
-                }
-
-                OnPropertyChanged(nameof(MeshQualityEnabled));
-                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-                try { App.Settings.Save(); } catch { }
-            }
-        }
-
-        public int MeshQuality
-        {
-            get => Math.Max(0, App.Settings.Prop.FastFlagMeshQualityPreset);
-            set
-            {
-                // holy..
-                int clamped = Math.Clamp(value, 0, LODLevels.Length - 1);
-                App.Settings.Prop.FastFlagMeshQualityPreset = clamped;
-
-                for (int i = 0; i < LODLevels.Length; i++)
-                {
-                    int lodValue = (Math.Clamp(clamped - i, 0, 3) + 1) * 250;
-                    string lodLevel = LODLevels[i];
-
-                    App.FastFlags.SetPreset($"Geometry.MeshLOD.{lodLevel}", lodValue);
-                }
-
-                OnPropertyChanged(nameof(MeshQuality));
-                OnPropertyChanged(nameof(MeshQualityEnabled));
-                // ★ FIX: simpan seketika agar nilai slider bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-                try { App.Settings.Save(); } catch { }
             }
         }
 
@@ -292,7 +176,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 Integrations.AutoOptimizeService.RemoveDisableRobloxAnimations();
                 OnPropertyChanged(nameof(DisableRobloxAnimations));
                 // ★ FIX: simpan seketika — state toggle disimpan TERPISAH di Settings
-                // (bukan cuma dibaca dari FastFlags) supaya survive PurgeAllKnownFlags
+                // (bukan cuma dibaca dari FastFlags) supaya survive renderer cleanup
                 // yang jalan setiap Play. FastFlags tetap ditulis untuk efek langsung.
                 try { App.Settings.Save(); } catch { }
                 try { App.FastFlags.Save(); } catch { }
@@ -745,7 +629,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
             // ForceExtremeMode harus di-reset saat pindah ke preset lain,
@@ -808,7 +692,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
@@ -866,7 +750,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
@@ -930,7 +814,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
@@ -984,7 +868,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
 
@@ -1180,17 +1064,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
         // ── Clear ClientAppSettings ───────────────────────────────────────────────────────
 
         /// <summary>
-        /// Hapus semua flag dari ClientAppSettings.json di path BoneFish DAN path Roblox.
+        /// Hapus flag renderer lama yang sudah digantikan kualitas grafis resmi Roblox.
         /// Berguna saat terjadi bug visual (gelap, aneh) akibat akumulasi flag lama.
         /// Setelah clear, user bisa pilih ulang preset yang diinginkan.
         /// </summary>
         private async Task ClearClientAppSettings()
         {
             var result = System.Windows.MessageBox.Show(
-                "Ini akan menghapus SEMUA FastFlag dari ClientAppSettings.json\n" +
-                "di folder BoneFish dan folder Roblox.\n\n" +
-                "Roblox akan berjalan dengan setting default sampai kamu\n" +
-                "pilih preset lagi.\n\n" +
+                "Ini akan menghapus seluruh FastFlag dari profil BoneFish, serta flag renderer lama " +
+                "dan flag yang ditolak Roblox dari konfigurasi klien Roblox.\n\n" +
+                "Pengaturan grafis tersimpan Roblox akan dipulihkan ke nilai sebelumnya.\n\n" +
                 "Lanjutkan?",
                 "Clear ClientAppSettings",
                 System.Windows.MessageBoxButton.YesNo,
@@ -1207,7 +1090,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 // 1. Clear via FastFlagManager (path BoneFish) — bersihkan MEMORY
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
                 App.FastFlags.Prop.Clear();
                 try { App.FastFlags.Save(); } catch { }
 

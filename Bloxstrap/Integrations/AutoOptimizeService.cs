@@ -1055,14 +1055,8 @@ namespace Bloxstrap.Integrations
                     App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation re-applied after CheckAndApply (priority: HIGHEST)");
                 }
 
-                // ── Manual FastFlag toggles — chokepoint boot ─────────────────────
-                // ★ FIX: DisableRobloxAnimations/EnableLowMemoryMode disimpan sebagai
-                // bool terpisah di Settings (bukan dibaca dari FastFlags saat itu).
-                // Setiap Play, PurgeAllKnownFlags()/RemoveOptimizations() menghapus
-                // keempat flag-nya dari AllKnownManagedFlags dan tidak ada yang
-                // me-re-apply → toggle manual "hilang" tiap main. Re-apply di sini
-                // (pola SAMA dengan TDR Mitigation di atas) supaya manual flags
-                // survive apa pun path yang dijalankan.
+                // ── Legacy FastFlag toggles ───────────────────────────────────────
+                // Roblox-rejected values are filtered by FastFlagManager before save.
                 if (App.Settings.Prop.DisableRobloxAnimations)
                 {
                     try { ApplyDisableRobloxAnimations(); } catch { }
@@ -1392,7 +1386,7 @@ namespace Bloxstrap.Integrations
                     }
                 }
 
-                PurgeAllKnownFlags();
+                PurgeLegacyRendererFlags();
                 ApplySafeRobloxGraphicsQuality(1);
                 ApplyNetworkOptimizations();
                 if (App.Settings.Prop.EnableFastLoadingFlags)
@@ -1420,7 +1414,10 @@ namespace Bloxstrap.Integrations
             }
         }
 
-        private static readonly string[] AllKnownManagedFlags =
+        // Retired renderer overrides emitted by previous BoneFish presets. All other
+        // flags, including user preferences and currently supported settings, survive
+        // update cleanup unchanged.
+        private static readonly string[] LegacyRendererFlags =
         {
             "DFFlagTextureQualityOverrideEnabled", "DFIntTextureQualityOverride", "FIntTextureCompositorLowResFactor", "DFIntTextureCompositorActiveJobs",
             "DFIntDebugFRMQualityLevelOverride", "FIntRomarkStartWithGraphicQualityLevel",
@@ -1429,54 +1426,25 @@ namespace Bloxstrap.Integrations
             "FFlagDebugSkyGray", "FFlagDisablePostFx", "FFlagDebugSSAOForce", "FIntSSAOMipLevels", "FIntRobloxGuiBlurIntensity", "FIntRenderGrainScale",
             "FIntFRMMinGrassDistance", "FIntFRMMaxGrassDistance", "FIntRenderGrassDetailStrands", "FIntRenderGrassHeightScaler", "FFlagGlobalWindActivated",
             "DFIntCSGLevelOfDetailSwitchingDistance", "DFIntCSGLevelOfDetailSwitchingDistanceL12", "DFIntCSGLevelOfDetailSwitchingDistanceL23",
-            "DFIntCSGLevelOfDetailSwitchingDistanceL34", "DFIntCSGLevelOfDetailSwitchingDistanceStatic", "DFIntCSGv2LodsToGenerate", "DFIntDebugRestrictGCDistance",
+            "DFIntCSGLevelOfDetailSwitchingDistanceL34", "DFIntCSGLevelOfDetailSwitchingDistanceStatic", "DFIntDebugRestrictGCDistance",
             "FIntTerrainArraySliceSize",
             "DFIntAnimationLodFacsDistanceMin", "DFIntAnimationLodFacsDistanceMax", "DFIntAnimationLodFacsVisibilityDenominator",
-            "FIntMaxBatchesPerFlush", "DFIntMaxFrameBufferSize", "FIntRuntimeMaxNumOfThreads", "DFFlagEnableRequestAsyncCompression",
-            "DFIntTaskSchedulerTargetFps",
             "FIntRenderLocalLightUpdatesMax", "FIntRenderLocalLightUpdatesMin", "FIntRenderLocalLightFadeInMs",
-            "DFIntMaxActiveAnimationTracks",
-            "FFlagDebugDisableTelemetryEphemeralCounter", "FFlagDebugDisableTelemetryEphemeralStat", "FFlagDebugDisableTelemetryEventIngest",
-            "FFlagDebugDisableTelemetryPoint", "FFlagDebugDisableTelemetryV2Counter", "FFlagDebugDisableTelemetryV2Event", "FFlagDebugDisableTelemetryV2Stat",
-            "FFlagRenderUIAnimations", "FFlagRenderMenuTransitions", "FFlagRenderInventoryEffects",
-            "FFlagLuaAppEnableLowMemoryMode",
-            "FIntRakNetPacketRateLimit", "DFIntMaxReceivePPS", "DFIntMaxSendPPS", "DFIntConnectionMTUSize", "DFIntOptimizeSendQueue",
-            "FFlagDebugDisplayFPS",
             "FIntDebugForceMSAASamples",
         };
 
-        public static void PurgeAllKnownFlags()
+        private static readonly string[] RendererFlagsToRemove = LegacyRendererFlags
+            .Concat(FastFlagManager.FlagsRejectedByRobloxLogs)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        public static void PurgeLegacyRendererFlags()
         {
-            foreach (string flag in AllKnownManagedFlags)
+            foreach (string flag in RendererFlagsToRemove)
                 App.FastFlags.SetValue(flag, null);
-            App.Logger.WriteLine(LOG_IDENT, $"Purged {AllKnownManagedFlags.Length} known managed flags");
+            App.Logger.WriteLine(LOG_IDENT,
+                $"Removed {RendererFlagsToRemove.Length} retired or Roblox-rejected flags from the active configuration");
         }
-
-        private static readonly string[] ManagedFlags =
-        {
-            "DFFlagTextureQualityOverrideEnabled", "DFIntTextureQualityOverride", "FIntTextureCompositorLowResFactor",
-            "DFIntDebugFRMQualityLevelOverride", "FIntRomarkStartWithGraphicQualityLevel",
-            "FIntRenderShadowIntensity", "DFFlagDebugPauseVoxelizer", "FIntCSGVoxelizerFadeRadius",
-            "FFlagFastGPULightCulling3", "FFlagNewLightAttenuation",
-            "FFlagDebugSSAOForce", "FIntSSAOMipLevels", "FIntRobloxGuiBlurIntensity", "FIntRenderGrainScale",
-            "FIntFRMMinGrassDistance", "FIntFRMMaxGrassDistance", "FIntRenderGrassDetailStrands", "FIntRenderGrassHeightScaler", "FFlagGlobalWindActivated",
-            "DFIntCSGLevelOfDetailSwitchingDistance", "DFIntCSGLevelOfDetailSwitchingDistanceL12", "DFIntCSGLevelOfDetailSwitchingDistanceL23",
-            "DFIntCSGLevelOfDetailSwitchingDistanceL34", "DFIntCSGLevelOfDetailSwitchingDistanceStatic", "DFIntCSGv2LodsToGenerate",
-            "FIntTerrainArraySliceSize",
-            "FIntMaxBatchesPerFlush",
-            "DFFlagEnableRequestAsyncCompression",
-            "DFIntTaskSchedulerTargetFps",
-            "FIntRenderLocalLightUpdatesMax", "FIntRenderLocalLightUpdatesMin",
-            "DFIntTextureCompositorActiveJobs",
-            "DFIntMaxActiveAnimationTracks", "FIntRenderLocalLightFadeInMs",
-            "FFlagDebugDisableTelemetryEphemeralCounter", "FFlagDebugDisableTelemetryEphemeralStat", "FFlagDebugDisableTelemetryEventIngest",
-            "FFlagDebugDisableTelemetryPoint", "FFlagDebugDisableTelemetryV2Counter", "FFlagDebugDisableTelemetryV2Event", "FFlagDebugDisableTelemetryV2Stat",
-            "FFlagRenderUIAnimations", "FFlagRenderMenuTransitions", "FFlagRenderInventoryEffects",
-            "FFlagLuaAppEnableLowMemoryMode",
-            "FIntRakNetPacketRateLimit", "DFIntMaxReceivePPS", "DFIntMaxSendPPS", "DFIntConnectionMTUSize", "DFIntOptimizeSendQueue",
-            "FFlagDebugDisplayFPS",
-            "FIntDebugForceMSAASamples",
-        };
 
         public static void CleanupLegacyRobloxFlags()
         {
@@ -1532,7 +1500,7 @@ namespace Bloxstrap.Integrations
                     return false;
 
                 bool modified = false;
-                foreach (string flag in AllKnownManagedFlags)
+                foreach (string flag in RendererFlagsToRemove)
                 {
                     if (flags.Remove(flag))
                         modified = true;
@@ -1666,7 +1634,7 @@ namespace Bloxstrap.Integrations
             try
             {
                 bool removedAny = false;
-                foreach (string flag in ManagedFlags)
+                foreach (string flag in RendererFlagsToRemove)
                 {
                     if (App.FastFlags.GetValue(flag) is not null)
                     {
@@ -1788,14 +1756,8 @@ namespace Bloxstrap.Integrations
         // ── Manual FastFlag Toggles (DisableRobloxAnimations / EnableLowMemoryMode) ─────
         // ★ FIX (v7.2.x, Opsi A — preset-aware purge): Dua toggle manual ini
         // sebelumnya state-nya dibaca langsung dari App.FastFlags. Setiap Play,
-        // CheckAndApply() → PurgeAllKnownFlags() menghapus flag-nya (keempat flag
-        // ada di AllKnownManagedFlags) dan TIDAK ada yang me-re-apply → toggle
-        // "hilang" tiap launch walau sudah disimpan dengan benar.
-        // Solusi: state toggle dipindah ke Settings (bool terpisah), lalu keempat
-        // flag di-RE-APPLY di akhir CheckAndApply() — pola SAMA dengan TDR Mitigation
-        // (priority: HIGHEST). Purge tetap membersihkan stale values dari preset
-        // sebelumnya, jadi fix v4.4.0 (flag tidak terhapus saat pindah preset)
-        // TIDAK ter-regresi.
+        // These retired controls remain as no-op compatibility methods for older UI
+        // state. Roblox-rejected values are filtered before saving.
         public static void ApplyDisableRobloxAnimations()
         {
             App.Settings.Prop.DisableRobloxAnimations = false;

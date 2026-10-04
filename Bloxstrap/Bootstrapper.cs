@@ -304,7 +304,7 @@ namespace Bloxstrap
                 {
                     // Bersihkan flag lama dari path Roblox standar — cegah kontaminasi antar versi
                     Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                    Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                    Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
 
                     if (App.Settings.Prop.UseFastFlagManager)
                     {

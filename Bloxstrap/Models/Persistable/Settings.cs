@@ -55,8 +55,6 @@ namespace Bloxstrap.Models.Persistable
         public bool GameSessionAutoSelectSafeApps { get; set; } = false;
         public bool GameSessionConservativeRulesApplied { get; set; } = false;
 
-        public int FastFlagMeshQualityPreset { get; set; } = -1;
-
         // Retained only to deserialize settings created by older versions.
         public bool GameSessionEnabled { get; set; } = false;
 
@@ -159,11 +157,8 @@ namespace Bloxstrap.Models.Persistable
         // dimatikan agar nilai user/preset sebelum toggle bisa dikembalikan.
         public Dictionary<string, string> TdrMitigationBackup { get; set; } = new();
 
-        // Manual FastFlag toggles — disimpan sebagai preferensi TERPISAH agar state-nya
-        // survive PurgeAllKnownFlags()/RemoveOptimizations() di setiap Play.
-        // Sebelumnya state dibaca langsung dari FastFlags yang di-purge tiap launch
-        // → toggle "hilang" setiap kali main walau sudah Save. Pola: sama seperti
-        // TDR Mitigation (Settings bool + re-apply di akhir CheckAndApply()).
+        // Legacy toggle state retained for settings compatibility. Roblox-rejected
+        // flag values are filtered by FastFlagManager and are not re-enabled.
         public bool DisableRobloxAnimations { get; set; } = false;
         public bool EnableLowMemoryMode { get; set; } = false;
 
