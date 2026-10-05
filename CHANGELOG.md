@@ -22,6 +22,15 @@
   cap and unrelated client settings remain intact.
 - Remove the Mesh LOD, MSAA, FRM-quality, and texture-quality FastFlag controls so the
   settings page no longer offers overrides that are cleared during launch migration.
+- Add opt-in Beta Tester controls for selected legacy v6.3.1-era renderer flags that
+  were not reported rejected in the analyzed logs; keep rejected Mesh LOD flags blocked.
+  Include a manual GitHub issue form for testers to report results.
+- Recommend a 30 FPS cap for confirmed systems with at most two physical CPU cores,
+  up to 8 GB RAM, and integrated graphics to reduce render load; other hardware keeps
+  the existing tier-based recommendation.
+- Preserve the installed BoneFish executable before upgrades and add an About-page
+  one-step rollback. Rollback only replaces the BoneFish executable; older builds may
+  not recognize or preserve newer BoneFish settings.
 
 ## v7.7.5 — Game Session Lifecycle, Adaptive FPS Cap, Update Checker Removal
 

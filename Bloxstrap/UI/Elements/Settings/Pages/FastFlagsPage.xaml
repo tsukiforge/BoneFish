@@ -354,6 +354,85 @@
                     </ComboBox>
                 </controls:OptionControl>
 
+                <Border Margin="0,20,0,0" Padding="14"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontSize="18" FontWeight="SemiBold"
+                                       Text="FastFlags versi 6.3.1 — Beta Tester" />
+                            <Border Margin="8,0,0,0" Padding="6,2"
+                                    Background="#5A3000" CornerRadius="4">
+                                <TextBlock FontSize="10" FontWeight="Bold"
+                                           Foreground="#FFA040" Text="REFERENSI / BELUM DIUJI" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Margin="0,6,0,10" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Tag v6.3.1 memperbaiki ikon dan font; kontrol di bawah adalah flag lama yang sudah ada di kode saat itu, bukan FastFlag baru dari rilis tersebut. Uji hanya jika bersedia menerima kemungkinan flag diabaikan, kualitas gambar berubah, atau performa memburuk." />
+
+                        <controls:OptionControl
+                            Header="Aktifkan opsi FastFlags beta"
+                            Description="Opt-in. Flag beta yang dipilih ditulis ke konfigurasi dan berlaku saat Roblox dimulai ulang; matikan opsi ini untuk menghapus semua flag beta yang dikelola BoneFish.">
+                            <ui:ToggleSwitch IsChecked="{Binding EnableLegacyFastFlagsBeta, Mode=TwoWay}" />
+                        </controls:OptionControl>
+
+                        <controls:OptionControl
+                            Header="MSAA samples (FIntDebugForceMSAASamples)"
+                            Description="Tidak terlihat ditolak di log yang dianalisis, tetapi dukungan saat ini belum terverifikasi. MSAA lebih tinggi dapat menambah beban GPU. Tidak tersedia saat TDR Mitigation aktif.">
+                            <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200"
+                                      IsEnabled="{Binding CanApplyBetaMSAA}"
+                                      ItemsSource="{Binding BetaMSAAOptions}"
+                                      SelectedItem="{Binding SelectedBetaMSAA, Mode=TwoWay}" />
+                        </controls:OptionControl>
+
+                        <controls:OptionControl
+                            Header="FRM quality override (DFIntDebugFRMQualityLevelOverride)"
+                            Description="Override lama, belum terverifikasi pada Roblox saat ini. Rentang dari kontrol lama: 1–21.">
+                            <StackPanel Orientation="Horizontal" IsEnabled="{Binding EnableLegacyFastFlagsBeta}">
+                                <ui:ToggleSwitch IsChecked="{Binding BetaFRMQualityEnabled, Mode=TwoWay}" />
+                                <Slider Margin="12,0,8,0" Width="130" Minimum="1" Maximum="21"
+                                        TickFrequency="1" IsSnapToTickEnabled="True"
+                                        IsEnabled="{Binding BetaFRMQualityEnabled}"
+                                        Value="{Binding BetaFRMQuality, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=300}" />
+                                <TextBlock VerticalAlignment="Center" Text="{Binding BetaFRMQuality}" />
+                            </StackPanel>
+                        </controls:OptionControl>
+
+                        <controls:OptionControl
+                            Header="Texture quality override"
+                            Description="Flag lama; status penerimaan saat ini tidak terverifikasi.">
+                            <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200"
+                                      IsEnabled="{Binding EnableLegacyFastFlagsBeta}"
+                                      ItemsSource="{Binding BetaTextureQualityOptions}"
+                                      SelectedItem="{Binding SelectedBetaTextureQuality, Mode=TwoWay}" />
+                        </controls:OptionControl>
+
+                        <TextBlock FontSize="13" FontWeight="SemiBold"
+                                   Text="Override renderer lama" />
+                        <TextBlock Margin="0,4,0,0" FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Pilih 'Roblox default' untuk menghapus override dan mengembalikan keputusan ke Roblox. Untuk mengurangi beban GPU, alternatif yang direkomendasikan adalah Graphics Quality di Roblox dan TDR Mitigation; beta MSAA tidak dapat dipakai bersamaan dengan TDR Mitigation." />
+
+                        <TextBlock Margin="0,10,0,0" FontSize="13" FontWeight="SemiBold"
+                                   Text="Mesh LOD (blocked)" />
+                        <TextBlock Margin="0,4,0,0" FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="DFIntCSGLevelOfDetailSwitchingDistance* (Mesh LOD): log Roblox yang dianalisis melaporkan penolakan pada flag LOD; flag ini tetap diblokir dan hanya ditampilkan sebagai informasi. Texture quality beta di atas hanya boleh diuji karena belum terverifikasi, bukan karena sudah terbukti diterima. Alternatifnya gunakan Graphics Quality di Roblox." />
+
+                        <TextBlock Margin="0,10,0,0" FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Rendering Mode dan Fix Display Scaling yang masih dikelola BoneFish tetap ada di pengaturan utama. Opsi beta tidak menjamin Roblox akan menerima atau menerapkan flag tersebut." />
+
+                        <ui:Anchor Margin="0,8,0,0" Padding="0"
+                                   Content="Laporkan hasil uji ke GitHub issue"
+                                   NavigateUri="{Binding BetaFastFlagFeedbackUrl}" />
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
         </Grid>
     </Grid>

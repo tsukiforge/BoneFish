@@ -113,6 +113,158 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public IReadOnlyDictionary<RenderingMode, string> RenderingModes => FastFlagManager.RenderingModes;
 
+        public bool EnableLegacyFastFlagsBeta
+        {
+            get => App.Settings.Prop.EnableLegacyFastFlagsBeta;
+            set
+            {
+                if (App.Settings.Prop.EnableLegacyFastFlagsBeta == value)
+                    return;
+
+                App.Settings.Prop.EnableLegacyFastFlagsBeta = value;
+                if (!value)
+                {
+                    foreach (string flag in FastFlagManager.BetaTestableLegacyFlags)
+                        App.FastFlags.SetValue(flag, null);
+                }
+
+                SaveLegacyBetaSettings();
+                OnPropertyChanged(nameof(EnableLegacyFastFlagsBeta));
+                OnPropertyChanged(nameof(CanApplyBetaMSAA));
+                OnPropertyChanged(nameof(SelectedBetaMSAA));
+                OnPropertyChanged(nameof(BetaFRMQualityEnabled));
+                OnPropertyChanged(nameof(BetaFRMQuality));
+                OnPropertyChanged(nameof(SelectedBetaTextureQuality));
+                Notify(value
+                    ? "FastFlags beta tester aktif. Nilai hanya diterapkan setelah memilih opsi; flag Mesh LOD yang ditolak tetap diblokir."
+                    : "FastFlags beta tester dinonaktifkan dan flag beta yang dikelola BoneFish dihapus.");
+            }
+        }
+
+        public bool CanApplyBetaMSAA =>
+            EnableLegacyFastFlagsBeta && !App.Settings.Prop.EnableTdrMitigation;
+
+        public IReadOnlyList<string> BetaMSAAOptions { get; } =
+            new[] { "Roblox default", "1x", "2x", "4x" };
+
+        public string SelectedBetaMSAA
+        {
+            get => App.FastFlags.GetValue(FastFlagManager.BetaMSAAFlag) switch
+            {
+                "1" => "1x",
+                "2" => "2x",
+                "4" => "4x",
+                _ => "Roblox default"
+            };
+            set
+            {
+                if (!EnableLegacyFastFlagsBeta)
+                    return;
+
+                if (!CanApplyBetaMSAA && value != "Roblox default")
+                {
+                    Notify("MSAA beta tidak bisa diterapkan selama TDR Mitigation aktif; matikan TDR Mitigation terlebih dahulu jika ingin mengujinya.");
+                    OnPropertyChanged(nameof(SelectedBetaMSAA));
+                    return;
+                }
+
+                string? samples = value switch
+                {
+                    "1x" => "1",
+                    "2x" => "2",
+                    "4x" => "4",
+                    _ => null
+                };
+                App.FastFlags.SetValue(FastFlagManager.BetaMSAAFlag, samples);
+                SaveLegacyBetaSettings();
+            }
+        }
+
+        public bool BetaFRMQualityEnabled
+        {
+            get => EnableLegacyFastFlagsBeta
+                && App.FastFlags.GetValue(FastFlagManager.BetaFRMQualityFlag) is not null;
+            set
+            {
+                if (!EnableLegacyFastFlagsBeta)
+                    return;
+
+                string? currentValue = App.FastFlags.GetValue(FastFlagManager.BetaFRMQualityFlag);
+                App.FastFlags.SetValue(
+                    FastFlagManager.BetaFRMQualityFlag,
+                    value ? currentValue ?? "1" : null);
+                SaveLegacyBetaSettings();
+                OnPropertyChanged(nameof(BetaFRMQualityEnabled));
+                OnPropertyChanged(nameof(BetaFRMQuality));
+            }
+        }
+
+        public int BetaFRMQuality
+        {
+            get => Int32.TryParse(
+                App.FastFlags.GetValue(FastFlagManager.BetaFRMQualityFlag),
+                out int quality) ? Math.Clamp(quality, 1, 21) : 1;
+            set
+            {
+                if (!EnableLegacyFastFlagsBeta || !BetaFRMQualityEnabled)
+                    return;
+
+                App.FastFlags.SetValue(
+                    FastFlagManager.BetaFRMQualityFlag,
+                    Math.Clamp(value, 1, 21));
+                SaveLegacyBetaSettings();
+            }
+        }
+
+        public IReadOnlyList<string> BetaTextureQualityOptions { get; } =
+            new[] { "Roblox default", "0", "1", "2", "3" };
+
+        public string SelectedBetaTextureQuality
+        {
+            get
+            {
+                if (App.FastFlags.GetValue(FastFlagManager.BetaTextureQualityEnabledFlag) != "True")
+                    return "Roblox default";
+
+                return App.FastFlags.GetValue(FastFlagManager.BetaTextureQualityFlag) ?? "Roblox default";
+            }
+            set
+            {
+                if (!EnableLegacyFastFlagsBeta)
+                    return;
+
+                if (value == "Roblox default")
+                {
+                    App.FastFlags.SetValue(FastFlagManager.BetaTextureQualityEnabledFlag, null);
+                    App.FastFlags.SetValue(FastFlagManager.BetaTextureQualityFlag, null);
+                }
+                else
+                {
+                    App.FastFlags.SetValue(FastFlagManager.BetaTextureQualityEnabledFlag, "True");
+                    App.FastFlags.SetValue(FastFlagManager.BetaTextureQualityFlag, value);
+                }
+
+                SaveLegacyBetaSettings();
+            }
+        }
+
+        public string BetaFastFlagFeedbackUrl =>
+            $"https://github.com/{App.ProjectRepository}/issues/new?template=beta_fastflag_feedback.yaml";
+
+        private void SaveLegacyBetaSettings()
+        {
+            try
+            {
+                App.FastFlags.Save();
+                App.Settings.Save();
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("FastFlagsViewModel::SaveLegacyBetaSettings", ex);
+                Notify($"Gagal menyimpan pengaturan FastFlags beta: {ex.Message}");
+            }
+        }
+
         public RenderingMode SelectedRenderingMode
         {
             get => App.FastFlags.GetPresetEnum(RenderingModes, "Rendering.Mode", "True");
@@ -493,6 +645,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 else
                     Integrations.AutoOptimizeService.RemoveTdrMitigationFlags();
                 OnPropertyChanged(nameof(EnableTdrMitigation));
+                OnPropertyChanged(nameof(CanApplyBetaMSAA));
+                OnPropertyChanged(nameof(SelectedBetaMSAA));
                 try { App.FastFlags.Save(); } catch { }
                 try { App.Settings.Save(); } catch { }
             }

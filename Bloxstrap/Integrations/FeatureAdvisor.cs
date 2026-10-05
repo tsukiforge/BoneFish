@@ -82,9 +82,9 @@ namespace Bloxstrap.Integrations
 
             bool integrated = profile.GpuDetectionComplete && !profile.HasDedicatedGpu;
             bool lowEnd = profile.Tier is HardwareProfile.HardwareTier.UltraLow or HardwareProfile.HardwareTier.Low;
-            int cap = FpsUnlockerService.GetRecommendedFramerateCap(profile.Tier, profile.DisplayRefreshRate);
+            int cap = FpsUnlockerService.GetRecommendedFramerateCap(profile);
 
-            string why = lowEnd
+            string why = lowEnd || (profile.PhysicalCores is > 0 and <= 2 && profile.TotalRamMb <= 8192 && integrated)
                 ? $"Hardware tier {profile.TierDisplay}{(integrated ? " dengan GPU integrated" : "")}. Cap otomatis {cap} FPS membatasi beban agar lebih sesuai dengan kemampuan hardware dan refresh rate monitor."
                 : integrated
                     ? $"GPU integrated ({profile.GpuName}), tier {profile.TierDisplay}. Cap otomatis {cap} FPS mengikuti tier dan refresh rate monitor ({profile.DisplayRefreshRate} Hz)."

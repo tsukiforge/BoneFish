@@ -6,6 +6,19 @@ namespace Bloxstrap
 {
     public class FastFlagManager : JsonManager<Dictionary<string, object>>
     {
+        public const string BetaMSAAFlag = "FIntDebugForceMSAASamples";
+        public const string BetaFRMQualityFlag = "DFIntDebugFRMQualityLevelOverride";
+        public const string BetaTextureQualityEnabledFlag = "DFFlagTextureQualityOverrideEnabled";
+        public const string BetaTextureQualityFlag = "DFIntTextureQualityOverride";
+
+        public static IReadOnlySet<string> BetaTestableLegacyFlags { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            BetaMSAAFlag,
+            BetaFRMQualityFlag,
+            BetaTextureQualityEnabledFlag,
+            BetaTextureQualityFlag
+        };
+
         private static readonly HashSet<string> ObservedRejectedFlags = new(StringComparer.OrdinalIgnoreCase)
         {
             "DFIntConnectionMTUSize",

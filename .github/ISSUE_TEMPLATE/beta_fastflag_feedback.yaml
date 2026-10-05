@@ -1,0 +1,60 @@
+name: Beta FastFlag test feedback
+description: Share results from BoneFish's opt-in legacy FastFlag tests
+title: "[Beta FastFlags] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form only for the optional legacy FastFlags marked **Beta Tester** in BoneFish.
+        Test one option/value at a time; open separate reports if results differ.
+        Roblox may ignore these flags or performance may get worse. Do not include passwords,
+        cookies, account identifiers, or unredacted logs.
+  - type: input
+    id: bonefish-version
+    attributes:
+      label: BoneFish version
+      placeholder: "7.x.x"
+    validations:
+      required: true
+  - type: input
+    id: roblox-version
+    attributes:
+      label: Roblox version
+      placeholder: "0.xxx.x.x"
+    validations:
+      required: true
+  - type: checkboxes
+    id: flags-tested
+    attributes:
+      label: Beta options tested
+      options:
+        - label: MSAA samples
+        - label: FRM quality override
+        - label: Texture quality override
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Test result
+      options:
+        - Improved
+        - No noticeable change
+        - Worse performance or stability
+        - Roblox ignored or removed the flag
+    validations:
+      required: true
+  - type: textarea
+    id: test-details
+    attributes:
+      label: Test details
+      description: Describe hardware, values tested, and what changed. Include before/after measurements if available.
+    validations:
+      required: true
+  - type: textarea
+    id: redacted-logs
+    attributes:
+      label: Optional redacted log excerpt
+      description: Remove usernames, file paths, account data, tokens, and other personal information before posting.
+    validations:
+      required: false

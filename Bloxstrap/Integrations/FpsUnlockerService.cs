@@ -75,18 +75,36 @@ namespace Bloxstrap.Integrations
             return Math.Min(tierCap, refreshRate);
         }
 
+        public static int GetRecommendedFramerateCap(HardwareProfile profile)
+        {
+            if (profile.DisplayRefreshRate <= 0)
+                return 0;
+
+            bool constrainedIntegratedSystem =
+                profile.PhysicalCores is > 0 and <= 2
+                && profile.TotalRamBytes > 0
+                && profile.TotalRamMb <= 8192
+                && profile.GpuDetectionComplete
+                && !profile.HasDedicatedGpu;
+
+            if (constrainedIntegratedSystem)
+                return Math.Min(30, profile.DisplayRefreshRate);
+
+            return GetRecommendedFramerateCap(profile.Tier, profile.DisplayRefreshRate);
+        }
+
         public static FpsUnlockerResult Apply()
         {
+            HardwareProfile profile = HardwareProfileEngine.GetProfile();
             int refreshRate = GetPrimaryDisplayRefreshRate();
-
             if (refreshRate <= 0)
             {
                 App.Logger.WriteLine(LOG_IDENT, "Gagal mendeteksi refresh rate monitor");
                 return new FpsUnlockerResult(false, false, 0);
             }
 
-            HardwareProfile profile = HardwareProfileEngine.GetProfile();
-            int cap = GetRecommendedFramerateCap(profile.Tier, refreshRate);
+            profile = profile with { DisplayRefreshRate = refreshRate };
+            int cap = GetRecommendedFramerateCap(profile);
 
             App.Logger.WriteLine(LOG_IDENT,
                 $"Menerapkan FramerateCap={cap} (tier={profile.TierDisplay}, refresh rate monitor={refreshRate} Hz)");

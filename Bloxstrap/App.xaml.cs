@@ -262,6 +262,13 @@ namespace Bloxstrap
 
             LaunchSettings = new LaunchSettings(e.Args);
 
+            if (LaunchSettings.RollbackHelperFlag.Active)
+            {
+                Installer.RunRollbackHelper(LaunchSettings.RollbackHelperFlag.Data);
+                Shutdown();
+                return;
+            }
+
             // A portable package contains a marker beside the executable. It must
             // take precedence over an existing installed copy on this machine.
             using var uninstallKey = Registry.CurrentUser.OpenSubKey(UninstallKey);

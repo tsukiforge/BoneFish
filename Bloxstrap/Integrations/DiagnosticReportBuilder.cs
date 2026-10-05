@@ -423,7 +423,7 @@ namespace Bloxstrap.Integrations
                 Text = $"Cap dikelola BoneFish: {(App.Settings.Prop.FpsUnlockerCapManaged ? $"ya (unlocker {(App.Settings.Prop.FpsUnlockerEnabled ? "ON" : "OFF")})" : "tidak")}"
                     + (App.Settings.Prop.FpsUnlockerPreviousCap is { } prev ? $", cap user sebelumnya: {prev}" : "")
             });
-            int recommendedCap = FpsUnlockerService.GetRecommendedFramerateCap(profile.Tier, profile.DisplayRefreshRate);
+            int recommendedCap = FpsUnlockerService.GetRecommendedFramerateCap(profile);
             entries.Add(new DiagnosticEntry
             {
                 Status = App.Settings.Prop.FpsUnlockerEnabled && recommendedCap == 0

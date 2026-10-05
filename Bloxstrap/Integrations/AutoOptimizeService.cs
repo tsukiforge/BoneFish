@@ -1438,12 +1438,23 @@ namespace Bloxstrap.Integrations
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
+        private static IEnumerable<string> GetRendererFlagsToRemove()
+        {
+            if (!App.Settings.Prop.EnableLegacyFastFlagsBeta)
+                return RendererFlagsToRemove;
+
+            return RendererFlagsToRemove.Where(flag =>
+                !FastFlagManager.BetaTestableLegacyFlags.Contains(flag)
+                || FastFlagManager.IsFlagRejectedByRobloxLogs(flag));
+        }
+
         public static void PurgeLegacyRendererFlags()
         {
-            foreach (string flag in RendererFlagsToRemove)
+            string[] flagsToRemove = GetRendererFlagsToRemove().ToArray();
+            foreach (string flag in flagsToRemove)
                 App.FastFlags.SetValue(flag, null);
             App.Logger.WriteLine(LOG_IDENT,
-                $"Removed {RendererFlagsToRemove.Length} retired or Roblox-rejected flags from the active configuration");
+                $"Removed {flagsToRemove.Length} retired or Roblox-rejected flags from the active configuration");
         }
 
         public static void CleanupLegacyRobloxFlags()
@@ -1500,7 +1511,7 @@ namespace Bloxstrap.Integrations
                     return false;
 
                 bool modified = false;
-                foreach (string flag in RendererFlagsToRemove)
+                foreach (string flag in GetRendererFlagsToRemove())
                 {
                     if (flags.Remove(flag))
                         modified = true;
@@ -1634,7 +1645,7 @@ namespace Bloxstrap.Integrations
             try
             {
                 bool removedAny = false;
-                foreach (string flag in RendererFlagsToRemove)
+                foreach (string flag in GetRendererFlagsToRemove())
                 {
                     if (App.FastFlags.GetValue(flag) is not null)
                     {

@@ -65,6 +65,7 @@ namespace Bloxstrap.Models.Persistable
         public bool UseDisableAppPatch { get; set; } = false;
 
         // experimental features
+        public bool EnableLegacyFastFlagsBeta { get; set; } = false;
         public bool EnableSystemTrayOnClose { get; set; } = false;
         public bool EnableRobloxNotifications { get; set; } = false;
         public bool EnableFriendOnlineNotifications { get; set; } = false;
