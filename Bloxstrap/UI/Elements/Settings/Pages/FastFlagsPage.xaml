@@ -17,12 +17,11 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </ui:UiPage.Resources>
 
-    <!-- ★ FIX 4: Layout 2 kolom untuk mengurangi scroll -->
     <Grid Margin="0,0,14,14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -46,21 +45,9 @@
             </StackPanel>
         </Border>
 
-        <!-- ═══ 2 KOLOM UTAMA ════════════════════════════════════════ -->
-        <!-- ★ FIX 4: Responsive — 2 kolom, fallback 1 kolom (stacking) kalo < 700px -->
-        <Grid Grid.Row="2" Margin="0,0,0,12" SizeChanged="MainGrid_SizeChanged">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="16" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <StackPanel Grid.Row="2" Margin="0,0,0,12">
 
-            <!-- ══ KOLOM KIRI ════════════════════════════════════════ -->
-            <StackPanel x:Name="LeftPanel" Grid.Column="0" Grid.Row="0">
+            <StackPanel>
                 <!-- SYSTEM INFO → ADAPTIVE HARDWARE DASHBOARD (Phase 5) -->
                 <!-- Ringan: seluruh isi dirender dari snapshot on-demand (SystemDashboard).
                      Tidak ada timer/polling — refresh HANYA saat page reload atau tombol. -->
@@ -285,8 +272,7 @@
                 </ui:CardAction>
             </StackPanel>
 
-            <!-- ══ KOLOM KANAN ═══════════════════════════════════════ -->
-            <StackPanel x:Name="RightPanel" Grid.Column="2" Grid.Row="0">
+            <StackPanel>
                 <!-- NIGHT VISION — DIHAPUS (GAP 4: deprecated flags) -->
 
                 <!-- FORCE EXTREME MODE -->
@@ -372,9 +358,15 @@
                                    Text="Tag v6.3.1 memperbaiki ikon dan font; kontrol di bawah adalah flag lama yang sudah ada di kode saat itu, bukan FastFlag baru dari rilis tersebut. Uji hanya jika bersedia menerima kemungkinan flag diabaikan, kualitas gambar berubah, atau performa memburuk." />
 
                         <controls:OptionControl
-                            Header="Aktifkan opsi FastFlags beta"
-                            Description="Opt-in. Flag beta yang dipilih ditulis ke konfigurasi dan berlaku saat Roblox dimulai ulang; matikan opsi ini untuk menghapus semua flag beta yang dikelola BoneFish.">
+                            Header="Aktifkan kontrol FastFlags beta"
+                            Description="Mengaktifkan kontrol MSAA, FRM quality, dan texture quality di bawah. Pengaturan ini terpisah dari preset performa di atas.">
                             <ui:ToggleSwitch IsChecked="{Binding EnableLegacyFastFlagsBeta, Mode=TwoWay}" />
+                        </controls:OptionControl>
+
+                        <controls:OptionControl
+                            Header="Paksa paket 19 FastFlag lawas v6.3.1"
+                            Description="Saat diaktifkan, FastFlag BoneFish yang lama dibersihkan lalu 19 flag historis v6.3.1 ditulis. Flag/settings langsung Roblox tidak disentuh. Otomatis mengaktifkan FastFlag Manager; Roblox tetap dapat mengabaikan flag.">
+                            <ui:ToggleSwitch IsChecked="{Binding EnableRejectedLegacyFastFlags, Mode=TwoWay}" />
                         </controls:OptionControl>
 
                         <controls:OptionControl
@@ -422,10 +414,19 @@
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                    Text="DFIntCSGLevelOfDetailSwitchingDistance* (Mesh LOD): log Roblox yang dianalisis melaporkan penolakan pada flag LOD; flag ini tetap diblokir dan hanya ditampilkan sebagai informasi. Texture quality beta di atas hanya boleh diuji karena belum terverifikasi, bukan karena sudah terbukti diterima. Alternatifnya gunakan Graphics Quality di Roblox." />
 
+                        <TextBlock Margin="0,8,0,0" FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="19 nama dan nilai historis yang ditulis oleh paket di atas (Roblox mungkin tetap menolak):" />
+                        <TextBlock Margin="0,4,0,0" FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="{Binding RejectedLegacyFastFlags}" />
+
                         <TextBlock Margin="0,10,0,0" FontSize="12"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Text="Rendering Mode dan Fix Display Scaling yang masih dikelola BoneFish tetap ada di pengaturan utama. Opsi beta tidak menjamin Roblox akan menerima atau menerapkan flag tersebut." />
+                                   Text="Preset Auto-optimize, Stable, Balanced, dan Extreme Performance di atas adalah pilihan performa terpisah—tidak perlu memilih salah satunya untuk menyalakan paket FastFlag lawas. Mengaktifkan paket hanya menulis nilai lokal; BoneFish tidak dapat melewati allowlist Roblox." />
 
                         <ui:Anchor Margin="0,8,0,0" Padding="0"
                                    Content="Laporkan hasil uji ke GitHub issue"
@@ -434,6 +435,6 @@
                 </Border>
 
             </StackPanel>
-        </Grid>
+        </StackPanel>
     </Grid>
 </ui:UiPage>

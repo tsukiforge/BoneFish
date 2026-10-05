@@ -44,6 +44,30 @@ namespace Bloxstrap
 
         private static readonly HashSet<string> ReportedRejectedFlags = new(StringComparer.OrdinalIgnoreCase);
 
+        public static IReadOnlyDictionary<string, string> RejectedLegacyFlagValues { get; } =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["DFIntConnectionMTUSize"] = "1500",
+                ["DFIntCSGLevelOfDetailSwitchingDistanceStatic"] = "0",
+                ["DFIntCSGv2LodsToGenerate"] = "0",
+                ["DFIntMaxReceivePPS"] = "50000",
+                ["DFIntMaxSendPPS"] = "50000",
+                ["DFIntOptimizeSendQueue"] = "1",
+                ["DFIntTextureCompositorActiveJobs"] = "1",
+                ["DFFlagEnableRequestAsyncCompression"] = "True",
+                ["FFlagDebugSSAOForce"] = "False",
+                ["FFlagLuaAppEnableLowMemoryMode"] = "True",
+                ["FFlagRenderInventoryEffects"] = "False",
+                ["FFlagRenderMenuTransitions"] = "False",
+                ["FFlagRenderUIAnimations"] = "False",
+                ["FIntMaxBatchesPerFlush"] = "5000",
+                ["FIntRakNetPacketRateLimit"] = "50000",
+                ["FIntRobloxGuiBlurIntensity"] = "0",
+                ["FIntRomarkStartWithGraphicQualityLevel"] = "1",
+                ["FIntSSAOMipLevels"] = "0",
+                ["FIntTerrainArraySliceSize"] = "0"
+            };
+
         public static IReadOnlySet<string> FlagsRejectedByRobloxLogs => ObservedRejectedFlags;
 
         public static bool IsFlagRejectedByRobloxLogs(string name) => ObservedRejectedFlags.Contains(name);
@@ -92,7 +116,7 @@ namespace Bloxstrap
             }
             else
             {
-                if (IsFlagRejectedByRobloxLogs(key))
+                if (IsFlagRejectedByRobloxLogs(key) && !App.Settings.Prop.EnableRejectedLegacyFastFlags)
                 {
                     Prop.Remove(key);
                     if (ReportedRejectedFlags.Add(key))
@@ -176,7 +200,9 @@ namespace Bloxstrap
 
         public override void Save()
         {
-            foreach (string flag in Prop.Keys.Where(IsFlagRejectedByRobloxLogs).ToArray())
+            foreach (string flag in Prop.Keys.Where(IsFlagRejectedByRobloxLogs)
+                         .Where(_ => !App.Settings.Prop.EnableRejectedLegacyFastFlags)
+                         .ToArray())
             {
                 Prop.Remove(flag);
                 if (ReportedRejectedFlags.Add(flag))
@@ -204,6 +230,18 @@ namespace Bloxstrap
             bool fastFlagsChanged = false;
             bool settingsChanged = false;
 
+            if (App.Settings.Prop.EnableRejectedLegacyFastFlags)
+            {
+                foreach ((string flag, string flagValue) in RejectedLegacyFlagValues)
+                {
+                    if (GetValue(flag) == flagValue)
+                        continue;
+
+                    SetValue(flag, flagValue);
+                    fastFlagsChanged = true;
+                }
+            }
+
             if (App.Settings.Prop.DisableRobloxAnimations || App.Settings.Prop.EnableLowMemoryMode)
             {
                 App.Settings.Prop.DisableRobloxAnimations = false;
@@ -221,7 +259,9 @@ namespace Bloxstrap
                     "Disabled Fast Loading because this CPU has fewer than 8 logical processors and its compositor flag was denied by the user's Roblox 0.741 client log.");
             }
 
-            foreach (string flag in Prop.Keys.Where(IsFlagRejectedByRobloxLogs).ToArray())
+            foreach (string flag in Prop.Keys.Where(IsFlagRejectedByRobloxLogs)
+                         .Where(_ => !App.Settings.Prop.EnableRejectedLegacyFastFlags)
+                         .ToArray())
             {
                 Prop.Remove(flag);
                 fastFlagsChanged = true;

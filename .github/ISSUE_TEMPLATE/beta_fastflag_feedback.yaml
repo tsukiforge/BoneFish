@@ -31,6 +31,7 @@ body:
         - label: MSAA samples
         - label: FRM quality override
         - label: Texture quality override
+        - label: Forced legacy v6.3.1 rejected-flag pack
     validations:
       required: true
   - type: dropdown

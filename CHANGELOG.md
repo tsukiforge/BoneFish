@@ -20,11 +20,12 @@
 - Remove legacy renderer overrides previously written by BoneFish presets and rely on
   Roblox's saved graphics-quality setting instead. Supported options such as the FPS
   cap and unrelated client settings remain intact.
-- Remove the Mesh LOD, MSAA, FRM-quality, and texture-quality FastFlag controls so the
-  settings page no longer offers overrides that are cleared during launch migration.
+- Restore the FastFlags page to a single vertical scrolling layout.
 - Add opt-in Beta Tester controls for selected legacy v6.3.1-era renderer flags that
-  were not reported rejected in the analyzed logs; keep rejected Mesh LOD flags blocked.
-  Include a manual GitHub issue form for testers to report results.
+  were not reported rejected in the analyzed logs, plus a separate opt-in switch to
+  write historical v6.3.1 values for 19 flags previously rejected in analyzed Roblox
+  logs. Roblox may still ignore or reject these values. Include a manual GitHub issue
+  form for testers to report results.
 - Recommend a 30 FPS cap for confirmed systems with at most two physical CPU cores,
   up to 8 GB RAM, and integrated graphics to reduce render load; other hardware keeps
   the existing tier-based recommendation.

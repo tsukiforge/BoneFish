@@ -1440,12 +1440,16 @@ namespace Bloxstrap.Integrations
 
         private static IEnumerable<string> GetRendererFlagsToRemove()
         {
-            if (!App.Settings.Prop.EnableLegacyFastFlagsBeta)
+            bool keepRejectedLegacyFlags = App.Settings.Prop.EnableRejectedLegacyFastFlags;
+            bool keepOtherBetaFlags = App.Settings.Prop.EnableLegacyFastFlagsBeta;
+            if (!keepRejectedLegacyFlags && !keepOtherBetaFlags)
                 return RendererFlagsToRemove;
 
             return RendererFlagsToRemove.Where(flag =>
-                !FastFlagManager.BetaTestableLegacyFlags.Contains(flag)
-                || FastFlagManager.IsFlagRejectedByRobloxLogs(flag));
+                !(keepRejectedLegacyFlags && FastFlagManager.IsFlagRejectedByRobloxLogs(flag))
+                && !(keepOtherBetaFlags
+                    && FastFlagManager.BetaTestableLegacyFlags.Contains(flag)
+                    && !FastFlagManager.IsFlagRejectedByRobloxLogs(flag)));
         }
 
         public static void PurgeLegacyRendererFlags()

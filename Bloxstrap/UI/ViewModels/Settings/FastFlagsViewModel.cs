@@ -141,6 +141,49 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        public bool EnableRejectedLegacyFastFlags
+        {
+            get => App.Settings.Prop.EnableRejectedLegacyFastFlags;
+            set
+            {
+                if (App.Settings.Prop.EnableRejectedLegacyFastFlags == value)
+                    return;
+
+                if (value)
+                {
+                    MessageBoxResult result = Frontend.ShowMessageBox(
+                        "BoneFish akan menulis nilai FastFlag historis dari preset v6.3.1, termasuk 19 flag yang pernah ditolak pada log Roblox yang dianalisis. Flag dapat diabaikan Roblox, menyebabkan gangguan visual/jaringan, atau memperburuk performa. Ini tidak memilih salah satu preset performa dan tidak dapat memaksa Roblox menerima flag. Lanjutkan?",
+                        MessageBoxImage.Warning,
+                        MessageBoxButton.YesNo);
+
+                    if (result != MessageBoxResult.Yes)
+                    {
+                        OnPropertyChanged(nameof(EnableRejectedLegacyFastFlags));
+                        return;
+                    }
+
+                    App.Settings.Prop.EnableRejectedLegacyFastFlags = true;
+                    App.Settings.Prop.UseFastFlagManager = true;
+                    App.FastFlags.Prop.Clear();
+                    foreach ((string flag, string flagValue) in FastFlagManager.RejectedLegacyFlagValues)
+                        App.FastFlags.SetValue(flag, flagValue);
+                    OnPropertyChanged(nameof(UseFastFlagManager));
+                }
+                else
+                {
+                    App.Settings.Prop.EnableRejectedLegacyFastFlags = false;
+                    foreach (string flag in FastFlagManager.RejectedLegacyFlagValues.Keys)
+                        App.FastFlags.SetValue(flag, null);
+                }
+
+                SaveLegacyBetaSettings();
+                OnPropertyChanged(nameof(EnableRejectedLegacyFastFlags));
+                Notify(value
+                    ? "FastFlag BoneFish yang lama dibersihkan, lalu paket 19 FastFlag historis disimpan. Roblox masih dapat mengabaikannya; mulai ulang Roblox untuk mencoba."
+                    : "Paket FastFlag yang ditolak dinonaktifkan dan nilainya dihapus dari konfigurasi BoneFish.");
+            }
+        }
+
         public bool CanApplyBetaMSAA =>
             EnableLegacyFastFlagsBeta && !App.Settings.Prop.EnableTdrMitigation;
 
@@ -250,6 +293,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public string BetaFastFlagFeedbackUrl =>
             $"https://github.com/{App.ProjectRepository}/issues/new?template=beta_fastflag_feedback.yaml";
+
+        public string RejectedLegacyFastFlags => String.Join(
+            Environment.NewLine,
+            FastFlagManager.RejectedLegacyFlagValues
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => $"{pair.Key} = {pair.Value}"));
 
         private void SaveLegacyBetaSettings()
         {
@@ -1090,10 +1139,15 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 string filePath = Path.Combine(Paths.Modifications, "ClientSettings", "ClientAppSettings.json");
                 int count = App.FastFlags.Prop.Count;
-                int blockedCount = FastFlagManager.FlagsRejectedByRobloxLogs.Count;
+                int blockedCount = App.Settings.Prop.EnableRejectedLegacyFastFlags
+                    ? 0
+                    : FastFlagManager.FlagsRejectedByRobloxLogs.Count;
                 if (File.Exists(filePath))
                 {
-                    Notify($"{presetName} tersimpan ({count} entri konfigurasi). {blockedCount} flag yang terbukti ditolak Roblox diblokir; Roblox tetap menentukan konfigurasi yang diterapkan.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil diubah." : "")}");
+                    string rejectedStatus = App.Settings.Prop.EnableRejectedLegacyFastFlags
+                        ? " Paket FastFlag lawas dipaksa masuk ke konfigurasi, tetapi Roblox masih dapat mengabaikannya."
+                        : $" {blockedCount} flag yang terbukti ditolak Roblox diblokir.";
+                    Notify($"{presetName} tersimpan ({count} entri konfigurasi).{rejectedStatus} Roblox menentukan konfigurasi yang diterapkan.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil diubah." : "")}");
                 }
                 else
                 {
@@ -1236,6 +1290,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             if (result != System.Windows.MessageBoxResult.Yes)
                 return;
+
+            App.Settings.Prop.EnableRejectedLegacyFastFlags = false;
+            OnPropertyChanged(nameof(EnableRejectedLegacyFastFlags));
 
             // ★ FIX freeze: CleanupLegacyRobloxFlags() men-scan SEMUA folder
             // Roblox/Versions/version-* lalu baca & tulis JSON tiap folder.
