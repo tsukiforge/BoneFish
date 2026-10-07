@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>BoneFish kon niet automatisch updaten naar versie {0}. Update het alstublieft manueel door het te downloaden en openen via de website.</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Roblox is nu al open, een ander venster openen zal het sluiten. Weet je zeker dat je een nieuw venster wilt openen?</value>
   </data>
@@ -495,12 +492,6 @@ Wil je je huidige geïnstalleerde versie bijwerken?</value>
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>Uiterlijk</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>BoneFish zal zichzelf automatisch controleren en bijwerken bij het starten van Roblox.</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>BoneFish automatisch bijwerken</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>Voorkom dat je bestaande spel niet wordt afgesloten als je per ongeluk een ander spel start.</value>
@@ -1197,9 +1188,6 @@ Sluit alstublieft alle applicaties die mogelijk de bestanden van Roblox gebruike
   </data>
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>Roblox ondersteunt niet meer Windows 7 of 8.1. Voor Roblox te blijven spelen, upgrade naar Windows 10 of nieuwer.</value>
-  </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>De nieuwste BoneFish krijgen...</value>
   </data>
   <data name="Menu.BoneFish.Description" xml:space="preserve">
     <value>Configureer opties gerelateerd aan het gedrag van BoneFish zelf.</value>

@@ -56,12 +56,12 @@
 
         public bool IsDisposed = false;
 
-        // ── Attach-existing mode (FIX race condition v7.3.1) ──────────────────
+        // Attach-existing mode prevents replaying old join/leave events for an
+        // external Roblox client that is already running.
         // Saat watcher reattach ke proses Roblox yang SUDAH BERJALAN lama, log file
         // berisi histori join/leave LAMA yang bukan milik sesi baru ini. Tanpa flag
         // ini, ActivityWatcher me-replay SELURUH histori → puluhan OnGameJoin/
-        // OnGameLeave terpicu → race condition: BeginSession/EndSession overlap,
-        // file I/O race, notifikasi tray duplikat (3x untuk 1 kejadian).
+        // OnGameLeave events and duplicate tray notifications.
         //
         // attachExisting=true: skip ke END of log file → hanya memproses entry BARU
         // yang ditulis SETELAH watcher dimulai (state terkini, bukan histori).
@@ -146,7 +146,7 @@
                 {
                     // Skip ke END of log file — hanya proses entry BARU yang datang.
                     // Tanpa ini, log yang sudah berisi histori join/leave lama akan
-                    // di-replay sebagai event baru → race condition BeginSession/EndSession.
+                    // di-replay sebagai event baru and duplicate activity notifications.
                     long initialPosition = logFileStream.Length;
                     logFileStream.Seek(initialPosition, SeekOrigin.Begin);
                     App.Logger.WriteLine(LOG_IDENT, $"Opened {LogLocation} (attachExisting — skipped {initialPosition:N0} bytes of history)");

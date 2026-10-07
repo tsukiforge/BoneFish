@@ -1,17 +1,8 @@
-using System.Diagnostics;
 using Bloxstrap.GameSession.Models;
+using System.Diagnostics;
 
 namespace Bloxstrap.GameSession
 {
-    public sealed class ProcessSuspendResult
-    {
-        public List<int> SuspendedThreadIds { get; init; } = new();
-        public int TotalThreadCount { get; init; }
-        public int FailedThreadCount { get; init; }
-        public bool PartiallySuspended { get; init; }
-        public int SweepPasses { get; init; }
-    }
-
     public sealed class RescuedProcess
     {
         public int ProcessId { get; init; }
@@ -21,9 +12,6 @@ namespace Bloxstrap.GameSession
 
     public sealed class ProcessSuspensionService
     {
-        public const int MaxSweepPasses = 5;
-        public static readonly TimeSpan SweepTimeoutPerProcess = TimeSpan.FromSeconds(2);
-
         private readonly Func<int, IProcessAccessor> _accessorFactory;
         private readonly Func<IEnumerable<ProcessSnapshot>> _processSource;
 
@@ -60,99 +48,6 @@ namespace Bloxstrap.GameSession
             }
 
             return snapshots;
-        }
-
-        public ProcessSuspendResult SuspendProcess(int processId, CancellationToken cancellationToken = default)
-        {
-            const string LOG_IDENT = "GameSession::SuspendProcess";
-            var result = new ProcessSuspendResultBuilder();
-            var stopwatch = Stopwatch.StartNew();
-            var suspendedThreadIds = new HashSet<int>();
-            var failedThreadIds = new HashSet<int>();
-            int pass = 0;
-            bool reachedPassLimit = false;
-
-            try
-            {
-                using IProcessAccessor accessor = _accessorFactory(processId);
-
-                for (pass = 1; pass <= MaxSweepPasses; pass++)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    if (stopwatch.Elapsed >= SweepTimeoutPerProcess)
-                    {
-                        reachedPassLimit = true;
-                        break;
-                    }
-
-                    IReadOnlyCollection<int> currentThreadIds = accessor.GetThreadIds();
-                    var pendingThreadIds = currentThreadIds
-                        .Where(threadId => !suspendedThreadIds.Contains(threadId) && !failedThreadIds.Contains(threadId))
-                        .ToArray();
-
-                    if (pendingThreadIds.Length == 0)
-                        break;
-
-                    foreach (int threadId in pendingThreadIds)
-                    {
-                        if (stopwatch.Elapsed >= SweepTimeoutPerProcess)
-                        {
-                            reachedPassLimit = true;
-                            break;
-                        }
-
-                        if (accessor.TrySuspendThread(threadId))
-                            suspendedThreadIds.Add(threadId);
-                        else
-                            failedThreadIds.Add(threadId);
-                    }
-
-                    if (pass == MaxSweepPasses)
-                        reachedPassLimit = true;
-
-                    // Give a process a scheduling opportunity to finish creating threads.
-                    Thread.Yield();
-                }
-
-                IReadOnlyCollection<int> finalThreadIds = accessor.GetThreadIds();
-                bool unresolvedThreads = finalThreadIds.Any(threadId =>
-                    !suspendedThreadIds.Contains(threadId) && !failedThreadIds.Contains(threadId));
-
-                int totalThreadCount = Math.Max(
-                    finalThreadIds.Count,
-                    suspendedThreadIds.Count + failedThreadIds.Count);
-
-                result.SuspendedThreadIds.AddRange(suspendedThreadIds);
-                result.TotalThreadCount = totalThreadCount;
-                result.FailedThreadCount = failedThreadIds.Count;
-                result.PartiallySuspended = failedThreadIds.Count > 0 || (reachedPassLimit && unresolvedThreads);
-                result.SweepPasses = Math.Min(pass, MaxSweepPasses);
-
-                App.Logger.WriteLine(
-                    LOG_IDENT,
-                    $"PID={processId}: {result.SuspendedThreadIds.Count}/{totalThreadCount} threads suspended; " +
-                    $"failed={result.FailedThreadCount}; passes={result.SweepPasses}; " +
-                    $"partial={result.PartiallySuspended}");
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                App.Logger.WriteLine(LOG_IDENT, $"PID={processId}: suspend skipped: {ex.Message}");
-
-                // A thread may already have been suspended before enumeration failed. Return
-                // those IDs so GameSessionService can persist and restore them.
-                result.SuspendedThreadIds.AddRange(suspendedThreadIds);
-                result.TotalThreadCount = suspendedThreadIds.Count + failedThreadIds.Count;
-                result.FailedThreadCount = failedThreadIds.Count;
-                result.PartiallySuspended = suspendedThreadIds.Count > 0;
-                result.SweepPasses = Math.Min(Math.Max(pass, 1), MaxSweepPasses);
-            }
-
-            return result.Build();
         }
 
         /// <summary>
@@ -354,22 +249,5 @@ namespace Bloxstrap.GameSession
             };
         }
 
-        private sealed class ProcessSuspendResultBuilder
-        {
-            public List<int> SuspendedThreadIds { get; } = new();
-            public int TotalThreadCount { get; set; }
-            public int FailedThreadCount { get; set; }
-            public bool PartiallySuspended { get; set; }
-            public int SweepPasses { get; set; }
-
-            public ProcessSuspendResult Build() => new()
-            {
-                SuspendedThreadIds = SuspendedThreadIds,
-                TotalThreadCount = TotalThreadCount,
-                FailedThreadCount = FailedThreadCount,
-                PartiallySuspended = PartiallySuspended,
-                SweepPasses = SweepPasses
-            };
-        }
     }
 }

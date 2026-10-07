@@ -6,6 +6,72 @@ namespace Bloxstrap
 {
     public class FastFlagManager : JsonManager<Dictionary<string, object>>
     {
+        public const string BetaMSAAFlag = "FIntDebugForceMSAASamples";
+        public const string BetaFRMQualityFlag = "DFIntDebugFRMQualityLevelOverride";
+        public const string BetaTextureQualityEnabledFlag = "DFFlagTextureQualityOverrideEnabled";
+        public const string BetaTextureQualityFlag = "DFIntTextureQualityOverride";
+
+        public static IReadOnlySet<string> BetaTestableLegacyFlags { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            BetaMSAAFlag,
+            BetaFRMQualityFlag,
+            BetaTextureQualityEnabledFlag,
+            BetaTextureQualityFlag
+        };
+
+        private static readonly HashSet<string> ObservedRejectedFlags = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "DFIntConnectionMTUSize",
+            "DFIntCSGLevelOfDetailSwitchingDistanceStatic",
+            "DFIntCSGv2LodsToGenerate",
+            "DFIntMaxReceivePPS",
+            "DFIntMaxSendPPS",
+            "DFIntOptimizeSendQueue",
+            "DFIntTextureCompositorActiveJobs",
+            "DFFlagEnableRequestAsyncCompression",
+            "FFlagDebugSSAOForce",
+            "FFlagLuaAppEnableLowMemoryMode",
+            "FFlagRenderInventoryEffects",
+            "FFlagRenderMenuTransitions",
+            "FFlagRenderUIAnimations",
+            "FIntMaxBatchesPerFlush",
+            "FIntRakNetPacketRateLimit",
+            "FIntRobloxGuiBlurIntensity",
+            "FIntRomarkStartWithGraphicQualityLevel",
+            "FIntSSAOMipLevels",
+            "FIntTerrainArraySliceSize"
+        };
+
+        private static readonly HashSet<string> ReportedRejectedFlags = new(StringComparer.OrdinalIgnoreCase);
+
+        public static IReadOnlyDictionary<string, string> RejectedLegacyFlagValues { get; } =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["DFIntConnectionMTUSize"] = "1500",
+                ["DFIntCSGLevelOfDetailSwitchingDistanceStatic"] = "0",
+                ["DFIntCSGv2LodsToGenerate"] = "0",
+                ["DFIntMaxReceivePPS"] = "50000",
+                ["DFIntMaxSendPPS"] = "50000",
+                ["DFIntOptimizeSendQueue"] = "1",
+                ["DFIntTextureCompositorActiveJobs"] = "1",
+                ["DFFlagEnableRequestAsyncCompression"] = "True",
+                ["FFlagDebugSSAOForce"] = "False",
+                ["FFlagLuaAppEnableLowMemoryMode"] = "True",
+                ["FFlagRenderInventoryEffects"] = "False",
+                ["FFlagRenderMenuTransitions"] = "False",
+                ["FFlagRenderUIAnimations"] = "False",
+                ["FIntMaxBatchesPerFlush"] = "5000",
+                ["FIntRakNetPacketRateLimit"] = "50000",
+                ["FIntRobloxGuiBlurIntensity"] = "0",
+                ["FIntRomarkStartWithGraphicQualityLevel"] = "1",
+                ["FIntSSAOMipLevels"] = "0",
+                ["FIntTerrainArraySliceSize"] = "0"
+            };
+
+        public static IReadOnlySet<string> FlagsRejectedByRobloxLogs => ObservedRejectedFlags;
+
+        public static bool IsFlagRejectedByRobloxLogs(string name) => ObservedRejectedFlags.Contains(name);
+
         public override string ClassName => nameof(FastFlagManager);
 
         public override string LOG_IDENT_CLASS => ClassName;
@@ -22,23 +88,10 @@ namespace Bloxstrap
             // Presets and stuff
             { "Rendering.ManualFullscreen", "FFlagHandleAltEnterFullscreenManually" },
             { "Rendering.DisableScaling", "DFFlagDisableDPIScale" },
-            { "Rendering.MSAA", "FIntDebugForceMSAASamples" },
-            { "Rendering.FRMQualityOverride", "DFIntDebugFRMQualityLevelOverride" },
 
             // Rendering engines
             { "Rendering.Mode.D3D11", "FFlagDebugGraphicsPreferD3D11" },
             { "Rendering.Mode.Vulkan", "FFlagDebugGraphicsPreferVulkan" },
-
-            // Geometry
-            { "Geometry.MeshLOD.Static", "DFIntCSGLevelOfDetailSwitchingDistanceStatic" }, // this isnt actually a flag, we use it to determine current value, not the best way of doing that :sob:
-            { "Geometry.MeshLOD.L0", "DFIntCSGLevelOfDetailSwitchingDistance" },
-            { "Geometry.MeshLOD.L12", "DFIntCSGLevelOfDetailSwitchingDistanceL12" },
-            { "Geometry.MeshLOD.L23", "DFIntCSGLevelOfDetailSwitchingDistanceL23" },
-            { "Geometry.MeshLOD.L34", "DFIntCSGLevelOfDetailSwitchingDistanceL34" },
-
-            // Texture quality
-            { "Rendering.TextureQuality.OverrideEnabled", "DFFlagTextureQualityOverrideEnabled" },
-            { "Rendering.TextureQuality.Level", "DFIntTextureQualityOverride" },
         };
 
         public static IReadOnlyDictionary<RenderingMode, string> RenderingModes => new Dictionary<RenderingMode, string>
@@ -46,23 +99,6 @@ namespace Bloxstrap
             { RenderingMode.Default, "None" },
             { RenderingMode.Vulkan, "Vulkan" },
             { RenderingMode.D3D11, "D3D11" },
-        };
-
-        public static IReadOnlyDictionary<MSAAMode, string?> MSAAModes => new Dictionary<MSAAMode, string?>
-        {
-            { MSAAMode.Default, null },
-            { MSAAMode.x1, "1" },
-            { MSAAMode.x2, "2" },
-            { MSAAMode.x4, "4" }
-        };
-
-        public static IReadOnlyDictionary<TextureQuality, string?> TextureQualityLevels => new Dictionary<TextureQuality, string?>
-        {
-            { TextureQuality.Default, null },
-            { TextureQuality.Level0, "0" },
-            { TextureQuality.Level1, "1" },
-            { TextureQuality.Level2, "2" },
-            { TextureQuality.Level3, "3" },
         };
 
         // all fflags are stored as strings
@@ -80,6 +116,17 @@ namespace Bloxstrap
             }
             else
             {
+                if (IsFlagRejectedByRobloxLogs(key) && !App.Settings.Prop.EnableRejectedLegacyFastFlags)
+                {
+                    Prop.Remove(key);
+                    if (ReportedRejectedFlags.Add(key))
+                    {
+                        App.Logger.WriteLine(LOG_IDENT,
+                            $"Blocked '{key}' because the user's Roblox 0.741 client log reported it as denied local configuration.");
+                    }
+                    return;
+                }
+
                 if (Prop.ContainsKey(key))
                 {
                     if (value.ToString() == Prop[key].ToString())
@@ -153,6 +200,18 @@ namespace Bloxstrap
 
         public override void Save()
         {
+            foreach (string flag in Prop.Keys.Where(IsFlagRejectedByRobloxLogs)
+                         .Where(_ => !App.Settings.Prop.EnableRejectedLegacyFastFlags)
+                         .ToArray())
+            {
+                Prop.Remove(flag);
+                if (ReportedRejectedFlags.Add(flag))
+                {
+                    App.Logger.WriteLine(LOG_IDENT_CLASS,
+                        $"Removed Roblox-rejected flag '{flag}' before saving ClientAppSettings.");
+                }
+            }
+
             // convert all flag values to strings before saving
 
             foreach (var pair in Prop)
@@ -168,11 +227,64 @@ namespace Bloxstrap
         {
             base.Load(alertFailure);
 
-            // clone the dictionary
-            OriginalProp = new(Prop);
+            bool fastFlagsChanged = false;
+            bool settingsChanged = false;
+
+            if (App.Settings.Prop.EnableRejectedLegacyFastFlags)
+            {
+                foreach ((string flag, string flagValue) in RejectedLegacyFlagValues)
+                {
+                    if (GetValue(flag) == flagValue)
+                        continue;
+
+                    SetValue(flag, flagValue);
+                    fastFlagsChanged = true;
+                }
+            }
+
+            if (App.Settings.Prop.DisableRobloxAnimations || App.Settings.Prop.EnableLowMemoryMode)
+            {
+                App.Settings.Prop.DisableRobloxAnimations = false;
+                App.Settings.Prop.EnableLowMemoryMode = false;
+                settingsChanged = true;
+                App.Logger.WriteLine(LOG_IDENT_CLASS,
+                    "Disabled animation and low-memory toggles because their flags were denied by the user's Roblox 0.741 client log.");
+            }
+
+            if (App.Settings.Prop.EnableFastLoadingFlags && Environment.ProcessorCount < 8)
+            {
+                App.Settings.Prop.EnableFastLoadingFlags = false;
+                settingsChanged = true;
+                App.Logger.WriteLine(LOG_IDENT_CLASS,
+                    "Disabled Fast Loading because this CPU has fewer than 8 logical processors and its compositor flag was denied by the user's Roblox 0.741 client log.");
+            }
+
+            foreach (string flag in Prop.Keys.Where(IsFlagRejectedByRobloxLogs)
+                         .Where(_ => !App.Settings.Prop.EnableRejectedLegacyFastFlags)
+                         .ToArray())
+            {
+                Prop.Remove(flag);
+                fastFlagsChanged = true;
+                App.Logger.WriteLine(LOG_IDENT_CLASS,
+                    $"Removed '{flag}' from existing ClientAppSettings because the user's Roblox 0.741 client log reported it as denied.");
+            }
+
+            if (settingsChanged)
+            {
+                try { App.Settings.Save(); }
+                catch (Exception ex) { App.Logger.WriteException(LOG_IDENT_CLASS, ex); }
+            }
 
             if (GetPreset("Rendering.ManualFullscreen") != "False")
+            {
                 SetPreset("Rendering.ManualFullscreen", "False");
+                fastFlagsChanged = true;
+            }
+
+            if (fastFlagsChanged)
+                Save();
+            else
+                OriginalProp = new(Prop);
         }
     }
 }

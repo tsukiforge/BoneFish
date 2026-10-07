@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>Bloxstrap kunne ikke automatisk opdatere til version {0}. Opdater det manuelt ved at downloade og køre det fra hjemmesiden.</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Roblox kører i øjeblikket, og opstart af en anden instans vil lukke den. Er du sikker på, at du vil fortsætte med at starte?</value>
   </data>
@@ -495,12 +492,6 @@ Vil du gerne opgradere din nuværende installerede version?</value>
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>Udseende</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>Bloxstrap vil automatisk tjekke og opdatere sig selv, når Roblox startes.</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>Opdater automatisk Bloxstrap</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>Undgå, at lukninger af dit eksisterende spil ved et uheld starter et andet.</value>
@@ -1198,9 +1189,6 @@ Luk alle programmer, der kan bruge Roblox's filer, og relancering.</value>
   </data>
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>Roblox understøtter ikke længere Windows 7 eller 8.1. For at fortsætte med at spille Roblox, bedes du opgradere til Windows 10 eller nyere.</value>
-  </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>Finder den nyeste Bloxstrap...</value>
   </data>
   <data name="Enums.CustomThemeTemplate.Blank" xml:space="preserve">
     <value>Blank</value>

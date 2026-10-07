@@ -65,9 +65,10 @@ namespace Bloxstrap.Integrations
         {
             public uint PropertyId;
             public uint QueryType;
+            public byte AdditionalParameters;
         }
 
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        [StructLayout(LayoutKind.Sequential)]
         private struct DEVICE_SEEK_PENALTY_DESCRIPTOR
         {
             public uint Version;
@@ -76,7 +77,7 @@ namespace Bloxstrap.Integrations
             public byte IncursSeekPenalty; // BOOLEAN: 0 = no seek penalty (SSD hint), 1 = seek penalty (HDD)
         }
 
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        [StructLayout(LayoutKind.Sequential)]
         private struct DEVICE_TRIM_DESCRIPTOR
         {
             public uint Version;
@@ -117,6 +118,21 @@ namespace Bloxstrap.Integrations
             mem.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
             if (GlobalMemoryStatusEx(ref mem))
                 return mem.ullTotalPhys;
+            return 0;
+        }
+
+        // ── HardwareProfileEngine accessors (Phase 3) ────────────────────────────
+        // Ringan: GlobalMemoryStatusEx = syscall kernel (±µs), bukan WMI. Dipublikasi
+        // agar mesin profil hardware bisa membaca total/available RAM tanpa duplikasi
+        // struct/P-Invoke, tanpa menambah sumber kebenaran baru.
+        public static ulong GetTotalPhysicalMemoryPublic() => GetTotalPhysicalMemory();
+
+        public static ulong GetAvailablePhysicalMemoryPublic()
+        {
+            var mem = new MEMORYSTATUSEX();
+            mem.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+            if (GlobalMemoryStatusEx(ref mem))
+                return mem.ullAvailPhys;
             return 0;
         }
 
@@ -184,6 +200,7 @@ namespace Bloxstrap.Integrations
             public string BusType { get; set; } = "";
             public string Confidence { get; set; } = "";
             public List<string> Sources { get; set; } = new();
+            public string Reason { get; set; } = "";
             public DateTime DetectedAtUtc { get; set; }
         }
 
@@ -266,6 +283,24 @@ namespace Bloxstrap.Integrations
                 }
 
                 var type = ParseStorageType(entry.StorageType);
+                if (type == StorageMediaType.Unknown)
+                    return null;
+
+                _lastDetection = new StorageDetectionResult
+                {
+                    Type = type,
+                    Confidence = entry.Confidence,
+                    PhysicalDiskIndex = entry.PhysicalDiskIndex >= 0
+                        ? entry.PhysicalDiskIndex.ToString(CultureInfo.InvariantCulture)
+                        : "?",
+                    DiskModel = entry.DiskModel,
+                    BusType = entry.BusType,
+                    SystemDrive = entry.SystemDriveRoot,
+                    Sources = new List<string>(entry.Sources),
+                    Reason = String.IsNullOrWhiteSpace(entry.Reason)
+                        ? "Loaded from persistent cache; original reason unavailable"
+                        : entry.Reason
+                };
                 App.Logger.WriteLine(LOG_IDENT,
                     $"Storage type from persistent cache: {entry.StorageType} (disk={entry.PhysicalDiskIndex}, model=\"{entry.DiskModel}\", sources=[{String.Join("+", entry.Sources)}])");
                 return type;
@@ -304,6 +339,7 @@ namespace Bloxstrap.Integrations
                     BusType = detection.BusType,
                     Confidence = detection.Confidence,
                     Sources = detection.Sources,
+                    Reason = detection.Reason,
                     DetectedAtUtc = DateTime.UtcNow
                 };
 
@@ -654,7 +690,8 @@ namespace Bloxstrap.Integrations
                     var query = new STORAGE_PROPERTY_QUERY
                     {
                         PropertyId = StorageDeviceSeekPenaltyProperty,
-                        QueryType = 0 // PropertyStandardQuery
+                        QueryType = 0, // PropertyStandardQuery
+                        AdditionalParameters = 0
                     };
 
                     int querySize = Marshal.SizeOf(typeof(STORAGE_PROPERTY_QUERY));
@@ -742,7 +779,8 @@ namespace Bloxstrap.Integrations
                     var query = new STORAGE_PROPERTY_QUERY
                     {
                         PropertyId = StorageDeviceTrimProperty,
-                        QueryType = 0
+                        QueryType = 0,
+                        AdditionalParameters = 0
                     };
 
                     int querySize = Marshal.SizeOf(typeof(STORAGE_PROPERTY_QUERY));
@@ -931,6 +969,19 @@ namespace Bloxstrap.Integrations
         {
             try
             {
+                if (!App.Settings.Prop.PerformancePresetGraphicsQualityManaged)
+                {
+                    int? savedPresetQuality = App.Settings.Prop.SelectedPerformancePreset switch
+                    {
+                        "Balanced" => 5,
+                        "AutoOptimize" or "Stable" or "UltraLow" or "ExtremePerformance" => 1,
+                        _ => null
+                    };
+
+                    if (savedPresetQuality.HasValue)
+                        ApplySafeRobloxGraphicsQuality(savedPresetQuality.Value);
+                }
+
                 // ── v7.0.5: tier ASLI vs tier EFEKTIF ──────────────────────────────
                 // Bug (sebelum fix): DetectSystemTier() punya short-circuit
                 //   if (ForceExtremeMode) return ExtremePerformance;
@@ -939,8 +990,6 @@ namespace Bloxstrap.Integrations
                 // return duluan — ApplyHDDBalancedOptimizations() TIDAK PERNAH terpanggil
                 // saat ForceExtremeMode aktif → semua tweak I/O HDD hilang, digantikan
                 // mode Extreme generik yang buta terhadap bottleneck disk.
-                // Sekarang: tier asli dihitung terpisah (ignoreForceExtreme) dan dipakai
-                // untuk memutuskan kombinasi Extreme+HDD.
                 SystemTier trueTier = DetectSystemTier(ignoreForceExtreme: true);
                 SystemTier tier = DetectSystemTier();
                 bool isExtreme = tier == SystemTier.ExtremePerformance;
@@ -966,42 +1015,25 @@ namespace Bloxstrap.Integrations
 
                 if (App.Settings.Prop.OptimizeForLowEnd)
                 {
-                    // v7.0.5: ForceExtreme + HDD + tier asli LowEnd/MidRange → GABUNGAN
-                    // Extreme & HDD tweaks ("Extreme Mode sadar HDD"), bukan saling
-                    // menggantikan. hddIoTweaks=true diarahkan ke ApplyAggressiveOptimizations
-                    // yang sudah ada (reuse, bukan reimplement) — nilai 250/jobs=2 dll.
-                    // bypassLowEndGuard=true hanya untuk kasus combo: bukti dari log device
-                    // nyata — user memakai ForceExtremeMode TAPI guard UserHasManualPreset()
-                    // di ApplyAggressiveOptimizations membuat auto-optimize di-skip total
-                    // saat boot (ClientAppSettings.json hanya berisi 4 flag dasar). Karena
-                    // toggle ForceExtremeMode ADALAH ekspresi intent user untuk extreme,
-                    // combo tidak boleh diam-diam di-skip oleh guard preset manual.
-                    bool hddCombo = App.Settings.Prop.ForceExtremeMode
-                        && GetStorageType() == StorageMediaType.Hdd
-                        && (trueTier == SystemTier.LowEnd || trueTier == SystemTier.MidRange);
+                    bool bypassManualPresetGuard = App.Settings.Prop.ForceExtremeMode
+                        && !String.Equals(App.Settings.Prop.SelectedPerformancePreset, "ExtremePerformance", StringComparison.Ordinal);
 
-                    if (hddCombo)
-                        App.Logger.WriteLine(LOG_IDENT,
-                            $"ForceExtreme + HDD combo: tier asli {trueTier}, tier efektif ExtremePerformance — applying Extreme + HDD tweaks (bypass manual-preset guard)");
-
-                    ApplyAggressiveOptimizations(
-                        tier: tier,
-                        hddIoTweaks: hddCombo,
-                        bypassLowEndGuard: hddCombo);
+                    ApplyAggressiveOptimizations(bypassLowEndGuard: bypassManualPresetGuard);
                     return true;
                 }
 
-                // v7.7.0: Unknown → optimasi HDD TIDAK diterapkan (tidak ada bukti).
-                // Ini keputusan aman: HDD tweaks menurunkan agresivitas I/O; menerapkannya
-                // pada SSD tidak merusak, tapi TIDAK menerapkannya pada HDD asli hanya
-                // kehilangan sedikit tuning — sedangkan SALAH klasifikasi jauh lebih buruk.
+                // Do not inject storage-specific renderer settings. Only clean stale
+                // overrides when a confirmed HDD profile reaches this path.
                 if (GetStorageType() == StorageMediaType.Hdd
                     && (tier == SystemTier.LowEnd || tier == SystemTier.MidRange) && !UserHasManualPreset())
                 {
-                    App.Logger.WriteLine(LOG_IDENT, $"HDD detected + {tier} tier — applying HDD Balanced optimizations");
+                    App.Logger.WriteLine(LOG_IDENT, $"HDD detected + {tier} tier — removing legacy renderer overrides");
                     ApplyHDDBalancedOptimizations();
                     return true;
                 }
+
+                if (!UserHasManualPreset() && !App.Settings.Prop.ForceExtremeMode)
+                    RestoreSafeRobloxGraphicsQuality();
 
                 return RemoveOptimizations();
             }
@@ -1023,14 +1055,8 @@ namespace Bloxstrap.Integrations
                     App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation re-applied after CheckAndApply (priority: HIGHEST)");
                 }
 
-                // ── Manual FastFlag toggles — chokepoint boot ─────────────────────
-                // ★ FIX: DisableRobloxAnimations/EnableLowMemoryMode disimpan sebagai
-                // bool terpisah di Settings (bukan dibaca dari FastFlags saat itu).
-                // Setiap Play, PurgeAllKnownFlags()/RemoveOptimizations() menghapus
-                // keempat flag-nya dari AllKnownManagedFlags dan tidak ada yang
-                // me-re-apply → toggle manual "hilang" tiap main. Re-apply di sini
-                // (pola SAMA dengan TDR Mitigation di atas) supaya manual flags
-                // survive apa pun path yang dijalankan.
+                // ── Legacy FastFlag toggles ───────────────────────────────────────
+                // Roblox-rejected values are filtered by FastFlagManager before save.
                 if (App.Settings.Prop.DisableRobloxAnimations)
                 {
                     try { ApplyDisableRobloxAnimations(); } catch { }
@@ -1040,6 +1066,11 @@ namespace Bloxstrap.Integrations
                 {
                     try { ApplyLowMemoryMode(); } catch { }
                     App.Logger.WriteLine(LOG_IDENT, "EnableLowMemoryMode re-applied after CheckAndApply (priority: HIGHEST)");
+                }
+                if (App.Settings.Prop.EnableFastLoadingFlags)
+                {
+                    try { ApplyFastLoadingFlags(); } catch { }
+                    App.Logger.WriteLine(LOG_IDENT, "Fast Loading re-applied after CheckAndApply.");
                 }
             }
         }
@@ -1075,10 +1106,271 @@ namespace Bloxstrap.Integrations
             }
         }
 
-        public static void ApplyAggressiveOptimizations(
-            SystemTier? tier = null,
-            bool hddIoTweaks = false,
-            bool bypassLowEndGuard = false)
+        /// <summary>
+        /// Diagnostik performa READ-ONLY (audit FPS Fase 6).
+        /// Dipanggil ON-DEMAND dari UI (tombol) — BUKAN background polling, tidak
+        /// menulis FastFlag / tidak Save apa pun, dan tidak mengubah konfigurasi user.
+        /// Hanya membaca: Settings, FastFlags, GlobalBasicSettings_13.xml, refresh rate,
+        /// dan satu query WMI GPU.
+        /// CATATAN: bila deteksi storage belum pernah jalan di sesi ini, pemanggilan
+        /// GetStorageType() bisa menulis cache hardware milik BoneFish sendiri
+        /// (HardwareCache.json) — cache internal, bukan konfigurasi Roblox/user.
+        /// </summary>
+        public static string GetPerformanceDiagnostics()
+        {
+            var sb = new StringBuilder();
+
+            void Line(string label, string value) => sb.AppendLine($"{label,-26}: {value}");
+
+            string Flag(string name)
+            {
+                try { return App.FastFlags.GetValue(name) ?? "(not set)"; }
+                catch { return "(error)"; }
+            }
+
+            try
+            {
+                sb.AppendLine("=== BoneFish Performance Diagnostics (READ-ONLY) ===");
+                sb.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                sb.AppendLine();
+
+                sb.AppendLine("-- Build --");
+                Line("BoneFish version", App.Version);
+                sb.AppendLine();
+
+                sb.AppendLine("-- Mode / preset --");
+                Line("Selected preset", App.Settings.Prop.SelectedPerformancePreset ?? "None");
+                Line("ForceExtremeMode", App.Settings.Prop.ForceExtremeMode ? "ON" : "OFF");
+                Line("OptimizeForLowEnd", App.Settings.Prop.OptimizeForLowEnd ? "ON" : "OFF");
+                Line("UserHasManualPreset", UserHasManualPreset() ? "yes" : "no");
+                Line("Guard bypass (intent)", App.Settings.Prop.ForceExtremeMode
+                    ? "armed — guard preset manual di-bypass"
+                    : "not armed");
+                sb.AppendLine();
+
+                sb.AppendLine("-- Hardware --");
+                Line("CPU cores", Environment.ProcessorCount.ToString());
+                Line("RAM tier (asli)", DetectSystemTier(ignoreForceExtreme: true).ToString());
+                Line("Tier efektif", DetectSystemTier().ToString());
+                Line("GPU", GetGpuName());
+                Line("Refresh rate", $"{FpsUnlockerService.GetPrimaryDisplayRefreshRate()} Hz");
+                sb.AppendLine();
+
+                sb.AppendLine("-- Storage (3-state, tidak menebak) --");
+                StorageDetectionResult storage = GetStorageDiagnostics();
+                Line("Storage type", GetStorageType().ToString());
+                Line("Confidence", String.IsNullOrWhiteSpace(storage.Confidence) ? "(none)" : storage.Confidence);
+                Line("Physical disk", String.IsNullOrWhiteSpace(storage.PhysicalDiskIndex) ? "?" : storage.PhysicalDiskIndex);
+                Line("Disk model", String.IsNullOrWhiteSpace(storage.DiskModel) ? "(unknown)" : storage.DiskModel);
+                Line("Bus type", String.IsNullOrWhiteSpace(storage.BusType) ? "(unknown)" : storage.BusType);
+                Line("Reason", String.IsNullOrWhiteSpace(storage.Reason) ? "(none)" : storage.Reason);
+                Line("HDD-specific renderer FastFlags", "not applied");
+                sb.AppendLine();
+
+                sb.AppendLine("-- Local rendering FastFlags (not proof Roblox applied them) --");
+                Line("LOD base / L12", $"{Flag("DFIntCSGLevelOfDetailSwitchingDistance")} / {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL12")}");
+                Line("LOD L23 / L34", $"{Flag("DFIntCSGLevelOfDetailSwitchingDistanceL23")} / {Flag("DFIntCSGLevelOfDetailSwitchingDistanceL34")}");
+                Line("TextureCompositorJobs", Flag("DFIntTextureCompositorActiveJobs"));
+                sb.AppendLine();
+
+                sb.AppendLine("-- Toggle performa --");
+                Line("Fast Loading", App.Settings.Prop.EnableFastLoadingFlags ? "ON" : "OFF");
+                Line("TDR Mitigation", App.Settings.Prop.EnableTdrMitigation ? "ON" : "OFF");
+                Line("FPS Unlocker", App.Settings.Prop.FpsUnlockerEnabled ? "ON" : "OFF");
+                sb.AppendLine();
+
+                sb.AppendLine("-- FPS cap --");
+                if (!App.GlobalSettings.Loaded)
+                    App.GlobalSettings.Load();
+
+                bool gbsAvailable = App.GlobalSettings.Document is not null;
+                string? effectiveCap = gbsAvailable ? App.GlobalSettings.GetPreset("Rendering.FramerateCap") : null;
+                string? graphicsLevel = gbsAvailable ? App.GlobalSettings.GetPreset("Rendering.SavedQualityLevel") : null;
+
+                Line("Effective FramerateCap", String.IsNullOrWhiteSpace(effectiveCap) ? "(tidak ada / default Roblox)" : effectiveCap);
+                Line("Cap dikelola BoneFish", App.Settings.Prop.FpsUnlockerCapManaged ? "yes" : "no");
+                Line("Cap user sebelumnya", App.Settings.Prop.FpsUnlockerPreviousCap ?? "(none)");
+                Line("Roblox graphics level", String.IsNullOrWhiteSpace(graphicsLevel) ? "(unavailable)" : graphicsLevel);
+                sb.AppendLine();
+
+                sb.AppendLine("-- Runtime --");
+                Line("Roblox priority", GetRobloxPriority());
+            }
+            catch (Exception ex)
+            {
+                sb.AppendLine($"(diagnostics incomplete: {ex.Message})");
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// GPU name untuk diagnostik — satu query WMI, hanya saat dipanggil.
+        /// </summary>
+        private static string GetGpuName()
+        {
+            try
+            {
+                var names = new List<string>();
+                using var searcher = new ManagementObjectSearcher(
+                    "root\\cimv2",
+                    "SELECT Name FROM Win32_VideoController");
+
+                foreach (ManagementObject controller in searcher.Get().Cast<ManagementObject>())
+                {
+                    try
+                    {
+                        string? name = controller["Name"]?.ToString();
+                        if (!String.IsNullOrWhiteSpace(name))
+                            names.Add(name);
+                    }
+                    finally
+                    {
+                        controller.Dispose();
+                    }
+                }
+
+                return names.Count == 0 ? "(unknown)" : String.Join(" + ", names);
+            }
+            catch
+            {
+                return "(unavailable)";
+            }
+        }
+
+        /// <summary>
+        /// Priority proses Roblox yang sedang berjalan (diagnostik, read-only).
+        /// Process di-dispose agar tidak menambah handle leak.
+        /// </summary>
+        private static string GetRobloxPriority()
+        {
+            try
+            {
+                Process[] robloxProcesses = Process.GetProcessesByName("RobloxPlayerBeta");
+
+                if (robloxProcesses.Length == 0)
+                    return "(Roblox tidak berjalan)";
+
+                string result;
+                try
+                {
+                    result = $"PID {robloxProcesses[0].Id} -> {robloxProcesses[0].PriorityClass}";
+                }
+                catch
+                {
+                    result = $"PID {robloxProcesses[0].Id} -> (priority tidak bisa dibaca)";
+                }
+
+                foreach (Process process in robloxProcesses)
+                {
+                    try { process.Dispose(); } catch { }
+                }
+
+                return result;
+            }
+            catch
+            {
+                return "(unavailable)";
+            }
+        }
+
+        public static bool ApplySafeRobloxGraphicsQuality(int qualityLevel)
+        {
+            const string LOG_IDENT = "AutoOptimizeService::ApplySafeRobloxGraphicsQuality";
+            if (qualityLevel is < 1 or > 10)
+                throw new ArgumentOutOfRangeException(nameof(qualityLevel), qualityLevel, "Graphics quality must be between 1 and 10.");
+
+            if (!App.GlobalSettings.Loaded)
+                App.GlobalSettings.Load();
+
+            if (App.GlobalSettings.Document is null
+                || App.GlobalSettings.GetPreset("Rendering.SavedQualityLevel") is null)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Roblox SavedQualityLevel is unavailable; graphics quality was not changed.");
+                return false;
+            }
+
+            string requestedValue = qualityLevel.ToString(CultureInfo.InvariantCulture);
+            string? currentValue = App.GlobalSettings.GetPreset("Rendering.SavedQualityLevel");
+            bool managed = App.Settings.Prop.PerformancePresetGraphicsQualityManaged;
+            string? previousValue = App.Settings.Prop.PerformancePresetPreviousGraphicsQuality;
+            string? storedPreviousValue = previousValue;
+            string? appliedValue = App.Settings.Prop.PerformancePresetAppliedGraphicsQuality;
+
+            if (!managed || currentValue != App.Settings.Prop.PerformancePresetAppliedGraphicsQuality)
+                previousValue = currentValue;
+
+            App.GlobalSettings.SetPreset("Rendering.SavedQualityLevel", requestedValue);
+            if (App.GlobalSettings.GetPreset("Rendering.SavedQualityLevel") != requestedValue)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Failed to set Roblox SavedQualityLevel to {requestedValue}.");
+                return false;
+            }
+
+            App.GlobalSettings.Save();
+            App.Settings.Prop.PerformancePresetGraphicsQualityManaged = true;
+            App.Settings.Prop.PerformancePresetPreviousGraphicsQuality = previousValue;
+            App.Settings.Prop.PerformancePresetAppliedGraphicsQuality = requestedValue;
+            try
+            {
+                App.Settings.Save();
+            }
+            catch
+            {
+                App.Settings.Prop.PerformancePresetGraphicsQualityManaged = managed;
+                App.Settings.Prop.PerformancePresetPreviousGraphicsQuality = storedPreviousValue;
+                App.Settings.Prop.PerformancePresetAppliedGraphicsQuality = appliedValue;
+
+                if (currentValue is null)
+                    App.GlobalSettings.RemovePreset("Rendering.SavedQualityLevel");
+                else
+                    App.GlobalSettings.SetPreset("Rendering.SavedQualityLevel", currentValue);
+
+                App.GlobalSettings.Save();
+                throw;
+            }
+            App.Logger.WriteLine(LOG_IDENT, $"Roblox SavedQualityLevel set to {requestedValue}.");
+            return true;
+        }
+
+        public static void RestoreSafeRobloxGraphicsQuality()
+        {
+            const string LOG_IDENT = "AutoOptimizeService::RestoreSafeRobloxGraphicsQuality";
+            if (!App.Settings.Prop.PerformancePresetGraphicsQualityManaged)
+                return;
+
+            if (!App.GlobalSettings.Loaded)
+                App.GlobalSettings.Load();
+
+            if (App.GlobalSettings.Document is null)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Roblox GlobalBasicSettings is unavailable; keeping the graphics-quality restore point.");
+                return;
+            }
+
+            string? currentValue = App.GlobalSettings.GetPreset("Rendering.SavedQualityLevel");
+            if (currentValue == App.Settings.Prop.PerformancePresetAppliedGraphicsQuality)
+            {
+                string? previousValue = App.Settings.Prop.PerformancePresetPreviousGraphicsQuality;
+                if (previousValue is null)
+                    App.GlobalSettings.RemovePreset("Rendering.SavedQualityLevel");
+                else
+                    App.GlobalSettings.SetPreset("Rendering.SavedQualityLevel", previousValue);
+
+                App.GlobalSettings.Save();
+            }
+            else
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Graphics quality changed outside the preset; preserving the newer value.");
+            }
+
+            App.Settings.Prop.PerformancePresetGraphicsQualityManaged = false;
+            App.Settings.Prop.PerformancePresetPreviousGraphicsQuality = null;
+            App.Settings.Prop.PerformancePresetAppliedGraphicsQuality = null;
+            App.Settings.Save();
+        }
+
+        public static void ApplyAggressiveOptimizations(bool bypassLowEndGuard = false)
         {
             try
             {
@@ -1089,163 +1381,43 @@ namespace Bloxstrap.Integrations
 
                     if (UserHasManualPreset())
                     {
-                        App.Logger.WriteLine(LOG_IDENT, "User has manual preset — skipping aggressive overrides to respect user choice.");
+                        App.Logger.WriteLine(LOG_IDENT, "User has manual preset — skipping automatic renderer changes.");
                         return;
                     }
                 }
 
-tier ??= DetectSystemTier();
-            bool isExtreme = tier == SystemTier.ExtremePerformance;
-            bool isUltraOrExtreme = tier == SystemTier.UltraLow || isExtreme;
-
-            // ── Konflik kombinasi (v7.x): HDD + Extreme ─────────────────────────────
-            // ★ FIX: Saat ForceExtremeMode aktif, DetectSystemTier() mengembalikan
-            // ExtremePerformance SEPENUHNYA terlepas dari hardware — akibatnya
-            // ApplyHDDBalancedOptimizations() TIDAK PERNAH dipanggil (CheckAndApply
-            // return dulu di cabang OptimizeForLowEnd). Agar preset HDD tetap "hidup"
-            // saat dieksekusi: relatif terhadap HDD di sini (hddIoTweaks juga diset
-            // dari sina berlaku) sehingga kombinasi Extreme+HDD menghasilkan LOD &
-            // compositor yang BENAR untuk disk lambat, bukan nilai "generic Extreme".
-            bool isHDD = GetStorageType() == StorageMediaType.Hdd;
-
-            PurgeAllKnownFlags();
-
-                // ── Rombak v7.2.7: flag render paksa DIBUANG ───────────────────────
-                // ★ Audit layar-putih 8/18/2026 (Intel HD 1GB, driver 20.19.15.5126):
-                //   DFIntDebugFRMQualityLevelOverride=3 + DFIntTextureQualityOverride=0
-                //   (dengan FFlagTextureQualityOverrideEnabled) + FIntTextureCompositorLowResFactor=1
-                //   terbukti merusak render di iGPU tua (ClientMemStatus Error, white screen).
-                //   Selain itu DFIntTaskSchedulerTargetFps TIDAK di allowlist sejak 2025-09-29
-                //   (client mengabaikannya) dan FIntRenderGrainScale di-deny client 0.734.
-                //   Keempatnya TIDAK PERNAH ditulis lagi; nilai lama tetap dibersihkan
-                //   oleh PurgeAllKnownFlags() via AllKnownManagedFlags.
-                App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
-
-                App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
-
-                App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
-                App.FastFlags.SetValue("FIntSSAOMipLevels", "0");
-
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-                // ── Konflik kombinasi Extreme + HDD pada LOD ────────────────────────
-                // Nilai Extreme 500/750 membuat geometri TETAP high-poly lebih jauh
-                // (switch LOD semakin jauh) = beban render lebih berat = FPS turun di
-                // perangkat 'potato' (bukti: LANGKAH 0 user — Extreme ON 36-40 FPS vs
-                // OFF 50-60). Saat dieksekusi bersamaan dengan HDD/LowEnd, LOD dipertahankan
-                // 250 (paling agresif) karena preset HDD sendiri TIDAK pernah jalan
-                // (CheckAndApply return duluan di cabang OptimizeForLowEnd).
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    isExtreme && !isHDD ? "500" : "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    isExtreme && !isHDD ? "750" : "250");
-                App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
-                App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
-
-                App.FastFlags.SetValue("FIntTerrainArraySliceSize", "0");
-
-                App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
-
-                // DFIntMaxFrameBufferSize=4 (frame buffer terlalu kecil → artefak render/
-                // layar putih di iGPU tua) dan FIntRuntimeMaxNumOfThreads=4 (thread render
-                // dibatasi tanpa manfaat terukur) DIBUANG di rombak v7.2.7 — tidak pernah
-                // ditulis lagi. FIntRuntimeMaxNumOfThreads hanya ditulis oleh toggle Fast
-                // Loading (6 jika cpuCores >= 8).
-                App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
-
-                // DFIntTaskSchedulerTargetFps: TIDAK ditulis lagi sejak rombak v7.2.7 —
-                // tidak ada di allowlist sejak 2025-09-29 (client modern mengabaikannya;
-                // pengganti: GlobalBasicSettings_13.xml FramerateCap). FPS cap manual
-                // tetap bisa di-set user lewat pengaturan FramerateCap di Roblox.
-
-                // ── ANR audit (v7.x) ❌ DIPERTAHANKAN ───────────────────────────────
-                // DFIntMaxActiveAnimationTracks, FIntRenderLocalLightFadeInMs, dan 7 flag
-                // telemetry (FFlagDebugDisableTelemetry*) TIDAK TERDAFTAR di Roblox Fast
-                // Flag Allowlist resmi yang aktif sejak 29 September 2025 (devforum thread
-                // 3966569; juga repo LeventGameing/allowlist) — client MODERN MENGABAIKAN
-                // flag ini (silent no-op). Tidak ada lagi SetValue untuk flag tersebut;
-                // nilai lama tetap dibersihkan lewat AllKnownManagedFlags saat purge.
-
-                if (isUltraOrExtreme)
-                {
-                    // FIntRenderLocalLightUpdatesMax/Min: DIBUANG di rombak v7.2.7 —
-                    // di-deny client 0.734 ("Denied local configuration"), menulisnya
-                    // sia-sia. Extreme+HDD → jobs=2 (selaras HDD Balanced); Extreme murni → 1
-                    App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", isHDD ? "2" : "1");
-
-                    App.Settings.Prop.EnableFpsMonitor = false;
-                    App.Settings.Prop.EnableRobloxNotifications = false;
-                    try { App.Settings.Save(); } catch { }
-
-                    string label = isExtreme ? "ExtremePerformance (Potato Mode)" : "UltraLow";
-                    if (isExtreme && hddIoTweaks)
-                        label += " + HDD tweaks (HDD-aware combo)";
-                    App.Logger.WriteLine(LOG_IDENT, $"Aggressive optimizations applied for {label}");
-                }
-                else if (hddIoTweaks)
-                {
-                    // HDD-specific I/O tweaks (only applied on top of LowEnd base, never Ultra/Extreme)
-                    App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "2");
-
-                    App.Logger.WriteLine(LOG_IDENT, "Rendering optimizations applied for low-end (with HDD I/O tweaks)");
-                }
-                else
-                {
-                    App.Logger.WriteLine(LOG_IDENT, "Rendering optimizations applied for low-end");
-                }
-
-// ── Network Optimizations ("sekelas NASA") ─────────────────────────
-                // ★ FIX: PurgeAllKnownFlags() di awal method ini MENGHAPUS flag network
-                // (FIntRakNetPacketRateLimit, DFIntMaxReceivePPS, DFIntMaxSendPPS,
-                // DFIntConnectionMTUSize, DFIntOptimizeSendQueue), tapi sebelumnya TIDAK
-                // pernah di-apply ulang di path low-end auto. Akibatnya user LowEnd/UltraLow
-                // yang tidak pilih preset manual justru KEHILANGAN optimasi jaringan —
-                // padahal preset manual (UltraLow, Balanced, dst) selalu memakainya.
-                // Sekarang semua path low-end (auto, HDD Balanced, Turbo Mode) juga
-                // mendapat network boost yang sama.
+                PurgeLegacyRendererFlags();
+                ApplySafeRobloxGraphicsQuality(1);
                 ApplyNetworkOptimizations();
-                App.Logger.WriteLine(LOG_IDENT, "Network optimizations applied (low-end path)");
-
-                // ── Konflik urutan / Fast Loading (toggle) ──────────────────────────
-                // ★ FIX: ApplyFastLoadingFlags() hanya dipanggil dari toggle UI, TIDAK
-                // pernah dari boot. Di relaunch, PurgeAllKnownFlags() + nilai di atas
-                // menghapus/menimpa flag-nya (DFIntTextureCompositorActiveJobs — dan
-                // FIntRuntimeMaxNumOfThreads sebelum rombak v7.2.7) — toggle Fast
-                // Loading mati diam-diam.
-                // Re-apply PALING AKHIR agar kombinasi ini menang apa pun preset lain.
                 if (App.Settings.Prop.EnableFastLoadingFlags)
-                {
-                    try { ApplyFastLoadingFlags(); } catch { }
-                    App.Logger.WriteLine(LOG_IDENT, "FastLoading re-applied after aggressive path (priority: HIGHEST)");
-                }
+                    ApplyFastLoadingFlags();
+                App.Logger.WriteLine(LOG_IDENT,
+                    "Removed legacy renderer FastFlags; Roblox graphics quality and frame-rate settings remain in control.");
             }
             catch (Exception ex)
             {
-                App.Logger.WriteLine(LOG_IDENT, $"Error applying aggressive optimizations: {ex.Message}");
+                App.Logger.WriteLine(LOG_IDENT, $"Error applying conservative optimizations: {ex.Message}");
             }
         }
 
-        // HDD-path delegates ke ApplyAggressiveOptimizations supaya tidak ada duplikasi flag.
-        // bypassLowEndGuard=true karena caller (CheckAndApply) memanggil ini justru saat OptimizeForLowEnd masih FALSE
-        // (HDD + LowEnd/MidRange tier, !OptimizeForLowEnd, !UserHasManualPreset()).
-        // hddIoTweaks=true menyebabkan tambahan 3 flag HDD-specific di akhir apply base:
-        //   DFIntTextureCompositorActiveJobs=2 (vs UltraLow=1 vs LowEnd=unset)
-        //   FIntRenderLocalLightUpdatesMax=4, FIntRenderLocalLightUpdatesMin=2 (seperti UltraOrExtreme tapi tanpa side-effect FPS/Notifications)
+        // Retained as a call-site-compatible cleanup path for confirmed HDD systems.
         public static void ApplyHDDBalancedOptimizations()
         {
             try
             {
-                App.Logger.WriteLine(LOG_IDENT, "HDD Balanced optimizations applied (LowEnd base + HDD I/O tweaks)");
-                ApplyAggressiveOptimizations(
-                    tier: SystemTier.LowEnd,
-                    hddIoTweaks: true,
-                    bypassLowEndGuard: true);
+                App.Logger.WriteLine(LOG_IDENT, "Cleaning legacy renderer overrides for confirmed HDD system.");
+                ApplyAggressiveOptimizations(bypassLowEndGuard: true);
             }
             catch (Exception ex)
             {
-                App.Logger.WriteLine(LOG_IDENT, $"Error applying HDD Balanced optimizations: {ex.Message}");
+                App.Logger.WriteLine(LOG_IDENT, $"Error cleaning HDD renderer overrides: {ex.Message}");
             }
         }
 
-        private static readonly string[] AllKnownManagedFlags =
+        // Retired renderer overrides emitted by previous BoneFish presets. All other
+        // flags, including user preferences and currently supported settings, survive
+        // update cleanup unchanged.
+        private static readonly string[] LegacyRendererFlags =
         {
             "DFFlagTextureQualityOverrideEnabled", "DFIntTextureQualityOverride", "FIntTextureCompositorLowResFactor", "DFIntTextureCompositorActiveJobs",
             "DFIntDebugFRMQualityLevelOverride", "FIntRomarkStartWithGraphicQualityLevel",
@@ -1254,53 +1426,40 @@ tier ??= DetectSystemTier();
             "FFlagDebugSkyGray", "FFlagDisablePostFx", "FFlagDebugSSAOForce", "FIntSSAOMipLevels", "FIntRobloxGuiBlurIntensity", "FIntRenderGrainScale",
             "FIntFRMMinGrassDistance", "FIntFRMMaxGrassDistance", "FIntRenderGrassDetailStrands", "FIntRenderGrassHeightScaler", "FFlagGlobalWindActivated",
             "DFIntCSGLevelOfDetailSwitchingDistance", "DFIntCSGLevelOfDetailSwitchingDistanceL12", "DFIntCSGLevelOfDetailSwitchingDistanceL23",
-            "DFIntCSGLevelOfDetailSwitchingDistanceL34", "DFIntCSGLevelOfDetailSwitchingDistanceStatic", "DFIntCSGv2LodsToGenerate", "DFIntDebugRestrictGCDistance",
+            "DFIntCSGLevelOfDetailSwitchingDistanceL34", "DFIntCSGLevelOfDetailSwitchingDistanceStatic", "DFIntDebugRestrictGCDistance",
             "FIntTerrainArraySliceSize",
             "DFIntAnimationLodFacsDistanceMin", "DFIntAnimationLodFacsDistanceMax", "DFIntAnimationLodFacsVisibilityDenominator",
-            "FIntMaxBatchesPerFlush", "DFIntMaxFrameBufferSize", "FIntRuntimeMaxNumOfThreads", "DFFlagEnableRequestAsyncCompression",
-            "DFIntTaskSchedulerTargetFps",
             "FIntRenderLocalLightUpdatesMax", "FIntRenderLocalLightUpdatesMin", "FIntRenderLocalLightFadeInMs",
-            "DFIntMaxActiveAnimationTracks",
-            "FFlagDebugDisableTelemetryEphemeralCounter", "FFlagDebugDisableTelemetryEphemeralStat", "FFlagDebugDisableTelemetryEventIngest",
-            "FFlagDebugDisableTelemetryPoint", "FFlagDebugDisableTelemetryV2Counter", "FFlagDebugDisableTelemetryV2Event", "FFlagDebugDisableTelemetryV2Stat",
-            "FFlagRenderUIAnimations", "FFlagRenderMenuTransitions", "FFlagRenderInventoryEffects",
-            "FFlagLuaAppEnableLowMemoryMode",
-            "FIntRakNetPacketRateLimit", "DFIntMaxReceivePPS", "DFIntMaxSendPPS", "DFIntConnectionMTUSize", "DFIntOptimizeSendQueue",
-            "FFlagDebugDisplayFPS",
             "FIntDebugForceMSAASamples",
         };
 
-        public static void PurgeAllKnownFlags()
+        private static readonly string[] RendererFlagsToRemove = LegacyRendererFlags
+            .Concat(FastFlagManager.FlagsRejectedByRobloxLogs)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        private static IEnumerable<string> GetRendererFlagsToRemove()
         {
-            foreach (string flag in AllKnownManagedFlags)
-                App.FastFlags.SetValue(flag, null);
-            App.Logger.WriteLine(LOG_IDENT, $"Purged {AllKnownManagedFlags.Length} known managed flags");
+            bool keepRejectedLegacyFlags = App.Settings.Prop.EnableRejectedLegacyFastFlags;
+            bool keepOtherBetaFlags = App.Settings.Prop.EnableLegacyFastFlagsBeta;
+            if (!keepRejectedLegacyFlags && !keepOtherBetaFlags)
+                return RendererFlagsToRemove;
+
+            return RendererFlagsToRemove.Where(flag =>
+                !(keepRejectedLegacyFlags && FastFlagManager.IsFlagRejectedByRobloxLogs(flag))
+                && !(keepOtherBetaFlags
+                    && FastFlagManager.BetaTestableLegacyFlags.Contains(flag)
+                    && !FastFlagManager.IsFlagRejectedByRobloxLogs(flag)));
         }
 
-        private static readonly string[] ManagedFlags =
+        public static void PurgeLegacyRendererFlags()
         {
-            "DFFlagTextureQualityOverrideEnabled", "DFIntTextureQualityOverride", "FIntTextureCompositorLowResFactor",
-            "DFIntDebugFRMQualityLevelOverride", "FIntRomarkStartWithGraphicQualityLevel",
-            "FIntRenderShadowIntensity", "DFFlagDebugPauseVoxelizer", "FIntCSGVoxelizerFadeRadius",
-            "FFlagFastGPULightCulling3", "FFlagNewLightAttenuation",
-            "FFlagDebugSSAOForce", "FIntSSAOMipLevels", "FIntRobloxGuiBlurIntensity", "FIntRenderGrainScale",
-            "FIntFRMMinGrassDistance", "FIntFRMMaxGrassDistance", "FIntRenderGrassDetailStrands", "FIntRenderGrassHeightScaler", "FFlagGlobalWindActivated",
-            "DFIntCSGLevelOfDetailSwitchingDistance", "DFIntCSGLevelOfDetailSwitchingDistanceL12", "DFIntCSGLevelOfDetailSwitchingDistanceL23",
-            "DFIntCSGLevelOfDetailSwitchingDistanceL34", "DFIntCSGv2LodsToGenerate",
-            "FIntTerrainArraySliceSize",
-            "FIntMaxBatchesPerFlush",
-            "DFIntTaskSchedulerTargetFps",
-            "FIntRenderLocalLightUpdatesMax", "FIntRenderLocalLightUpdatesMin",
-            "DFIntTextureCompositorActiveJobs",
-            "DFIntMaxActiveAnimationTracks", "FIntRenderLocalLightFadeInMs",
-            "FFlagDebugDisableTelemetryEphemeralCounter", "FFlagDebugDisableTelemetryEphemeralStat", "FFlagDebugDisableTelemetryEventIngest",
-            "FFlagDebugDisableTelemetryPoint", "FFlagDebugDisableTelemetryV2Counter", "FFlagDebugDisableTelemetryV2Event", "FFlagDebugDisableTelemetryV2Stat",
-            "FFlagRenderUIAnimations", "FFlagRenderMenuTransitions", "FFlagRenderInventoryEffects",
-            "FFlagLuaAppEnableLowMemoryMode",
-            "FIntRakNetPacketRateLimit", "DFIntMaxReceivePPS", "DFIntMaxSendPPS", "DFIntConnectionMTUSize", "DFIntOptimizeSendQueue",
-            "FFlagDebugDisplayFPS",
-            "FIntDebugForceMSAASamples",
-        };
+            string[] flagsToRemove = GetRendererFlagsToRemove().ToArray();
+            foreach (string flag in flagsToRemove)
+                App.FastFlags.SetValue(flag, null);
+            App.Logger.WriteLine(LOG_IDENT,
+                $"Removed {flagsToRemove.Length} retired or Roblox-rejected flags from the active configuration");
+        }
 
         public static void CleanupLegacyRobloxFlags()
         {
@@ -1356,7 +1515,7 @@ tier ??= DetectSystemTier();
                     return false;
 
                 bool modified = false;
-                foreach (string flag in AllKnownManagedFlags)
+                foreach (string flag in GetRendererFlagsToRemove())
                 {
                     if (flags.Remove(flag))
                         modified = true;
@@ -1383,17 +1542,6 @@ tier ??= DetectSystemTier();
         {
             if (!App.Settings.Prop.OptimizeForLowEnd)
                 return;
-
-            try
-            {
-                using var robloxProc = Process.GetProcessById(robloxPid);
-                robloxProc.PriorityClass = ProcessPriorityClass.AboveNormal;
-                App.Logger.WriteLine(LOG_IDENT, $"Set Roblox PID {robloxPid} priority → AboveNormal");
-            }
-            catch (Exception ex)
-            {
-                App.Logger.WriteLine(LOG_IDENT, $"Priority set failed (non-fatal): {ex.Message}");
-            }
 
             try
             {
@@ -1431,11 +1579,26 @@ tier ??= DetectSystemTier();
 
         private static void TrimBackgroundProcesses(int robloxPid)
         {
+            // ★ HARDENING (Phase 2 — Windows Security investigation): skip list dulu
+            // hanya proses inti Windows. Proses keamanan (SecurityHealthService dll.)
+            // SECARA TEORI bisa kerja-set-nya di-trim walau bukan protected process —
+            // sekarang seluruh set proses keamanan Windows + audio vendor di-skip
+            // eksplisit. Defense in depth: this process trim is a separate pathway.
+            // MsMpEng sendiri adalah protected process (OpenProcess gagal) tapi tetap
+            // didaftarkan agar kebijakannya eksplisit dan tahan terhadap perubahan OS.
             var skipNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "System", "Idle", "smss", "csrss", "lsass", "services",
                 "winlogon", "wininit", "svchost", "dwm", "explorer",
-                "audiodg", "fontdrvhost", "spoolsv", "SearchIndexer"
+                "audiodg", "fontdrvhost", "spoolsv", "SearchIndexer",
+                // Windows security stack (Phase 2 rule: selalu dilindungi)
+                "MsMpEng", "MsSense", "NisSrv", "MsMpEngCP",
+                "SecurityHealthService", "SecurityHealthSystray", "wscsvc",
+                "WinDefend", "SenseIR", "SenseCncAgent", "SenseSampleUploader",
+                // Realtek/audio vendor companion processes
+                "RAVBg64", "RAVCpl64", "RAVCpl", "RtkAudioService64",
+                "RtkAudUService64", "RtkAudUService", "RtkAudioService",
+                "RtkNGUI64", "RtkNGUI", "RtkBtManServ", "BthAudioAgent", "WsaAudioService"
             };
 
             string selfName = Process.GetCurrentProcess().ProcessName;
@@ -1486,7 +1649,7 @@ tier ??= DetectSystemTier();
             try
             {
                 bool removedAny = false;
-                foreach (string flag in ManagedFlags)
+                foreach (string flag in GetRendererFlagsToRemove())
                 {
                     if (App.FastFlags.GetValue(flag) is not null)
                     {
@@ -1510,77 +1673,21 @@ tier ??= DetectSystemTier();
             }
         }
 
-        // ── Network Optimizations (Reusable) ─────────────────────────────────────────
-        // ★ REFACTOR: Ekstrak dari FastFlagsViewModel untuk menghilangkan duplikasi
-        // di 5 preset method. Method ini SETARA dengan blok yang sebelumnya inline:
-        //   App.Settings.Prop.EnableBetterMatchmaking = true;
-        //   App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
-        //   App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
-        //   App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
-        //   App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
-        //   App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
-        //   App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
-        //
-        // TIDAK memanggil Save()/Notify()/Reload() — itu tanggung jawab caller.
-        // Caller: ApplyRecommendedNetworkSettings(), ApplyRecommendedStabilityPreset(),
-        //         ApplyUltraLowSpecPreset(), ApplyBalancedPreset(),
-        //         ApplyExtremePerformancePreset().
-        //
-        // Verifikasi: Kelima preset sebelumnya menulis flag yang SAMA PERSIS —
-        // method ini adalah 1-to-1 replacement, tidak ada perubahan nilai.
+        // ── Network preferences (Reusable) ────────────────────────────────────────────
+        // Keep BoneFish's matchmaking preferences. Local network flags were reported as
+        // denied by the user's Roblox 0.741 client log and do not improve ping.
         public static void ApplyNetworkOptimizations()
         {
             App.Settings.Prop.EnableBetterMatchmaking = true;
             App.Settings.Prop.EnableBetterMatchmakingRandomization = true;
-            App.FastFlags.SetValue("FIntRakNetPacketRateLimit", "50000");
-            App.FastFlags.SetValue("DFIntMaxReceivePPS",        "50000");
-            App.FastFlags.SetValue("DFIntMaxSendPPS",           "50000");
-            App.FastFlags.SetValue("DFIntConnectionMTUSize",    "1500");
-            App.FastFlags.SetValue("DFIntOptimizeSendQueue",    "1");
         }
 
         // ── Fast Loading Flags (Toggle Terpisah) ─────────────────────────────────────
-        // ★ Fast Loading toggle: EnableFastLoadingFlags — mempercepat loading aset
-        // (texture, mesh) dengan meningkatkan paralelisme komposisi texture dan
-        // thread scheduler. Stack dengan preset visual apa pun.
-        //
-        // Flag yang dipakai (semua SUDAH ADA di AllKnownManagedFlags):
-        //   DFIntTextureCompositorActiveJobs=2  (jika cpuCores >= 4)
-        //     Naikkan dari 1 (UltraLow/Extreme) ke 2 agar texture compositor
-        //     lebih paralel — aset texture muncul lebih cepat.
-        //   FIntRuntimeMaxNumOfThreads=6        (jika cpuCores >= 8)
-        //     Naikkan dari 4 (default semua preset) ke 6 agar task scheduler
-        //     punya lebih banyak thread untuk loading aset.
-        //
-        // Flag yang TIDAK dipakai (riset menemukan kemungkinan diblokir Allowlist):
-        //   FFlagEnableAsyncResourceLoading     — ❌ Tidak di Allowlist
-        //   FIntRenderChunkLODThreshold         — ❌ Tidak di Allowlist
-        //   FFlagEnableTextureStreamingFix      — ❌ Tidak di Allowlist
-        //   FIntPartSizeBoostThreshold          — ❌ Tidak di Allowlist
-        //
-        // Flag yang JANGAN dipakai (visual, bukan loading):
-        //   FIntRenderShadowIntensity           — Flag visual
-        //   DFFlagDisablePostProcessing         — Flag visual
-        //
-        // Catatan rombak v7.2.7: DFIntTaskSchedulerTargetFps tidak lagi ditulis
-        // oleh ApplyAggressiveOptimizations() (dead flag, di luar allowlist sejak
-        // 2025-09-29) — tidak ada konflik nilai yang perlu dijaga di sini.
+        // On systems with fewer than 8 logical processors, no supported flag remains:
+        // the texture-compositor flag was denied by the analyzed Roblox client.
         public static void ApplyFastLoadingFlags()
         {
             int cpuCores = Environment.ProcessorCount;
-            
-            // DFIntTextureCompositorActiveJobs: naikkan ke 2 KHUSUS cpuCores >= 4
-            if (cpuCores >= 4)
-            {
-                App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "2");
-                App.Logger.WriteLine(LOG_IDENT, $"FastLoading: DFIntTextureCompositorActiveJobs=2 (cpuCores={cpuCores} >= 4)");
-            }
-            else
-            {
-                App.Logger.WriteLine(LOG_IDENT, $"FastLoading: DFIntTextureCompositorActiveJobs SKIPPED (cpuCores={cpuCores} < 4)");
-            }
-
-            // FIntRuntimeMaxNumOfThreads: naikkan ke 6 KHUSUS cpuCores >= 8
             if (cpuCores >= 8)
             {
                 App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", "6");
@@ -1588,7 +1695,11 @@ tier ??= DetectSystemTier();
             }
             else
             {
-                App.Logger.WriteLine(LOG_IDENT, $"FastLoading: FIntRuntimeMaxNumOfThreads SKIPPED (cpuCores={cpuCores} < 8)");
+                App.Settings.Prop.EnableFastLoadingFlags = false;
+                App.FastFlags.SetValue("FIntRuntimeMaxNumOfThreads", null);
+                try { App.Settings.Save(); }
+                catch (Exception ex) { App.Logger.WriteException(LOG_IDENT, ex); }
+                App.Logger.WriteLine(LOG_IDENT, $"FastLoading disabled: no applicable non-denied flag for cpuCores={cpuCores}");
             }
         }
 
@@ -1599,37 +1710,8 @@ tier ??= DetectSystemTier();
             App.Logger.WriteLine(LOG_IDENT, "FastLoading flags removed");
         }
 
-        // ── TDR Mitigation Mode (Toggle Terpisah) ──────────────────────────────────
-        // ★ LATAR BELAKANG (v7.0.5): freeze "layar putih" terkonfirmasi = Intel iGPU
-        // Driver TDR (Event ID 4101 di Event Viewer, cocok ±1 detik dengan log stall).
-        // Device: Intel HD 4400 (Haswell 2013-2014) — legacy sejak 2018, TIDAK ada
-        // update driver lagi dari Intel (driver 2020 = versi terakhir). Karena jalur
-        // update buntu, satu-satunya mitigasi software yang jujur adalah MENURUNKAN
-        // BEBAN RENDER GPU agar TDR lebih jarang terpicu — BUKAN menghilangkan total
-        // (akar masalah di driver, di luar kendali FastFlag apa pun).
-        //
-        // ★ ROMBAK v7.2.7 (audit layar-putih 8/18/2026, Intel HD 1GB driver
-        // 20.19.15.5126): kombinasi lama "MSAA=1 + FRM=3 + Texture=0 + FPS cap=30"
-        // TERBUKTI MENYEBABKAN layar putih di iGPU tua (ClientMemStatus Error,
-        // artefak render). Rombak: TDR Mitigation sekarang HANYA menurunkan MSAA —
-        // satu-satunya komponen yang menurunkan beban per-pixel tanpa merusak render:
-        //   FIntDebugForceMSAASamples=1              — MSAA off → beban per-pixel GPU turun
-        //                                              drastis (MSAA = beban render per-frame
-        //                                              paling signifikan yang bisa diatur).
-        //
-        // Flag yang DIBUANG dari TDR (tidak pernah ditulis lagi):
-        //   DFIntDebugFRMQualityLevelOverride=3      — render quality paksa; kombinasi
-        //                                              dengan texture override terbukti
-        //                                              merusak render di iGPU tua.
-        //   DFFlagTextureQualityOverrideEnabled=True + DFIntTextureQualityOverride=0
-        //                                              — texture paksa 0; bagian dari
-        //                                              kombinasi layar-putih di atas.
-        //   DFIntTaskSchedulerTargetFps=30           — ❌ TIDAK di allowlist sejak 2025-09-29
-        //                                              (client modern mengabaikannya; pengganti:
-        //                                              GlobalBasicSettings_13.xml FramerateCap).
-        //
-        // Nilai lama dari versi terpasang tetap dibersihkan oleh PurgeAllKnownFlags()
-        // via AllKnownManagedFlags — tidak ada migrasi khusus yang dibutuhkan.
+        // TDR mitigation uses Roblox's supported saved graphics quality instead of
+        // forcing renderer FastFlags. Old MSAA=1 values are removed during migration.
         private static readonly string[] TdrMitigationFlags =
         {
             "FIntDebugForceMSAASamples",
@@ -1644,15 +1726,18 @@ tier ??= DetectSystemTier();
                 foreach (string flag in TdrMitigationFlags)
                 {
                     string? current = App.FastFlags.GetValue(flag);
-                    if (current is not null)
+                    if (current is not null && current != "1")
                         App.Settings.Prop.TdrMitigationBackup[flag] = current;
                 }
                 try { App.Settings.Save(); } catch { }
             }
 
-            App.FastFlags.SetValue("FIntDebugForceMSAASamples", "1");
+            App.FastFlags.SetValue("FIntDebugForceMSAASamples", null);
+            bool qualityApplied = ApplySafeRobloxGraphicsQuality(1);
 
-            App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation applied: MSAA=1 only (FRM/texture/FPS-cap overrides removed in v7.2.7 overhaul)");
+            App.Logger.WriteLine(LOG_IDENT, qualityApplied
+                ? "TDR mitigation uses Roblox's saved graphics quality level 1; no MSAA FastFlag is forced."
+                : "TDR mitigation cleared the MSAA FastFlag, but Roblox SavedQualityLevel is unavailable.");
         }
 
         public static void RemoveTdrMitigationFlags()
@@ -1660,31 +1745,38 @@ tier ??= DetectSystemTier();
             foreach (string flag in TdrMitigationFlags)
             {
                 string? previous = App.Settings.Prop.TdrMitigationBackup.TryGetValue(flag, out string? value) ? value : null;
-                App.FastFlags.SetValue(flag, previous);
+                App.FastFlags.SetValue(flag, previous == "1" ? null : previous);
             }
 
             App.Settings.Prop.TdrMitigationBackup.Clear();
             try { App.Settings.Save(); } catch { }
 
-            App.Logger.WriteLine(LOG_IDENT, "TDR Mitigation flags removed (previous values restored)");
+            int? selectedPresetQuality = App.Settings.Prop.ForceExtremeMode
+                ? 1
+                : App.Settings.Prop.SelectedPerformancePreset switch
+                {
+                    "Balanced" => 5,
+                    "AutoOptimize" or "Stable" or "UltraLow" or "ExtremePerformance" => 1,
+                    _ => null
+                };
+
+            if (selectedPresetQuality.HasValue)
+                ApplySafeRobloxGraphicsQuality(selectedPresetQuality.Value);
+            else
+                RestoreSafeRobloxGraphicsQuality();
+
+            App.Logger.WriteLine(LOG_IDENT, "TDR mitigation removed; preset graphics quality or the original user value was restored.");
         }
 
         // ── Manual FastFlag Toggles (DisableRobloxAnimations / EnableLowMemoryMode) ─────
         // ★ FIX (v7.2.x, Opsi A — preset-aware purge): Dua toggle manual ini
         // sebelumnya state-nya dibaca langsung dari App.FastFlags. Setiap Play,
-        // CheckAndApply() → PurgeAllKnownFlags() menghapus flag-nya (keempat flag
-        // ada di AllKnownManagedFlags) dan TIDAK ada yang me-re-apply → toggle
-        // "hilang" tiap launch walau sudah disimpan dengan benar.
-        // Solusi: state toggle dipindah ke Settings (bool terpisah), lalu keempat
-        // flag di-RE-APPLY di akhir CheckAndApply() — pola SAMA dengan TDR Mitigation
-        // (priority: HIGHEST). Purge tetap membersihkan stale values dari preset
-        // sebelumnya, jadi fix v4.4.0 (flag tidak terhapus saat pindah preset)
-        // TIDAK ter-regresi.
+        // These retired controls remain as no-op compatibility methods for older UI
+        // state. Roblox-rejected values are filtered before saving.
         public static void ApplyDisableRobloxAnimations()
         {
-            App.FastFlags.SetValue("FFlagRenderUIAnimations", "False");
-            App.FastFlags.SetValue("FFlagRenderMenuTransitions", "False");
-            App.FastFlags.SetValue("FFlagRenderInventoryEffects", "False");
+            App.Settings.Prop.DisableRobloxAnimations = false;
+            RemoveDisableRobloxAnimations();
         }
 
         public static void RemoveDisableRobloxAnimations()
@@ -1696,7 +1788,8 @@ tier ??= DetectSystemTier();
 
         public static void ApplyLowMemoryMode()
         {
-            App.FastFlags.SetValue("FFlagLuaAppEnableLowMemoryMode", "True");
+            App.Settings.Prop.EnableLowMemoryMode = false;
+            RemoveLowMemoryMode();
         }
 
         public static void RemoveLowMemoryMode()

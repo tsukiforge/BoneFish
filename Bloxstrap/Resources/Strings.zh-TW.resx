@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>BoneFish 未能自動更新到版本 {0}。請自行到官方網站下載最新版本並執行它來手動更新。</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Roblox 當前正在運行，開啟另一個窗口將會關掉它。您確定要繼續開啟嗎？</value>
   </data>
@@ -494,12 +491,6 @@
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>外觀</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>BoneFish在啟動Roblox時會自動進行檢查目前版本並且更新（如果有的話）。</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>自動更新BoneFish</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>防止因意外啟動另一個Roblox程式而導致當前運行的程式被關閉。</value>
@@ -1222,9 +1213,6 @@ BoneFish 安裝在 "{1}"。</value>
   </data>
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>Roblox 已不再支援 Windows 7 和 8.1。 如果您想要繼續遊玩的話，請更新至 Windows 10 或更新的作業系統。</value>
-  </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>正在取得最新的BoneFish...</value>
   </data>
   <data name="Menu.BoneFish.Description" xml:space="preserve">
     <value>調整 BoneFish 自身行為相關的選項。</value>

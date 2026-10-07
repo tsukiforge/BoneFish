@@ -1,16 +1,3 @@
-// To debug the automatic updater:
-// - Uncomment the definition below
-// - Publish the executable
-// - Launch the executable (click no when it asks you to upgrade)
-// - Launch Roblox (for testing web launches, run it from the command prompt)
-// - To re-test the same executable, delete it from the installation folder
-
-// #define DEBUG_UPDATER
-
-#if DEBUG_UPDATER
-#warning "Automatic updater debugging is enabled"
-#endif
-
 using Bloxstrap.AppData;
 using Bloxstrap.Models.APIs;
 using Bloxstrap.Models.APIs.RoValra;
@@ -203,16 +190,6 @@ namespace Bloxstrap
             if (connectionResult is not null)
                 HandleConnectionError(connectionResult);
 
-#if (!DEBUG || DEBUG_UPDATER) && !QA_BUILD
-            if (App.Settings.Prop.CheckForUpdates && !App.LaunchSettings.UpgradeFlag.Active)
-            {
-                bool updatePresent = await CheckForUpdates();
-                
-                if (updatePresent)
-                    return;
-            }
-#endif
-
             // ensure only one instance of the bootstrapper is running at the time
             // so that we don't have stuff like two updates happening simultaneously
 
@@ -327,10 +304,12 @@ namespace Bloxstrap
                 {
                     // Bersihkan flag lama dari path Roblox standar — cegah kontaminasi antar versi
                     Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
+                    Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
 
-                    if (App.Settings.Prop.UseFastFlagManager && Integrations.AutoOptimizeService.CheckAndApply())
+                    if (App.Settings.Prop.UseFastFlagManager)
                     {
-                        App.Logger.WriteLine(LOG_IDENT, "Auto-optimize: low-end performance FastFlags applied");
+                        if (Integrations.AutoOptimizeService.CheckAndApply())
+                            App.Logger.WriteLine(LOG_IDENT, "Auto-optimize: conservative graphics quality applied and legacy renderer flags cleared");
 
                         if (App.FastFlags.Changed)
                             App.FastFlags.Save();
@@ -906,32 +885,7 @@ namespace Bloxstrap
 
             var autoclosePids = new List<int>();
 
-            // Game Session Manager is opt-in. Unless the user explicitly enabled it
-            // AND actually has something to suspend (a checked rule or auto-select),
-            // skip BeginSessionAsync() entirely — no WMI query, no process scan,
-            // no file write. Zero overhead for users who don't use this feature.
-            bool gameSessionShouldRun = _launchMode == LaunchMode.Player
-                && App.Settings.Prop.GameSessionEnabled
-                && (App.Settings.Prop.GameSessionAutoSelectSafeApps
-                    || App.Settings.Prop.GameSessionRules.Any(rule => rule.SuspendDuringGame));
 
-            GameSessionRecord? gameSession = null;
-            if (gameSessionShouldRun)
-            {
-                try
-                {
-                    gameSession = await App.GameSession.BeginSessionAsync(_cancelTokenSource.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    // Session management must never prevent Roblox from launching.
-                    App.Logger.WriteLine(LOG_IDENT, $"Game Session start failed (non-fatal): {ex.Message}");
-                }
-            }
 
             // the code you're gonna read ahead is horrible. sorry for the hack, but it works ¯\_(ツ)_/¯
             // check if prelaunch is checked
@@ -977,26 +931,11 @@ namespace Bloxstrap
                 _appPid = process.Id;
                 _appWindowHandle = process.MainWindowHandle;
 
-                if (gameSession is not null)
-                {
-                    try
-                    {
-                        App.GameSession.AttachGameProcess(_appPid);
-                    }
-                    catch (Exception ex)
-                    {
-                        App.Logger.WriteLine(LOG_IDENT, $"Game Session PID attach failed (non-fatal): {ex.Message}");
-                    }
-                }
-
-                // Anti not-responding: set priority + trim RAM background processes.
-                // Dilakukan masih dalam blok `using` agar handle process masih valid
-                // untuk GetProcessById (walaupun kita buka ulang di dalam method-nya).
+                // Optional memory trim for eligible low-memory SSD systems.
                 // Hanya aktif saat OptimizeForLowEnd = true.
                 if (App.Settings.Prop.OptimizeForLowEnd && _launchMode == LaunchMode.Player)
                 {
-                    // Beri Roblox sedikit waktu untuk inisialisasi sebelum kita set priority —
-                    // terlalu cepat bisa race condition dengan Roblox's own priority setup.
+                    // Beri Roblox waktu untuk inisialisasi sebelum pengecekan kondisi memori.
                     await Task.Delay(800);
                     Integrations.AutoOptimizeService.OptimizeRobloxProcess(_appPid);
                 }
@@ -1004,18 +943,12 @@ namespace Bloxstrap
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
                 // 1223 = ERROR_CANCELLED, gets thrown if a UAC prompt is cancelled
-                if (gameSession is not null)
-                    App.GameSession.EndSession();
-
                 return;
             }
             catch (Exception)
             {
                 // attempt a reinstall on next launch
                 File.Delete(AppData.ExecutablePath);
-
-                if (gameSession is not null)
-                    App.GameSession.EndSession();
 
                 throw;
             }
@@ -1081,8 +1014,7 @@ namespace Bloxstrap
 
             if (App.Settings.Prop.EnableActivityTracking
                 || App.LaunchSettings.TestModeFlag.Active
-                || autoclosePids.Any()
-                || gameSession is { SuspendedProcesses.Count: > 0 })
+                || autoclosePids.Any())
             {
                 var watcherData = new WatcherData
                 {
@@ -1106,9 +1038,6 @@ namespace Bloxstrap
                 // for stale instances). Holding it from the bootstrapper made the freshly
                 // spawned watcher fail to acquire the lock and abort before creating the tray icon.
                 Process.Start(Paths.Process, args);
-
-                if (gameSession is { SuspendedProcesses.Count: > 0 })
-                    App.GameSession.MarkHandedOffToWatcher();
             }
 
             // allow for window to show, since the log is created pretty far beforehand
@@ -1177,114 +1106,6 @@ namespace Bloxstrap
             Dialog?.CloseBootstrapper();
 
             App.SoftTerminate(ErrorCode.ERROR_CANCELLED);
-        }
-        #endregion
-
-        #region App Install
-        private async Task<bool> CheckForUpdates()
-        {
-            const string LOG_IDENT = "Bootstrapper::CheckForUpdates";
-
-            // don't update if there's another instance running (likely running in the background)
-            // i don't like this, but there isn't much better way of doing it /shrug
-            if (Process.GetProcessesByName(App.ProjectName).Length > 1)
-            {
-                App.Logger.WriteLine(LOG_IDENT, $"More than one Bloxstrap instance running, aborting update check");
-                return false;
-            }
-
-            App.Logger.WriteLine(LOG_IDENT, "Checking for updates...");
-
-#if !DEBUG_UPDATER
-            var releaseInfo = await App.GetLatestRelease();
-
-            if (releaseInfo is null)
-                return false;
-
-            var versionComparison = Utilities.CompareVersions(App.Version, releaseInfo.TagName);
-
-            // check if we aren't using a deployed build, so we can update to one if a new version comes out
-            if (App.IsProductionBuild && versionComparison == VersionComparison.Equal || versionComparison == VersionComparison.GreaterThan)
-            {
-                App.Logger.WriteLine(LOG_IDENT, "No updates found");
-                return false;
-            }
-
-            if (Dialog is not null)
-                Dialog.CancelEnabled = false;
-
-            string version = releaseInfo.TagName;
-#else
-            string version = App.Version;
-#endif
-
-            SetStatus(Strings.Bootstrapper_Status_UpgradingBloxstrap);
-
-            try
-            {
-#if DEBUG_UPDATER
-                string downloadLocation = Path.Combine(Paths.TempUpdates, "Bloxstrap.exe");
-
-                Directory.CreateDirectory(Paths.TempUpdates);
-
-                File.Copy(Paths.Process, downloadLocation, true);
-#else
-                var asset = releaseInfo.Assets![0];
-
-                string downloadLocation = Path.Combine(Paths.TempUpdates, asset.Name);
-
-                Directory.CreateDirectory(Paths.TempUpdates);
-
-                App.Logger.WriteLine(LOG_IDENT, $"Downloading {releaseInfo.TagName}...");
-
-                if (!File.Exists(downloadLocation))
-                {
-                    var response = await App.HttpClient.GetAsync(asset.BrowserDownloadUrl);
-
-                    await using var fileStream = new FileStream(downloadLocation, FileMode.OpenOrCreate, FileAccess.Write);
-                    await response.Content.CopyToAsync(fileStream);
-                }
-#endif
-
-                App.Logger.WriteLine(LOG_IDENT, $"Starting {version}...");
-
-                ProcessStartInfo startInfo = new()
-                {
-                    FileName = downloadLocation,
-                };
-
-                startInfo.ArgumentList.Add("-upgrade");
-
-                foreach (string arg in App.LaunchSettings.Args)
-                    startInfo.ArgumentList.Add(arg);
-
-                if (_launchMode == LaunchMode.Player && !startInfo.ArgumentList.Contains("-player"))
-                    startInfo.ArgumentList.Add("-player");
-                else if (_launchMode == LaunchMode.Studio && !startInfo.ArgumentList.Contains("-studio"))
-                    startInfo.ArgumentList.Add("-studio");
-
-                App.Settings.Save();
-
-                new InterProcessLock("AutoUpdater");
-
-                Process.Start(startInfo);
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                App.Logger.WriteLine(LOG_IDENT, "An exception occurred when running the auto-updater");
-                App.Logger.WriteException(LOG_IDENT, ex);
-
-                Frontend.ShowMessageBox(
-                    string.Format(Strings.Bootstrapper_AutoUpdateFailed, version),
-                    MessageBoxImage.Information
-                );
-
-                Utilities.ShellExecute(App.ProjectDownloadLink);
-            }
-
-            return false;
         }
         #endregion
 

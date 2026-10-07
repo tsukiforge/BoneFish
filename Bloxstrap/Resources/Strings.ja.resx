@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>BoneFish {0}への自動更新に失敗しました。Webサイトから手動でインストールしてください。</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Robloxは現在実行中です。新しくゲームを起動する場合、もとのゲームは終了します。本当に起動しますか？</value>
   </data>
@@ -495,12 +492,6 @@
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>見た目</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>Roblox起動時にBoneFishの更新がある場合は自動的に行います。</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>BoneFishを自動的に更新する</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>新しく別のゲームを起動した際に、既存のゲームが終了するのを防ぎます。</value>
@@ -1233,9 +1224,6 @@ Robloxのアプリファイルを使用している可能性のあるアプリ�
   </data>
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>RobloxはWindows 7や8.1のサポートを終了しました。Robloxをプレイしたい場合は、Windows 10以降にアップグレードしてください。</value>
-  </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>BoneFishの最新版を取得中...</value>
   </data>
   <data name="Menu.BoneFish.Description" xml:space="preserve">
     <value>BoneFishの動作に関する設定を変更できます。</value>

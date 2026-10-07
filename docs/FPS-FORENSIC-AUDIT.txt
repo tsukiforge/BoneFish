@@ -1,0 +1,664 @@
+================================================================================
+BONEFISH — FPS / PERFORMANCE FORENSIC AUDIT
+================================================================================
+Target audit   : current version (7.7.1)
+Dibandingkan   : v5.0.0, v5.1.0, v5.3.0, v5.5.0, v5.5.3, v6.0.0, v6.1.0,
+                 v6.3.1, v7.0.0, v7.2.7, v7.5.0, v7.6.0, v7.7.0
+Tujuan         : mencari penyebab FPS current berpotensi lebih buruk dari v5.x
+Status         : READ-ONLY. Tidak ada kode yang diubah saat audit ini.
+Catatan metode : history lengkap (bukan shallow) — 59 tag, 203 commit. Tag
+                 v5.0.0..v7.7.0 tersedia, jadi perbandingan memakai SOURCE ASLI,
+                 bukan release note.
+Hasil benchmark: TIDAK ADA benchmark dijalankan. Tidak ada klaim FPS terverifikasi.
+================================================================================
+
+
+--------------------------------------------------------------------------------
+RINGKASAN METODE AUDIT
+--------------------------------------------------------------------------------
+- File kunci:
+    Bloxstrap/Integrations/AutoOptimizeService.cs        (923 -> 1707 baris)
+    Bloxstrap/UI/ViewModels/Settings/FastFlagsViewModel.cs
+    Bloxstrap/Integrations/FpsUnlockerService.cs
+    Bloxstrap/GlobalSettingsManager.cs
+    Bloxstrap/Bootstrapper.cs
+- Temuan awal penting: NAMA FastFlag nyaris identik di semua versi v5.x..current.
+  Jadi regresi (kalau ada) ada di NILAI & PATH EKSEKUSI, bukan di nama flag.
+
+
+--------------------------------------------------------------------------------
+TANGGAL TAG (untuk timeline)
+--------------------------------------------------------------------------------
+v5.0.0  2026-07-05    v6.0.0  2026-07-20    v7.2.7  2026-08-18
+v5.1.0  2026-07-15    v6.1.0  2026-07-22    v7.5.0  2026-09-07
+v5.3.0  2026-07-16    v6.3.1  2026-07-22    v7.6.0  2026-09-11
+v5.5.0  2026-07-17    v7.0.0  2026-07-29    v7.7.0  2026-09-18
+v5.5.3  2026-07-18    v7.0.2  2026-08-08    current 7.7.1
+
+
+================================================================================
+# BoneFish FPS Forensic Report
+================================================================================
+
+
+--------------------------------------------------------------------------------
+## 1. Most Significant Historical Performance Changes
+--------------------------------------------------------------------------------
+Diurutkan dari yang paling mengubah beban render/FPS.
+
+#  Versi        Tanggal     Perubahan                                   Dampak FPS
+-- ------------ ----------- ------------------------------------------- ---------------------------
+1  v7.2.7       2026-08-18  Pembuangan massal flag penurun beban render:
+                             DFIntDebugFRMQualityLevelOverride=3,
+                             DFFlagTextureQualityOverrideEnabled +
+                             DFIntTextureQualityOverride=0,
+                             FIntTextureCompositorLowResFactor=1,
+                             DFIntMaxFrameBufferSize=4,
+                             FIntRuntimeMaxNumOfThreads=4.
+                             FPS-cap flag DFIntTaskSchedulerTargetFps
+                             berhenti ditulis. TDR Mitigation dirombak
+                             jadi hanya MSAA.
+                                                           => TURUN (beban render naik vs
+                                                              v5.x/v6.x) — ditukar dengan
+                                                              hilangnya white-screen
+
+2  v5.3.0       2026-07-16  HDD detection via DeviceIoControl
+                             seek-penalty + HDD Balanced auto-apply
+                             (HDD + MidRange/LowEnd + tanpa preset
+                             manual) yang menulis seluruh set agresif
+                             termasuk FIntRuntimeMaxNumOfThreads=4
+                             dan "FPS cap 30".
+                                                           => NAIK pada device kelas user;
+                                                              versi terakhir yang otomatis
+                                                              menerapkan set berat
+
+3  v7.0.2       2026-08-08  LOD dibuat HDD-aware (mitigasi 250/250
+                             saat HDD), Fast Loading diprioritaskan
+                             HIGHEST setiap boot, pembersih flag
+                             non-allowlist.
+                                                           => NAIK (mitigasi) TAPI hanya
+                                                              jika storage terkonfirmasi HDD
+
+4  v7.0.6/7.2.7 2026-08-10  TDR Mitigation: FIntDebugForceMSAASamples=1
+                 /08-18      (MSAA off) — satu-satunya penurunan beban
+                             GPU per-pixel yang dipertahankan.
+                                                           => NAIK (ringan)
+
+5  v5.1.0       2026-07-15  Turbo Mode = pintasan preset Extreme
+                             (set penurun kualitas), auto-reset saat
+                             restart.
+                                                           => NAIK saat aktif, lalu hilang sendiri
+
+6  v6.0.0       2026-07-20  Toggle Fast Loading
+                             (TextureCompositorActiveJobs=2,
+                             RuntimeMaxNumOfThreads=6), refactor
+                             network flag, buang Night Vision.
+                                                           => NETRAL/NEGATIF — paralelisme naik,
+                                                              FPS cap tidak naik
+
+7  v7.6.0..7.6.8 2026-09-07 FPS Unlocker -> tulis FramerateCap di
+                 ..09-18     GlobalBasicSettings_13.xml (mekanisme baru
+                             yang benar-benar bekerja).
+                                                           => NAIK, tapi hanya jika toggle ON
+
+8  v7.7.0       2026-09-18  Storage detection 3-state (SSD/HDD/
+                             Unknown). HDD->Unknown => tuning HDD
+                             tidak lagi diterapkan.
+                                                           => TURUN pada HDD yang terdeteksi
+                                                              Unknown (mitigasi LOD ikut mati)
+
+9  v7.2.5+      2026-08+     Tambahan runtime permanen: tray watcher
+                             2 detik + log tail, Game Session suspend/
+                             resume, Discord RPC, crosshair overlay,
+                             FPS monitor ETW.
+                                                           => NEGATIF KECIL & KONSTAN —
+                                                              tidak ada di v5.x
+
+Klasifikasi kategori:
+  #1 = rendering + CPU-thread
+  #2/#3/#8 = storage/I/O
+  #5/#6 = rendering/loading
+  #9 = overhead UI/background — BUKAN FPS improvement, dinyatakan eksplisit
+       sebagai cost
+
+
+--------------------------------------------------------------------------------
+## 2. Version-by-Version Comparison
+--------------------------------------------------------------------------------
+Versi        | Perubahan performa                | FastFlag berubah            | Preset berubah        | Launch berubah           | Memori/CPU            | Storage/I/O          | Dampak diharapkan
+-------------|-----------------------------------|-----------------------------|-----------------------|--------------------------|-----------------------|----------------------|--------------------------------
+v5.0.0       | Auto-optimize + OptimizeRobloxProc| Set awal lengkap            | Stable/UltraLow/      | Hook priority 800ms      | Trim RAM (belum       | Belum ada deteksi    | Baseline "agresif"
+             | (priority, trim, affinity)        | (TaskSchedulerTargetFps,    | Balanced/Extreme ada  | pasca-launch             | di-gate SSD)          | storage              |
+             |                                   | FRM=3, texture=0,           |                       |                          |                       |                      |
+             |                                   | LowResFactor=1,             |                       |                          |                       |                      |
+             |                                   | FrameBuffer=4, Threads=4,   |                       |                          |                       |                      |
+             |                                   | grain=0)                    |                       |                          |                       |                      |
+v5.1.0       | + Turbo Mode                      | Sama seperti Extreme        | Turbo = alias Extreme | Auto-reset Turbo saat    | Sama                  | Sama                 | Boost sementara
+             |                                   |                             |                       | restart                  |                       |                      |
+v5.3.0       | HDD detect akurat + HDD Bal. auto | Sama + jobs=2 untuk HDD     | + HDD Balanced;       | Sama                     | Trim RAM + Threads=4  | DeviceIoControl      | PALING RAMAH DEVICE USER
+             |                                   |                             | LOD 250/250 (bukan    |                          |                       | seek-penalty,        | (MidRange + HDD)
+             |                                   |                             | 500/750)              |                          |                       | gagal->asumsi HDD    |
+v5.5.0       | Perbaikan stabilitas UI + dedup   | Tidak ada perubahan nilai   | Sama                  | Sama                     | Sama                  | Sama                 | Netral
+v5.5.3       | HDD path                            |                             |                       |                          |                       |                      |
+v6.0.0       | + Fast Loading (toggle), network  | + jobs=2 (cores>=4),        | Preset tidak berubah  | Sama                     | Tidak ada perubahan   | Sama                 | Loading lebih paralel
+             | diekstrak ke 1 method             | threads=6 (cores>=8);       | nilai                 |                          | limit                 |                      |
+             |                                   | Night Vision dibuang        |                       |                          |                       |                      |
+v6.1.0       | Auto-reconnect + docs             | Tidak ada                   | Tidak ada             | Sama                     | Sama                  | Sama                 | Netral (UI/docs)
+v6.3.1       | Icon/font global (murni UI)       | Tidak ada                   | Tidak ada             | Sama                     | Sama                  | Sama                 | TIDAK ADA (UI != FPS)
+v7.0.x..     | LOD HDD-aware, Fast Loading       | Banyak flag BERHENTI        | Preset diturunkan     | + Game Session attach    | Trim di-gate <5GB     | Cache hardware       | Stabilitas NAIK,
+v7.2.7       | prioritas, buang flag berbahaya,  | ditulis                     | agresivitasnya        |                          | DAN SSD               | 30 hari              | beban render NAIK
+             | TDR Mitigation                    |                             |                       |                          |                       |                      |
+v7.6.x       | FPS Unlocker via FramerateCap     | Berhenti pakai flag cap     | Tidak ada             | Tulis FramerateCap       | Sama                  | Sama                 | Kontrol cap nyata
+             |                                   | sama sekali                 |                       | sebelum start            |                       |                      |
+CURRENT      | Storage 3-state, Game Session     | Set agresif lama hanya      | Extreme masih 500/750 | Idem + TDR/manual        | Trim HDD tidak jalan; | Unknown => tidak ada | Aman, tapi PALING SEDIKIT
+(7.7.1)      | aman, RAM leak fix                | jadi PURGE-ONLY             | kecuali HDD           | re-apply HIGHEST         | affinity hanya <=2    | tuning storage       | "menurunkan beban render"
+             |                                   |                             |                       |                          | core                  |                      |
+
+
+--------------------------------------------------------------------------------
+## 3. FastFlag Differences
+--------------------------------------------------------------------------------
+Nilai diambil dari source tiap tag.
+"NOT WRITTEN" = masih ada di purge-list tapi TIDAK LAGI ditulis
+(nilai lama dibersihkan lewat AllKnownManagedFlags).
+
+Flag                                      | v5.0.0      | v5.1.0  | v5.3.0            | v6.0.0      | Current                | Current status              | Tujuan
+------------------------------------------|-------------|---------|-------------------|-------------|------------------------|-----------------------------|-------------------
+DFIntTaskSchedulerTargetFps               | 24-60/30    | sama    | 30(HDD)/24-60     | 30/24-60    | NOT WRITTEN            | DEPRECATED - REJECT         | FPS cap lama
+ExtremeModeFpsTarget                      | 30          | 30      | 30                | 30          | property DIHAPUS       | DEPRECATED                  | Sumber nilai cap
+DFIntDebugFRMQualityLevelOverride         | 3           | 3       | 3                 | 3           | NOT WRITTEN            | REJECT (white-screen iGPU)  | Render quality
+DFFlagTextureQualityOverrideEnabled /     | True / 0    | True/0  | True / 0          | True / 0    | NOT WRITTEN            | REJECT                      | Texture quality
+  DFIntTextureQualityOverride             |             |         |                   |             | (preset -> Texture L1) |                             |
+FIntTextureCompositorLowResFactor         | 1           | 1       | 1                 | 1           | NOT WRITTEN            | REJECT                      | Resolusi kompositor
+DFIntMaxFrameBufferSize                   | 4           | 4       | 4                 | 4           | NOT WRITTEN            | REJECT                      | Frame buffer
+FIntRuntimeMaxNumOfThreads                | 4           | 4       | 4                 | 4           | hanya Fast Loading,    | REJECT sebagai preset;      | Thread render
+                                          |             |         |                   |             | cores>=8 -> 6          | UNKNOWN via Fast Loading    |
+FIntRenderGrainScale                      | 0           | 0       | 0                 | 0           | NOT WRITTEN            | REJECT (denied 0.734)       | Grain
+FIntRenderLocalLightUpdatesMax / Min      | 4 / 2       | 4 / 2   | 4 / 2             | 4 / 2       | NOT WRITTEN            | REJECT (denied 0.734)       | Dynamic light
+DFIntMaxActiveAnimationTracks             | 32          | 32      | 32                | 32          | NOT WRITTEN            | REJECT (non-allowlist)      | Animation tracks
+FIntRenderLocalLightFadeInMs              | 0           | 0       | 0                 | 0           | NOT WRITTEN            | REJECT (non-allowlist)      | Light fade
+7x FFlagDebugDisableTelemetry*            | True        | True    | True              | True        | NOT WRITTEN            | REJECT (non-allowlist)      | Telemetry
+DFIntCSGLevelOfDetailSwitchingDistance    | 250/250,    | sama    | 500/750 extreme,  | 500/750     | 500/750 kecuali        | SUPPORTED                   | LOD
+  L12/L23/L34                             | 500, 750    |         | 250/250 HDD       |             | isHDD                  |                             |
+DFIntCSGLevelOfDetailSwitchingDistance    | 0 / 0       | 0 / 0   | 0 / 0             | 0 / 0       | 0 / 0                  | SUPPORTED                   | LOD
+  Static / DFIntCSGv2LodsToGenerate       |             |         |                   |             |                        |                             |
+DFIntTextureCompositorActiveJobs          | 1           | 1       | 1 / 2 HDD         | 1 / 2 HDD   | isHDD?2:1, lalu 2      | SUPPORTED                   | Kompositor
+                                          |             |         |                   |             | jika Fast Loading      |                             |
+FIntRomarkStartWithGraphicQualityLevel    | 1           | 1       | 1                 | 1           | 1                      | SUPPORTED                   | Start quality
+FFlagDebugSSAOForce / FIntSSAOMipLevels   | False / 0   | F / 0   | False / 0         | False / 0   | False / 0              | SUPPORTED                   | SSAO
+FIntRobloxGuiBlurIntensity                | 0           | 0       | 0                 | 0           | 0                      | SUPPORTED                   | Blur UI
+FIntTerrainArraySliceSize /               | 0 / 5000    | 0/5000  | 0 / 5000          | 0 / 5000    | 0 / 5000               | SUPPORTED                   | Terrain/batch
+  FIntMaxBatchesPerFlush                  |             |         |                   |             |                        |                             |
+DFFlagEnableRequestAsyncCompression       | True        | True    | True              | True        | True                   | SUPPORTED                   | Kompresi aset
+5 network flags (FIntRakNetPacketRate-    | 50000 /     | sama    | sama              | sama        | sama                   | SUPPORTED                   | Network
+  Limit, DFIntMaxReceivePPS, DFIntMaxSend | 50000 /     |         |                   |             |                        |                             |
+  PPS, DFIntConnectionMTUSize,            | 50000 /     |         |                   |             |                        |                             |
+  DFIntOptimizeSendQueue)                 | 1500 / 1    |         |                   |             |                        |                             |
+FFlagRenderUIAnimations / MenuTransitions | purge-only  | purge   | purge-only        | purge-only  | False bila toggle ON   | SUPPORTED                   | UI anim
+  / InventoryEffects                      |             |         |                   |             |                        |                             |
+FIntDebugForceMSAASamples                 | -           | -       | -                 | -           | 1 bila TDR ON          | SUPPORTED                   | MSAA (turunkan beban GPU)
+Rendering.FramerateCap (XML)              | tidak       | tidak   | tidak disentuh    | tidak       | 240 (ON) /             | SUPPORTED (mekanisme baru)  | FPS cap nyata
+                                          | disentuh    | disentuh|                   | disentuh    | DIHAPUS (OFF)          |                             |
+
+CATATAN STATUS ALLOWLIST:
+Status SUPPORTED/DEPRECATED di tabel ini berasal dari audit yang SUDAH ADA di repo
+(v7.2.7 + devforum 3966569 + LeventGameing/allowlist). Status TIDAK diverifikasi
+ulang hari ini — sebelum implementasi, allowlist wajib dicek ulang.
+
+
+--------------------------------------------------------------------------------
+## 4. Turbo Mode Analysis
+--------------------------------------------------------------------------------
+HISTORICAL TURBO MODE (v5.1.0 - v6.3.1)
+Turbo Mode tidak punya FastFlag sendiri; ia alias dari preset Extreme:
+
+    EnableTurboMode = true
+      -> OptimizeForLowEnd = true
+      -> ForceExtremeMode   = true
+      -> ApplyAggressiveOptimizations(SystemTier.ExtremePerformance)
+      -> Save() + FastFlags.Save()
+
+    EnableTurboMode = false
+      -> OptimizeForLowEnd = false, ForceExtremeMode = false
+      -> RemoveOptimizations()
+
+- Preset yang diaktifkan   : ExtremePerformance, seluruhnya.
+- Flag yang diterapkan     : set lengkap Extreme (FRM=3, texture=0,
+                             LowResFactor=1, FrameBuffer=4, Threads=4, jobs=1,
+                             grain=0, animation tracks=32, telemetry off, network).
+- Flag yang dihapus saat OFF: semua ManagedFlags via RemoveOptimizations().
+- Mengubah FPS cap         : YA secara kode
+                             (DFIntTaskSchedulerTargetFps = clamp(
+                              ExtremeModeFpsTarget, 24, 60)), TAPI flag itu sudah
+                             tidak di allowlist sejak 2025-09-29 => tidak ada cap nyata.
+- Mengubah kualitas render : YA, agresif.
+- CPU/memori               : DFIntMaxFrameBufferSize=4,
+                             FIntRuntimeMaxNumOfThreads=4; branch Ultra/Extreme
+                             mematikan EnableFpsMonitor + EnableRobloxNotifications.
+- Auto-reset saat restart  : YA (v5.1.0-v6.3.1 Bootstrapper memaksa OFF).
+
+RANTAI PERBANDINGAN
+
+    Historical Turbo Mode
+            |
+            v
+    Current equivalent
+      ExperimentalViewModel.EnableTurboMode (baris 469-500) MASIH IDENTIK:
+      OptimizeForLowEnd=true + ForceExtremeMode=true +
+      ApplyAggressiveOptimizations(ExtremePerformance);
+      OFF -> RemoveOptimizations()
+            |
+            v
+    Missing behavior
+      Auto-reset saat restart DIHAPUS di v7.x (Bootstrapper "FIX 2"),
+      sengaja sebagai preferensi persisten.
+            |
+            v
+    Potential regression
+      Bila user pernah menyalakan Turbo Mode, kini ia MENEMPEL PERMANEN dan
+      memaksa ForceExtremeMode=true setiap boot. Pada device ini,
+      ForceExtremeMode=true + storage Unknown memilih jalur LOD TERBERAT
+      500/750 (lihat bagian 7). Bukti terukur di dalam repo: Turbo/Extreme
+      ON = 36-40 FPS, OFF = 50-60 FPS. Jadi jalur Turbo/Extreme justru dapat
+      MENURUNKAN FPS dibanding tidak mengaktifkan apa pun.
+
+Tidak diimplementasikan apa pun pada tahap ini.
+
+
+--------------------------------------------------------------------------------
+## 5. v5.3.0 Analysis
+--------------------------------------------------------------------------------
+RAM CLASSIFICATION
+  Diperbaiki dari integer division bytes/(1024^3) (8GB terbaca 7GB -> salah ke
+  LowEnd) menjadi perbandingan MB dengan toleransi:
+      >= 15600 MB -> HighEnd
+      >=  7800 MB -> MidRange
+      <   3800 MB -> UltraLow
+  Nilai ini MASIH IDENTIK di current. Jadi klasifikasi RAM user (MidRange)
+  tidak pernah berubah sejak v5.3.0.
+
+STORAGE DETECTION
+  DeviceIoControl + IOCTL_STORAGE_QUERY_PROPERTY +
+  StorageDeviceSeekPenaltyProperty pada \\.\C:.
+  BIAS "GAGAL -> ASUMSI HDD" di 3 tempat:
+     1. buka volume gagal
+     2. IOCTL gagal
+     3. exception
+  Inilah akar misklasifikasi HDD<->SSD yang diperbaiki bertahap sampai
+  v7.7.0 (3-state).
+
+HDD BALANCED PRESET
+  Basis  : ExtremePerformance penuh (FRM=3, texture=0, LowResFactor=1, grain=0,
+           LOD 250/250/250/250)
+  Plus   : I/O khusus HDD
+             FIntRuntimeMaxNumOfThreads        = 4
+             DFFlagEnableRequestAsyncCompression = True
+             DFIntTextureCompositorActiveJobs  = 2
+             DFIntTaskSchedulerTargetFps       = 30      <-- FLAG MATI
+             telemetry OFF
+  Auto   : HDD + tier LowEnd/MidRange + belum pilih preset manual -> JALAN OTOMATIS.
+           Untuk device user (MidRange + HDD), v5.3.0 adalah versi TERAKHIR yang
+           otomatis menerapkan set berat ini.
+
+THREAD LIMIT & FPS CAP DI v5.3.0
+  Keduanya hanya EFEKTIF SEBAGIAN:
+    - FIntRuntimeMaxNumOfThreads  : masih allowlist (efektif)
+    - DFIntTaskSchedulerTargetFps : SUDAH MATI (tidak allowlist sejak 2025-09-29)
+
+PENTING (sesuai peringatan prompt)
+  "Cap 30" v5.3.0 BUKAN konfigurasi 110 FPS. Konfigurasi itu adalah
+  performance optimization untuk I/O HDD. v5.3.0 tetap bukan sumber 110 FPS.
+
+YANG HILANG DI CURRENT
+  - Semua tuning HDD otomatis (karena storage Unknown)
+  - LOD 250/250 HDD (diganti 500/750 generik)
+  - FIntRuntimeMaxNumOfThreads=4 (dibuang v7.2.7)
+
+
+--------------------------------------------------------------------------------
+## 6. v6.0.0 Analysis (Fast Loading)
+--------------------------------------------------------------------------------
+v6.0.0 Fast Loading (toggle independen):
+    DFIntTextureCompositorActiveJobs = 2   bila cpuCores >= 4
+    FIntRuntimeMaxNumOfThreads       = 6   bila cpuCores >= 8
+
+Nilai di current 100% IDENTIK (ApplyFastLoadingFlags() baris 1568-1600).
+
+Aspek                          | Temuan
+-------------------------------|------------------------------------------------
+Kapan diterapkan               | Saat toggle ON; di-re-apply di AKHIR
+                               | ApplyAggressiveOptimizations (prioritas HIGHEST)
+                               | dan setelah setiap preset UI
+Ambang CPU                     | jobs=2 -> >=4 core; threads=6 -> >=8 core
+Stack dengan preset?           | Ya, sengaja — tidak pernah jadi preset berdiri sendiri
+Current masih apply?           | Ya, prioritas tertinggi; bahkan menimpa nilai jobs preset
+Bisa menurunkan FPS?           | BERPOTENSI. jobs=2 menaikkan paralelisme kompositor =
+                               | lebih banyak akses disk/CPU bersamaan. Pada i3 2C/4T
+                               | + HDD, saat streaming aset ini menambah contention.
+                               | FPS cap tidak berubah sama sekali.
+Konflik dengan logika optimasi | YA: pada device user FIntRuntimeMaxNumOfThreads
+                               | TIDAK PERNAH ditulis (cores 4 < 8), sedangkan
+                               | DFIntTextureCompositorActiveJobs dinaikkan 1->2.
+                               | Jadi Fast Loading di device ini HANYA menambah
+                               | concurrency, tanpa komponen thread.
+
+CATATAN: FIntRuntimeMaxNumOfThreads=4 (patokan "thread dibatasi", alasan HDD head
+tidak oleng) secara eksplisit DIBUANG di v7.2.7 dan TIDAK dikembalikan oleh Fast
+Loading kecuali cores >= 8.
+
+FLAG YANG SUDAH DITOLAK (tidak di allowlist) saat riset v6.0.0:
+    FFlagEnableAsyncResourceLoading
+    FIntRenderChunkLODThreshold
+    FFlagEnableTextureStreamingFix
+    FIntPartSizeBoostThreshold
+
+Tidak mengasumsikan "Fast Loading" = FPS lebih tinggi.
+
+
+--------------------------------------------------------------------------------
+## 7. Current Version Regression Candidates
+--------------------------------------------------------------------------------
+Checklist A-L terhadap kode current:
+
+  A  FPS cap lebih rendah dari yang diharapkan
+     => TIDAK. FpsUnlockerService.Apply() selalu menulis 240. Tapi lihat C.
+
+  B  FPS cap ditimpa
+     => YA (bukan regresi FPS). FramerateCap user yang di-set di halaman Global
+        Settings DITIMPA jadi 240 setiap launch selama toggle ON.
+
+  C  Cap 60/75/120/144/240 bisa terpasang tanpa sengaja
+     => YA. refreshRate hanya DI-LOG, tidak dipakai:
+            int cap = MaximumRobloxFramerateCap;   // selalu 240
+        Apa pun monitor-nya. Saat toggle OFF, RemovePreset MENGHAPUS elemen =>
+        Roblox kembali ke default (bisa 60). Jika sebelumnya user punya cap
+        tinggi manual, mematikan toggle = CAP TURUN, bukan kembali ke nilai lama.
+
+  D  Preset ditimpa setelah launch
+     => TIDAK. Satu-satunya aksi pasca-launch adalah OptimizeRobloxProcess
+        (priority/trim), tidak menyentuh flag.
+
+  E  FastFlag diabaikan Roblox modern
+     => YA, BANYAK — semua "NOT WRITTEN" di bagian 3 masih ada di purge-list.
+        Ini disengaja.
+
+  F  Overhead Game Session berlebihan
+     => RENDAH saat ini — opt-in (GameSessionEnabled default false),
+        di-suspend hanya saat join.
+
+  G  Perubahan prioritas CPU
+     => POSITIF — AboveNormal, hanya saat OptimizeForLowEnd. Affinity hanya
+        aktif pada <=2 core => TIDAK BERLAKU di device 4-core.
+
+  H  Background service tak perlu
+     => ADA, kecil tapi baru: tray watcher permanen sejak v7.2.7 (poll 2 detik +
+        log tail), Discord RPC, crosshair overlay (default off),
+        FPS monitor ETW (default off). Tidak ada di v5.x.
+
+  I  Optimasi HDD kena SSD
+     => TIDAK (Unknown tidak menebak).
+
+  J  Optimasi SSD kena HDD
+     => TIDAK.
+
+  K  Game Session mengganggu Roblox
+     => TIDAK — dan WAJIB DIPERTAHANKAN.
+
+  L  Urutan launch/restart mereset konfigurasi
+     => TIDAK mereset, tapi ADA SILENT NO-OP (lihat di bawah).
+
+KANDIDAT REGRESI PALING SIGNIFIKAN (berurut bukti)
+
+1) LOD 500/750 pada Extreme tetap terpasang saat storage Unknown.
+   ApplyAggressiveOptimizations:
+       isHDD = GetStorageType() == Hdd;         // Unknown => false
+       ...L23/L34 = isExtreme && !isHDD ? "500" : "250"
+   => 500/750. Mitigasi HDD-aware (v7.0.2) TIDAK PERNAH aktif pada user yang
+   storage-nya Unknown.
+   Komentar resmi di source menyatakan arahnya:
+     "Nilai Extreme 500/750 membuat geometri TETAP high-poly lebih jauh
+      (switch LOD semakin jauh) = beban render lebih berat = FPS turun di
+      perangkat 'potato' (bukti: LANGKAH 0 user — Extreme ON 36-40 FPS vs
+      OFF 50-60)."
+   Ini satu-satunya bukti FPS terukur yang ada di repo, dan device-nya kelas
+   yang sama dengan user.
+
+2) ForceExtremeMode bisa jadi SILENT NO-OP.
+   Bypass guard manual-preset hanya aktif bila:
+       ForceExtremeMode && GetStorageType()==Hdd &&
+       trueTier in {LowEnd, MidRange}
+   Karena storage Unknown, hddCombo=false => bypassLowEndGuard=false =>
+   jika user pernah menekan preset manual (mis. "Balanced"),
+   ApplyAggressiveOptimizations RETURN LEBIH AWAL dan Extreme tidak menulis
+   apa pun. Toggle menyala, efek nol, tanpa warning di UI.
+
+3) Set penurun beban render v5.x/v6.x HILANG SELURUHNYA
+   (FRM=3, texture=0, LowResFactor=1, FrameBuffer=4, Threads=4, grain=0,
+    light updates, telemetry, animation tracks).
+   Ini DISENGAJA untuk white-screen, tetapi konsekuensinya current secara
+   harfiah LEBIH BERAT untuk dirender dibanding v5.x/v6.x pada hardware yang
+   sama. Ini kandidat utama untuk persepsi "sekarang lebih lambat".
+
+4) Batas thread hilang. FIntRuntimeMaxNumOfThreads=4 tidak lagi pernah ditulis
+   pada CPU 2C/4T (Fast Loading butuh >=8 core). Scheduler Roblox kini tak
+   dibatasi pada CPU kecil. Belum ada bukti arah dampaknya => UNKNOWN, bukan
+   alasan untuk mengembalikan flag.
+
+5) Fast Loading di device ini hanya menaikkan concurrency jobs 1->2 tanpa
+   komponen thread; di HDD ini menambah beban seek saat streaming.
+
+6) FramerateCap lifecycle (item B/C): penulisan 240 tanpa memperhitungkan
+   refresh rate, dan penghapusan elemen saat OFF.
+
+7) Overhead permanen v7.x (tray/log tail/Discord/overlay) — kecil, tapi tidak
+   ada di v5.x, dan tidak pernah diukur.
+
+
+--------------------------------------------------------------------------------
+## 8. Deprecated / Unsafe Flags
+--------------------------------------------------------------------------------
+Flag                                          | Status                          | Alasan
+----------------------------------------------|---------------------------------|-----------------------------------------
+DFIntTaskSchedulerTargetFps                   | DEPRECATED -> REJECT            | Tidak di allowlist sejak 2025-09-29;
+                                              |                                 | pengganti resmi FramerateCap
+DFIntDebugFRMQualityLevelOverride             | UNSAFE -> REJECT                | Komponen kombinasi white-screen iGPU
+                                              |                                 | (audit 2026-08-18)
+DFFlagTextureQualityOverrideEnabled +         | UNSAFE -> REJECT                | Idem; preset kini pakai Texture Level1
+  DFIntTextureQualityOverride=0               |                                 |
+FIntTextureCompositorLowResFactor             | UNSAFE -> REJECT                | Idem
+DFIntMaxFrameBufferSize=4                     | UNSAFE -> REJECT                | Artefak render / frame buffer terlalu kecil
+FIntRenderLocalLightUpdatesMax/Min            | NOT ALLOWLISTED (denied 0.734)  | Client menolak "Denied local configuration"
+                                              | -> REJECT                       |
+FIntRenderGrainScale                          | DEPRECATED -> REJECT            | Di-deny client 0.734
+DFIntMaxActiveAnimationTracks,                | NOT ALLOWLISTED -> REJECT       | Silent no-op di client modern
+  FIntRenderLocalLightFadeInMs,               |                                 |
+  7x FFlagDebugDisableTelemetry*              |                                 |
+FFlagEnableAsyncResourceLoading,              | NOT ALLOWLISTED -> REJECT       | Sudah ditolak saat riset v6.0.0
+  FIntRenderChunkLODThreshold,                |                                 |
+  FFlagEnableTextureStreamingFix,             |                                 |
+  FIntPartSizeBoostThreshold                  |                                 |
+FIntRuntimeMaxNumOfThreads=4 (sebagai preset) | UNKNOWN -> jangan dikembalikan  | Masih allowlist, tetapi dibuang karena
+                                              | tanpa benchmark                 | tanpa manfaat terukur + terkait artefak
+FFlagFastGPULightCulling3,                    | DEPRECATED -> REJECT            | Sudah dihapus v6.0.0
+  FFlagNewLightAttenuation                    |                                 |
+DFFlagDebugPauseVoxelizer,                    | UNSAFE -> REJECT                | Game gelap / sky abu-abu / mic rusak /
+  FIntRenderShadowIntensity,                  |                                 | not-responding
+  DFFlagDebugRenderForceTechnologyVoxel,      |                                 |
+  FFlagDebugSkyGray, FFlagDisablePostFx,      |                                 |
+  DFIntDebugRestrictGCDistance,               |                                 |
+  DFIntAnimationLodFacs*                      |                                 |
+
+Tidak ada satu pun flag di tabel ini boleh dikembalikan.
+Yang SUPPORTED dan aman dipertimbangkan hanya yang sudah ditulis current
+(bagian 3), ditambah FramerateCap.
+
+
+--------------------------------------------------------------------------------
+## 9. Benchmark Results
+--------------------------------------------------------------------------------
+TIDAK ADA BENCHMARK YANG DIJALANKAN.
+- Tidak mengeksekusi Roblox
+- Tidak menjalankan skenario A/B/C/D
+- Tidak mengukur FPS/CPU/GPU/RAM
+=> TIDAK ADA KLAIM FPS dari sisi audit ini.
+
+Satu-satunya angka yang ada dan boleh dikutip adalah BUKTI TAK-TERKENDALI milik
+repo sendiri: komentar di AutoOptimizeService.cs (baris ~1131-1138) mencatat hasil
+device user "LANGKAH 0": Extreme ON = 36-40 FPS vs OFF = 50-60 FPS.
+Ini BUKAN benchmark terkontrol (game/server/graphics level tidak dicatat), jadi
+hanya boleh dipakai sebagai indikasi arah, bukan bukti kuantitatif.
+
+PROTOKOL BENCHMARK (harus dijalankan sebelum menyentuh flag)
+Semua variabel dikunci: experience, server, resolusi, graphics level, mode
+window, refresh rate, power plan, background app, setting BoneFish.
+
+  Skenario | Konfigurasi
+  ---------|-------------------------------------------------------------------
+  A        | Roblox TANPA BoneFish (baseline)
+  B        | BoneFish current apa adanya (ForceExtreme + FPS Unlocker ON +
+           | Fast Loading ON + TDR ON)
+  C        | Kandidat historis aman: current dengan LOD 250/250/250/250
+           | (FramerateCap=240)
+  D        | Current + perbaikan aman bagian 10
+
+Rekam: avg FPS, min FPS, 1% low, CPU%, GPU%, RAM, aktivitas disk, suhu,
+FramerateCap efektif, graphics level Roblox.
+Minimum 3 run x 5 menit per skenario.
+JANGAN bandingkan angka antar game / antar graphics setting.
+JANGAN simpulkan apa pun dari 1 run.
+
+
+--------------------------------------------------------------------------------
+## 10. Safe Fixes
+--------------------------------------------------------------------------------
+Diurutkan; SEMUANYA BELUM DIIMPLEMENTASIKAN.
+
+1) [bukti kuat] LOD tidak boleh menurunkan FPS saat storage tidak diketahui.
+   Ubah keputusan LOD agar jalur berat 500/750 hanya dipakai bila storage
+   DIKONFIRMASI bukan-HDD, atau lebih konservatif: UNKNOWN diperlakukan seperti
+   HDD untuk LOD (turun ke 250/250).
+   Tidak menebak jenis storage, tidak menyentuh logika deteksi, dan memakai
+   nilai yang sudah ada di kode.
+   Ini fix terkecil dengan dasar bukti paling jelas.
+
+2) [safe, keputusan user] Hilangkan silent no-op ForceExtremeMode.
+   Bypass guard manual-preset jangan bergantung pada
+   GetStorageType()==Hdd; cukup pada INTENT EKSPLISIT user menyalakan
+   ForceExtremeMode, atau minimal LOG PERINGATAN + tampilkan status di UI saat
+   guard memblokir. Tidak mengubah nilai flag.
+
+3) [perlu benchmark] Fast Loading: jangan naikkan TextureCompositorActiveJobs
+   ke 2 saat storage Unknown/HDD tanpa bukti.
+   Ini eksperimen, bukan kepastian — jalankan skenario C/D dulu.
+
+4) [hardening, bukan FPS] FramerateCap lifecycle:
+   - gunakan GetPrimaryDisplayRefreshRate() sebagai sanity check
+     (sekarang hanya di-log)
+   - JANGAN hapus elemen saat toggle OFF jika nilainya bukan milik BoneFish;
+     pulihkan nilai sebelumnya
+   - jangan timpa cap manual user secara diam-diam
+
+5) [diagnostik] Perluas panel System Info yang sudah ada (sudah read-only) dengan:
+     versi BoneFish
+     preset aktif
+     FPS cap efektif DAN nilai sebelumnya
+     graphics level Roblox
+     storage type + model
+     tier asli / efektif
+     status Fast Loading / TDR / Game Session
+     daftar FastFlag aktif
+     priority proses
+   Read-only dulu.
+
+6) [JANGAN] Eksplisit jangan mengembalikan FIntRuntimeMaxNumOfThreads=4,
+   DFIntDebugFRMQualityLevelOverride, texture override, atau flag deprecated
+   lain. Bila benchmark menunjukkan thrash, solusinya harus mekanisme allowlisted
+   yang BARU DIVERIFIKASI, bukan flag lama.
+
+7) [JANGAN DISENTUH] Game Session + daftar proteksi (Windows/security/audio/
+   Realtek/mic/Voice Chat, elevated, verifikasi suspend), Discord RPC, crosshair,
+   dan logika kepercayaan storage detection.
+
+
+--------------------------------------------------------------------------------
+## 11. Files That Would Need Modification
+--------------------------------------------------------------------------------
+File                                                    | Perubahan (kalau fix    | Wajib?
+                                                        | disetujui)              |
+--------------------------------------------------------|-------------------------|--------
+Bloxstrap/Integrations/AutoOptimizeService.cs            | Keputusan LOD (fix 1),  | Ya
+                                                        | bypass ForceExtremeMode  |
+                                                        | (fix 2), gating Fast     |
+                                                        | Loading (fix 3), sumber  |
+                                                        | data diagnostik (fix 5)  |
+Bloxstrap/Integrations/FpsUnlockerService.cs             | Lifecycle FramerateCap, | Ya
+                                                        | pemakaian refresh rate,  |
+                                                        | restore nilai sebelumnya |
+                                                        | (fix 4)                  |
+Bloxstrap/UI/ViewModels/Settings/FastFlagsViewModel.cs   | Panel diagnostik +      | Opsional
+                                                        | peringatan cap ditimpa   |
+                                                        | (fix 5/2)                |
+Bloxstrap/GlobalSettingsManager.cs                       | Hanya bila perlu        | Opsional
+                                                        | pembacaan nilai pra-tulis|
+                                                        | (GetPreset kemungkinan   |
+                                                        | sudah cukup)             |
+Bloxstrap/Bootstrapper.cs                                | Hanya 1 baris log      | Opsional
+                                                        | diagnostik saat launch;  |
+                                                        | tidak ada perubahan      |
+                                                        | logika                   |
+CHANGELOG.md                                             | Dokumentasi perubahan + | Ya
+                                                        | hasil benchmark          |
+Bloxstrap/Integrations/Watcher.cs,                       | TIDAK ADA PERUBAHAN —   | Tidak
+  Bloxstrap/GameSession/*,                               | tidak relevan dengan     |
+  Bloxstrap/Integrations/DiscordRichPresence.cs,         | isu FPS                  |
+  Bloxstrap/Integrations/CrosshairService.cs             |                          |
+
+
+--------------------------------------------------------------------------------
+## 12. Final Recommendation
+--------------------------------------------------------------------------------
+BUKTI YANG ADA
+- Nama FastFlag nyaris tidak berubah antara v5.0.0 dan current; yang berubah
+  adalah NILAI, PATH EKSEKUSI, dan flag mana yang berhenti ditulis.
+- Kap FPS di v5.x-v6.x memakai DFIntTaskSchedulerTargetFps, yang SEJAK
+  2025-09-29 TIDAK ADA DI ALLOWLIST — artinya versi lama TIDAK PERNAH benar-benar
+  membatasi FPS lewat BoneFish, sedangkan current justru SECARA AKTIF mengelola
+  FramerateCap. Jadi "110 FPS dulu, sekarang tidak" lebih mungkin dijelaskan oleh
+  cap yang dulu kebetulan tidak pernah aktif / diatur Roblox sendiri, bukan oleh
+  penghapusan optimasi. INI BELUM TERBUKTI TANPA BENCHMARK.
+- Yang JELAS dan bisa diuji adalah satu perbedaan beban render: jalur Extreme
+  menulis LOD 500/750, dan mitigasi HDD-aware-nya MATI saat storage Unknown
+  (kondisi device user). Repo ini sendiri mencatat arah dampaknya
+  (Extreme ON 36-40 FPS vs OFF 50-60).
+- Sejak v7.2.7 seluruh set penurun beban render v5.x/v6.x DIBUANG karena
+  menyebabkan white-screen pada Intel iGPU + driver 2020 — hardware user.
+  Ini pertukaran stabilitas<->FPS yang disengaja, bukan kelalaian.
+
+JALUR TEKNIS PALING AMAN (urut; berhenti untuk evaluasi di tiap langkah)
+  1. Jalankan protokol benchmark bagian 9 skenario A-D dulu.
+     Tanpa itu, tidak ada dasar untuk mengubah flag apa pun.
+  2. Bersamaan dengan itu, terapkan HANYA fix #1 (LOD Unknown -> 250/250) karena
+     dasar buktinya sudah ada di dalam repo dan perubahannya tidak menebak
+     storage, tidak mengembalikan flag deprecated, tidak menyentuh Game Session/
+     Discord/crosshair.
+  3. Perbaiki silent no-op ForceExtremeMode (fix #2) agar status di UI jujur —
+     tanpa mengubah nilai flag.
+  4. Jalankan ulang benchmark. Bila C/D tidak berbeda dari B, BERHENTI — berarti
+     masalahnya bukan di FastFlag, melainkan di driver iGPU/TDR, HDD streaming,
+     atau ekspektasi cap. Jangan mengejar FPS dengan mengembalikan flag lama.
+  5. Pertimbangkan fix #3/#4 hanya jika benchmark menunjukkan efek; lalu
+     dokumentasikan di CHANGELOG.md beserta angka mentahnya.
+
+TIDAK BOLEH DILAKUKAN
+  - mengembalikan DFIntTaskSchedulerTargetFps, DFIntDebugFRMQualityLevelOverride,
+    texture override, DFIntMaxFrameBufferSize, atau flag non-allowlist lain
+  - menurunkan kepercayaan deteksi storage demi memicu tuning HDD
+  - mengorbankan proteksi Game Session
+  - mengklaim kenaikan FPS tanpa hasil benchmark
+
+STATUS: Tidak ada kode yang diubah pada tahap ini. Implementasi menunggu keputusan
+        atas fix #1 dan hasil benchmark bagian 9.
+
+================================================================================
+END OF REPORT
+================================================================================

@@ -19,7 +19,6 @@ namespace Bloxstrap.Models.Persistable
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public bool DeveloperMode { get; set; } = false;
         public bool ForceLocalData { get; set; } = false;
-        public bool CheckForUpdates { get; set; } = true;
         public bool MultiInstanceLaunching { get; set; } = false;
         public bool ConfirmLaunches { get; set; } = true;
         public string Locale { get; set; } = "nil";
@@ -50,27 +49,24 @@ namespace Bloxstrap.Models.Persistable
         public bool ShowServerDetails { get; set; } = false;
         public ObservableCollection<CustomIntegration> CustomIntegrations { get; set; } = new();
 
-        // Game Session Manager rules. New applications are persisted disabled.
+        // Legacy Game Session settings are retained for config compatibility and
+        // restoring data from v7.7.5. Current versions never start suspension.
         public ObservableCollection<GameSessionRule> GameSessionRules { get; set; } = new();
         public bool GameSessionAutoSelectSafeApps { get; set; } = false;
+        public bool GameSessionConservativeRulesApplied { get; set; } = false;
 
-        // Master toggle Game Session Manager — default OFF (opt-in).
-        // Saat false, BeginSessionAsync() tidak pernah dipanggil di bootstrapper,
-        // jadi nol overhead WMI/process-scan/file-write untuk user yang tidak memakai
-        // fitur ini. Rules yang sudah dicentang TETAP tersimpan, hanya tidak dieksekusi.
+        // Retained only to deserialize settings created by older versions.
         public bool GameSessionEnabled { get; set; } = false;
 
-        // ★ FIX v7.6.3: saat detector keamanan gagal (Security Center mati/disable —
-        // umum di Windows debloat), suspend dulu selalu fail-closed: NOL proses pernah
-        // ter-suspend walau user sudah mencentangnya. Opt-in ini melanjutkan suspend
-        // untuk proses yang DISETUJUI USER dengan guard IsAlwaysProtected tetap penuh
-        // (daftar proses kritik, service SCM, session 0, Windows path, security vendor).
+        // Retained only to deserialize settings created by older versions.
         public bool GameSessionAllowSuspensionOnDetectorFailure { get; set; } = false;
 
         // mod preset configuration
         public bool UseDisableAppPatch { get; set; } = false;
 
         // experimental features
+        public bool EnableLegacyFastFlagsBeta { get; set; } = false;
+        public bool EnableRejectedLegacyFastFlags { get; set; } = false;
         public bool EnableSystemTrayOnClose { get; set; } = false;
         public bool EnableRobloxNotifications { get; set; } = false;
         public bool EnableFriendOnlineNotifications { get; set; } = false;
@@ -85,6 +81,9 @@ namespace Bloxstrap.Models.Persistable
 
         // performance preset
         public string SelectedPerformancePreset { get; set; } = "None";
+        public bool PerformancePresetGraphicsQualityManaged { get; set; }
+        public string? PerformancePresetPreviousGraphicsQuality { get; set; }
+        public string? PerformancePresetAppliedGraphicsQuality { get; set; }
 
         // ExtremePerformance (Potato Mode) — override manual agar user bisa paksa mode ini
         // walau auto-detect tidak mendeteksi perangkat sebagai UltraLow
@@ -137,9 +136,19 @@ namespace Bloxstrap.Models.Persistable
         public bool EnableFastLoadingFlags { get; set; } = false;
 
         // FPS Unlocker — toggle INDEPENDEN (bisa stack dengan preset apa pun):
-        // deteksi refresh rate monitor & tulis FramerateCap di GlobalBasicSettings_13.xml.
+        // cap otomatis berdasarkan tier hardware dan refresh rate monitor.
         // Terpisah dari preset potato/ExtremeMode yang bertujuan menurunkan beban.
         public bool FpsUnlockerEnabled { get; set; } = false;
+
+        // ★ Hardening FPS Unlocker (audit FPS Fase 5): BoneFish menandai nilai
+        // FramerateCap yang IA tulis, supaya cap manual user tidak dihancurkan
+        // diam-diam dan bisa dipulihkan saat toggle dimatikan.
+        //   FpsUnlockerCapManaged  : true bila FramerateCap saat ini ditulis BoneFish
+        //   FpsUnlockerPreviousCap : nilai FramerateCap milik user SEBELUM ditimpa
+        //                            (null bila tidak ada nilai sebelumnya)
+        public bool FpsUnlockerCapManaged { get; set; } = false;
+        public string? FpsUnlockerPreviousCap { get; set; } = null;
+        public int? FpsUnlockerAppliedCap { get; set; } = null;
 
         // TDR Mitigation — toggle independen untuk KURANGI freeze/layar putih
         // (Intel iGPU Driver TDR, Event ID 4101) dengan menurunkan beban GPU.
@@ -150,11 +159,8 @@ namespace Bloxstrap.Models.Persistable
         // dimatikan agar nilai user/preset sebelum toggle bisa dikembalikan.
         public Dictionary<string, string> TdrMitigationBackup { get; set; } = new();
 
-        // Manual FastFlag toggles — disimpan sebagai preferensi TERPISAH agar state-nya
-        // survive PurgeAllKnownFlags()/RemoveOptimizations() di setiap Play.
-        // Sebelumnya state dibaca langsung dari FastFlags yang di-purge tiap launch
-        // → toggle "hilang" setiap kali main walau sudah Save. Pola: sama seperti
-        // TDR Mitigation (Settings bool + re-apply di akhir CheckAndApply()).
+        // Legacy toggle state retained for settings compatibility. Roblox-rejected
+        // flag values are filtered by FastFlagManager and are not re-enabled.
         public bool DisableRobloxAnimations { get; set; } = false;
         public bool EnableLowMemoryMode { get; set; } = false;
 

@@ -44,6 +44,8 @@ namespace Bloxstrap
 
         public LaunchFlag RedirectedFlag            { get; } = new("redirected");
 
+        public LaunchFlag RollbackHelperFlag        { get; } = new("rollbackhelper");
+
         public LaunchFlag BloxshadeFlag { get; } = new("bloxshade");
 
 #if DEBUG

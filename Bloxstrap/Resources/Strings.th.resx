@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>BoneFish ไม่สามารถอัปเดตเป็นเวอร์ชั่น {0} โดยอัตโนมัติได้. โปรดอัพเดทด้วยตัวเองเเละใช้งานจากเว็ปไซต์</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Roblox กําลังทํางานอยู่เเละการเปิดอีกหน้าต่างจะปิด Roblox คุณเเน่ใจไหมว่าคุณจะเปิดอีกหน้าต่าง?</value>
   </data>
@@ -495,12 +492,6 @@
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>การแสดงผล</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>BoneFish จะเช็คและอัพเดทโดยอัตโนมัติเมื่อเปิด Roblox อีกครั้ง</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>อัพเดท BoneFish โดยอัตโนมัติ</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>ป้องกันการปิดเกมโดยไม่ได้ตั้งใจจากการเปิดใหม่อีกหน้าต่าง</value>
@@ -1214,9 +1205,6 @@ BoneFish จะติดตั้งไว้ที่ "{1}"</value>
   </data>
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>Roblox ไม่รองรับ Windows 7 หรือ Windows 8.1 เพื่อเล่น Roblox ต่อไปโปรดอัปเกรดเป็น Windows 10 หรือใหม่กว่า</value>
-  </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>กำลังดาวน์โหลดเวอร์ชั่นล่าสุดของ BoneFish...</value>
   </data>
   <data name="Menu.BoneFish.Description" xml:space="preserve">
     <value>กำหนดค่าเกี่ยวกับตัวเลือกที่เกี่ยวข้องกับพฤติกรรมของ BoneFish เอง</value>

@@ -1,0 +1,48 @@
+<base:WpfUiWindow x:Class="Bloxstrap.UI.Elements.Settings.Pages.DiagnosticCenterWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:base="clr-namespace:Bloxstrap.UI.Elements.Base"
+        mc:Ignorable="d"
+        Title="BoneFish Diagnostic Center"
+        Width="560"
+        MinHeight="420"
+        Height="620"
+        ResizeMode="CanResize"
+        Background="{ui:ThemeResource ApplicationBackgroundBrush}"
+        ExtendsContentIntoTitleBar="True"
+        WindowStartupLocation="CenterScreen"
+        TextElement.FontFamily="{StaticResource JetBrainsMonoRegular}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="BoneFish Diagnostic Center" ShowMinimize="False" ShowMaximize="False" CanMaximize="False"
+                     Icon="pack://application:,,,/Bloxstrap.ico" />
+
+        <!--
+            Phase 6: daftar statis — TANPA chart, TANPA WebView, TANPA animasi,
+            TANPA polling. Seluruh isi dirender SEKALI saat window dibuka
+            (on-demand), lalu tidak ada kerja latar belakang sama sekali.
+            Aman untuk HDD + 4GB RAM.
+        -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      Margin="12,4,12,4" Focusable="True" PanningMode="VerticalOnly">
+            <StackPanel x:Name="RootPanel" />
+        </ScrollViewer>
+
+        <Border Grid.Row="2" Padding="12" Background="{ui:ThemeResource SolidBackgroundFillColorSecondaryBrush}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <TextBlock x:Name="GeneratedText" VerticalAlignment="Center" Margin="0,0,12,0"
+                           FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                <Button x:Name="CopyReportButton" MinWidth="90" Content="Copy Report" Click="CopyReportButton_Click" />
+                <Button Margin="8,0,0,0" MinWidth="90" Content="Close" IsCancel="True" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</base:WpfUiWindow>

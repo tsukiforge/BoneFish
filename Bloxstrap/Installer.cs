@@ -8,6 +8,15 @@ namespace Bloxstrap
 {
     internal class Installer
     {
+        private sealed record RollbackRequest(
+            string TargetPath,
+            string StagedPath,
+            string PreviousPath,
+            string LogPath,
+            int WaitingProcessId);
+
+        private static string PreviousExecutablePath => Path.Combine(Paths.Base, $"{App.ProjectName}.previous.exe");
+
         /// <summary>
         /// Should this version automatically open the release notes page?
         /// Recommended for major updates only.
@@ -684,6 +693,8 @@ namespace Bloxstrap
 
             App.Logger.WriteLine(LOG_IDENT, "Doing upgrade");
 
+            PreserveInstalledVersion(existingVer);
+
             // ── Cleanup .bak menumpuk saat update (FIX v7.3.1) ──────────────
             // Hapus backup .bak yang menumpuk (>2 versi) SEBELUM overwrite binary
             // supaya folder BoneFish tidak membengkak dari versi ke versi.
@@ -692,6 +703,7 @@ namespace Bloxstrap
                 JsonManager<Settings>.CleanupAllBackupsOnStartup();
                 App.Logger.WriteLine(LOG_IDENT, "Old .bak files cleaned during upgrade");
             }
+
             catch (Exception ex)
             {
                 App.Logger.WriteException(LOG_IDENT, ex);
@@ -936,6 +948,230 @@ namespace Bloxstrap
                 );
             }
         }
+
+        private static void PreserveInstalledVersion(string? installedVersion)
+        {
+            const string LOG_IDENT = "Installer::PreserveInstalledVersion";
+
+            if (String.IsNullOrWhiteSpace(installedVersion) || !File.Exists(Paths.Application))
+                return;
+
+            string temporaryBackup = PreviousExecutablePath + $".{Guid.NewGuid():N}.new";
+
+            try
+            {
+                File.Copy(Paths.Application, temporaryBackup, true);
+                string? copiedVersion = FileVersionInfo.GetVersionInfo(temporaryBackup).ProductVersion;
+                if (copiedVersion is null
+                    || Utilities.CompareVersions(copiedVersion, installedVersion) != VersionComparison.Equal)
+                {
+                    File.Delete(temporaryBackup);
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Skipped rollback backup because copied version '{copiedVersion ?? "(unknown)"}' did not match installed version '{installedVersion}'.");
+                    return;
+                }
+
+                if (File.Exists(PreviousExecutablePath))
+                    File.SetAttributes(PreviousExecutablePath, FileAttributes.Normal);
+                File.Move(temporaryBackup, PreviousExecutablePath, true);
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"Saved installed BoneFish v{installedVersion} for one-step rollback.");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Could not preserve installed BoneFish version: {ex.Message}");
+                App.Logger.WriteException(LOG_IDENT, ex);
+
+                try
+                {
+                    if (File.Exists(temporaryBackup))
+                        File.Delete(temporaryBackup);
+                }
+                catch (Exception cleanupException)
+                {
+                    App.Logger.WriteException(LOG_IDENT, cleanupException);
+                }
+            }
+        }
+
+        public static bool IsRollbackAvailable
+        {
+            get
+            {
+                if (!Paths.Initialized
+                    || !String.Equals(Paths.Process, Paths.Application, StringComparison.OrdinalIgnoreCase)
+                    || !File.Exists(Paths.Application)
+                    || !File.Exists(PreviousExecutablePath))
+                    return false;
+
+                try
+                {
+                    string? currentVersion = FileVersionInfo.GetVersionInfo(Paths.Application).ProductVersion;
+                    string? previousVersion = FileVersionInfo.GetVersionInfo(PreviousExecutablePath).ProductVersion;
+                    return currentVersion is not null
+                        && previousVersion is not null
+                        && Utilities.CompareVersions(previousVersion, currentVersion) == VersionComparison.LessThan;
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteLine("Installer::IsRollbackAvailable",
+                        $"Could not inspect the saved BoneFish version: {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
+        public static void BeginRollback()
+        {
+            const string LOG_IDENT = "Installer::BeginRollback";
+
+            if (!IsRollbackAvailable)
+                throw new InvalidOperationException("No valid previous BoneFish version is available for rollback.");
+
+            string helperDirectory = Path.Combine(Paths.Temp, $"Rollback-{Guid.NewGuid():N}");
+            string helperPath = Path.Combine(helperDirectory, $"{App.ProjectName}.exe");
+            string stagedPath = Path.Combine(Paths.Base, $"{App.ProjectName}.rollback-stage.exe");
+            string requestPath = Path.Combine(helperDirectory, "request.json");
+            string previousPath = PreviousExecutablePath;
+            string logPath = Path.Combine(Paths.Logs, "Rollback.log");
+
+            Directory.CreateDirectory(helperDirectory);
+            if (File.Exists(stagedPath))
+                File.SetAttributes(stagedPath, FileAttributes.Normal);
+            File.Copy(previousPath, stagedPath, true);
+            File.Copy(Paths.Application, helperPath, true);
+
+            RollbackRequest request = new(
+                Paths.Application,
+                stagedPath,
+                previousPath,
+                logPath,
+                Environment.ProcessId);
+            File.WriteAllText(requestPath, System.Text.Json.JsonSerializer.Serialize(request));
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = helperPath,
+                UseShellExecute = true
+            };
+            startInfo.ArgumentList.Add("-rollbackhelper");
+            startInfo.ArgumentList.Add(requestPath);
+
+            if (Process.Start(startInfo) is null)
+                throw new InvalidOperationException("Could not start the BoneFish rollback helper.");
+
+            App.Logger.WriteLine(LOG_IDENT,
+                $"Started rollback helper for saved version {FileVersionInfo.GetVersionInfo(stagedPath).ProductVersion}.");
+            App.Terminate(ErrorCode.ERROR_SUCCESS);
+        }
+
+        public static void RunRollbackHelper(string? requestPath)
+        {
+            const string LOG_IDENT = "Installer::RollbackHelper";
+            string fallbackLogPath = Path.Combine(Paths.Temp, "RollbackHelper.log");
+            string? recoveryTarget = null;
+
+            try
+            {
+                string tempRoot = Path.GetFullPath(Paths.Temp) + Path.DirectorySeparatorChar;
+                string fullRequestPath = Path.GetFullPath(requestPath ?? "");
+                if (!fullRequestPath.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase)
+                    || !File.Exists(fullRequestPath))
+                    throw new InvalidOperationException("Rollback request path is invalid.");
+
+                RollbackRequest request = System.Text.Json.JsonSerializer.Deserialize<RollbackRequest>(
+                    File.ReadAllText(fullRequestPath))
+                    ?? throw new InvalidOperationException("Rollback request could not be read.");
+
+                string? installLocation = Registry.CurrentUser.OpenSubKey(App.UninstallKey)?
+                    .GetValue("InstallLocation") as string;
+                if (String.IsNullOrWhiteSpace(installLocation))
+                    throw new InvalidOperationException("BoneFish install location could not be found.");
+
+                string expectedTarget = Path.GetFullPath(Path.Combine(installLocation, $"{App.ProjectName}.exe"));
+                string expectedPrevious = Path.GetFullPath(Path.Combine(installLocation, $"{App.ProjectName}.previous.exe"));
+                string expectedStage = Path.GetFullPath(Path.Combine(installLocation, $"{App.ProjectName}.rollback-stage.exe"));
+                recoveryTarget = expectedTarget;
+
+                if (!String.Equals(Path.GetFullPath(request.TargetPath), expectedTarget, StringComparison.OrdinalIgnoreCase)
+                    || !String.Equals(Path.GetFullPath(request.PreviousPath), expectedPrevious, StringComparison.OrdinalIgnoreCase)
+                    || !String.Equals(Path.GetFullPath(request.StagedPath), expectedStage, StringComparison.OrdinalIgnoreCase)
+                    || !String.Equals(Path.GetFullPath(request.LogPath),
+                        Path.GetFullPath(Path.Combine(installLocation, "Logs", "Rollback.log")),
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Rollback request paths do not match the BoneFish installation.");
+
+                Directory.CreateDirectory(Path.GetDirectoryName(request.LogPath)!);
+                try
+                {
+                    using Process waitingProcess = Process.GetProcessById(request.WaitingProcessId);
+                    if (!waitingProcess.WaitForExit(30_000))
+                        throw new TimeoutException("BoneFish did not close in time to replace its executable.");
+                }
+                catch (ArgumentException)
+                {
+                    // The initiating process exited before the helper started waiting.
+                }
+
+                string? installedVersion = FileVersionInfo.GetVersionInfo(request.TargetPath).ProductVersion;
+                string? rollbackVersion = FileVersionInfo.GetVersionInfo(request.StagedPath).ProductVersion;
+                if (installedVersion is null || rollbackVersion is null
+                    || Utilities.CompareVersions(rollbackVersion, installedVersion) != VersionComparison.LessThan)
+                    throw new InvalidOperationException("The saved executable is not older than the installed version.");
+
+                File.SetAttributes(request.TargetPath, FileAttributes.Normal);
+                File.SetAttributes(request.StagedPath, FileAttributes.Normal);
+                string currentBackupPath = request.TargetPath + ".rollback-current";
+                if (File.Exists(currentBackupPath))
+                    File.Delete(currentBackupPath);
+
+                File.Replace(request.StagedPath, request.TargetPath, currentBackupPath);
+                File.SetAttributes(request.PreviousPath, FileAttributes.Normal);
+                File.Move(currentBackupPath, request.PreviousPath, true);
+
+                using (var uninstallKey = Registry.CurrentUser.CreateSubKey(App.UninstallKey))
+                    uninstallKey.SetValueSafe("DisplayVersion", rollbackVersion);
+
+                File.AppendAllText(request.LogPath,
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Rolled BoneFish back from {installedVersion} to {rollbackVersion}.{Environment.NewLine}");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = request.TargetPath,
+                    Arguments = "-menu",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Rollback failed: {ex.Message}");
+                try
+                {
+                    File.AppendAllText(fallbackLogPath,
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {LOG_IDENT} failed: {ex}{Environment.NewLine}");
+                }
+                catch (Exception logException)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Could not write rollback failure log: {logException.Message}");
+                }
+
+                System.Windows.MessageBox.Show(
+                    $"BoneFish rollback helper failed. Check the rollback log; the executable may already have been replaced.{Environment.NewLine}{Environment.NewLine}{ex.Message}",
+                    App.ProjectName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                if (recoveryTarget is not null && File.Exists(recoveryTarget))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = recoveryTarget,
+                        Arguments = "-menu",
+                        UseShellExecute = true
+                    });
+                }
+            }
+        }
+
 
         public void ImportSettingsFromBloxstrap()
         {

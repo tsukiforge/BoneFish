@@ -30,8 +30,6 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
 
             _viewModel = new ChannelViewModel();
             _viewModel.RequestNotificationEvent += (_, message) => ShowChannelNotification(message);
-            _viewModel.RequestUpdateAvailableEvent += (_, version) => ShowUpdateAvailable(version);
-            _viewModel.RequestHideUpdateAvailableEvent += (_, _) => HideUpdateAvailableCard();
 
             DataContext = _viewModel;
         }
@@ -41,18 +39,6 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
             ChannelSnackbar.Message = message;
             ChannelSnackbar.Visibility = Visibility.Visible;
             ChannelSnackbar.Show();
-        }
-
-        private void ShowUpdateAvailable(string version)
-        {
-            UpdateAvailableMessage.Text = $"Pembaruan tersedia: {version}. Klik untuk membuka halaman rilis.";
-            UpdateAvailableCard.Visibility = Visibility.Visible;
-            ShowChannelNotification(UpdateAvailableMessage.Text);
-        }
-
-        private void HideUpdateAvailableCard()
-        {
-            UpdateAvailableCard.Visibility = Visibility.Collapsed;
         }
 
         private void ToggleSwitch_Checked(object sender, RoutedEventArgs e)

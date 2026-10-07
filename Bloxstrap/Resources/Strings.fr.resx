@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Bootstrapper.AutoUpdateFailed" xml:space="preserve">
-    <value>BoneFish n'a pas pu se mettre à jour automatiquement vers la version {0}. Veuillez le mettre à jour manuellement en le téléchargeant et en l'exécutant depuis le site web.</value>
-  </data>
   <data name="Bootstrapper.ConfirmLaunch" xml:space="preserve">
     <value>Une instance Roblox est actuellement ouverte, lancer une nouvelle instance fermera l'instance existante. Êtes-vous sûr de vouloir continuer ?</value>
   </data>
@@ -494,12 +491,6 @@ Sinon, veuillez signaler cette exception via un [problème GitHub]({1}) accompag
   </data>
   <data name="Menu.Appearance.Title" xml:space="preserve">
     <value>Apparence</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Description" xml:space="preserve">
-    <value>BoneFish vérifiera et se mettra automatiquement à jour lors du lancement de Roblox.</value>
-  </data>
-  <data name="Menu.Behaviour.AutoUpdate.Title" xml:space="preserve">
-    <value>Mettre à jour BoneFish automatiquement</value>
   </data>
   <data name="Menu.Behaviour.ConfirmLaunches.Description" xml:space="preserve">
     <value>Empêche la fermeture accidentelle de votre instance existante lors du lancement accidentel d'une autre instance.</value>
@@ -1219,9 +1210,6 @@ Veuillez fermer toutes les applications qui pourraient utiliser les fichiers de 
   </data>
   <data name="App.OSDeprecation.Win7_81" xml:space="preserve">
     <value>Roblox ne prend plus en charge Windows 7 ou 8.1. Pour continuer à jouer à Roblox, veuillez mettre à niveau vers Windows 10 ou version ultérieure.</value>
-  </data>
-  <data name="Bootstrapper.Status.UpgradingBloxstrap" xml:space="preserve">
-    <value>Obtention de la dernière version de BoneFish...</value>
   </data>
   <data name="Menu.BoneFish.Description" xml:space="preserve">
     <value>Configurer les options liées au comportement de BoneFish lui-même.</value>

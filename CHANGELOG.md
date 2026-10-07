@@ -1,5 +1,227 @@
 # BoneFish Changelog
 
+## Unreleased — Game Session removal
+
+### Removed
+
+- Remove Game Session process suspension, its settings page, tray settings shortcut,
+  and related diagnostic status. New versions no longer suspend background apps.
+- Keep a tray recovery action and startup recovery for sessions left suspended by
+  older versions. This is recovery-only and does not start new suspension sessions.
+- Game Session remains available in the older v7.7.5 version for users who explicitly
+  want to try it; it may suspend selected background applications and is not supported
+  by this removal update.
+
+### Performance configuration migration
+
+- Preserve user settings and FastFlags that are not retired renderer overrides or
+  rejected by Roblox. Startup and preset cleanup no longer erase every BoneFish-managed
+  FastFlag.
+- Remove legacy renderer overrides previously written by BoneFish presets and rely on
+  Roblox's saved graphics-quality setting instead. Supported options such as the FPS
+  cap and unrelated client settings remain intact.
+- Restore the FastFlags page to a single vertical scrolling layout.
+- Add opt-in Beta Tester controls for selected legacy v6.3.1-era renderer flags that
+  were not reported rejected in the analyzed logs, plus a separate opt-in switch to
+  write historical v6.3.1 values for 19 flags previously rejected in analyzed Roblox
+  logs. Roblox may still ignore or reject these values. Include a manual GitHub issue
+  form for testers to report results.
+- Recommend a 30 FPS cap for confirmed systems with at most two physical CPU cores,
+  up to 8 GB RAM, and integrated graphics to reduce render load; other hardware keeps
+  the existing tier-based recommendation.
+- Preserve the installed BoneFish executable before upgrades and add an About-page
+  one-step rollback. Rollback only replaces the BoneFish executable; older builds may
+  not recognize or preserve newer BoneFish settings.
+
+## v7.7.5 — Game Session Lifecycle, Adaptive FPS Cap, Update Checker Removal
+
+Release date: 2026-10-01
+
+### 🎮 Game Session reliability
+
+- Prevent duplicate Game Session start/restore handlers from racing on Roblox
+  join/leave events.
+- Keep join/leave log monitoring available to Game Session when optional Activity
+  Tracking is disabled, and start the watcher whenever Game Session is configured.
+- Scope leave-event restore to the Roblox process associated with that activity
+  watcher to avoid restoring a different active game session.
+- On the next Game Session start, disable old `SensorDBSynch` and `esrv` rules once;
+  disable automatic safe-app selection, and require enabled app rules for future
+  suspensions. Existing app rules remain available for user review.
+
+### ⚙️ Adaptive performance and diagnostics
+
+- Add an adaptive FPS cap based on hardware tier and monitor refresh rate, with a
+  maximum cap of 120 FPS; the user's previous cap is restored when the feature is
+  turned off.
+- Improve storage detection diagnostics and use a native-aligned storage descriptor.
+- Do not raise Roblox process priority as part of low-end optimization.
+- Block and clean 19 FastFlags explicitly reported as denied in the supplied Roblox
+  0.741 log; migrate mesh-quality UI state away from a denied flag; and remove the
+  ineffective animation and low-memory controls.
+- Clarify that saving local FastFlags does not prove Roblox applied them, and that
+  matchmaking preferences do not reduce ping.
+- Populate storage diagnostic details from a valid cached result so the hardware
+  profile and dashboard no longer show `Unknown` when the detector has a cached HDD
+  or SSD result.
+- Replace preset-driven renderer FastFlags (including forced LOD, texture, and
+  compositor settings) with Roblox's saved graphics-quality setting; preserve and
+  restore the previous quality when clearing the preset.
+- Keep legacy renderer FastFlags purged during automatic optimization instead of
+  rewriting them at launch.
+- Change TDR mitigation to use Roblox's saved graphics quality rather than forcing
+  the MSAA FastFlag; migrate existing performance presets to the equivalent quality
+  level while preserving user changes.
+
+### 🔕 BoneFish update checks removed
+
+- Remove automatic BoneFish update checks from Roblox launch and system-tray
+  startup, along with the manual update-check controls in Channel settings.
+- Remove the associated release lookup and obsolete update-check resources.
+- Roblox client version checks and Roblox updates are unchanged.
+
+### ✅ Verification and limitation
+
+- Windows-targeted build succeeded with 0 warnings and 0 errors.
+- Game Session behavior has not yet been runtime-tested on Windows.
+
+## v7.7.3 — Adaptive System UI: Hardware Profile, Dashboard Adaptif, Diagnostic Center, Tray Status-Oriented
+
+Release date: 2026-09-30
+
+Overhaul UI/UX per spesifikasi 15 fase: hardware-aware adaptive UI, audit Windows
+Security, tray menu status-oriented, Diagnostic Center menggantikan MessageBox
+diagnostik. **Belum ada runtime testing di Windows** — build Linux Release sukses,
+0 error 0 warning.
+
+### 🧠 Hardware Profile Engine (baru — `Integrations/HardwareProfile.cs`)
+
+- Snapshot hardware read-only: CPU (nama, logical/physical cores), RAM (total,
+tersedia, tekanan), GPU (nama, dedicated/integrated), storage 3-state (delegasi
+penuh ke AutoOptimizeService — Unknown TIDAK pernah ditebak), display, OS build.
+- Tier UltraLow/Low/Balanced/Mid/High dari **kombinasi** karakteristik — bukan RAM
+saja. HDD membatasi tier maksimum ke Balanced. Alasan tier disertakan.
+- Query mahal (WMI GPU/CPU, registry OS) **maksimal sekali per proses**, hanya saat
+diminta. Tekanan RAM di-refresh per panggilan via 2 syscall (bukan WMI).
+
+### 📊 System Dashboard adaptif (halaman Fast Flags)
+
+- Kartu System Info lama diganti dashboard 5 seksi: DEVICE / PROFILE / HEALTH /
+OPTIMIZATION / SECURITY — data tier, mode performa, storage confidence, tekanan
+memori, status Roblox, Game Session, preset, FramerateCap, Fast Loading, TDR,
+memori, dan state security.
+- Render sekali per load/refresh manual — tanpa timer, tanpa polling, tanpa WMI
+berulang. Tombol "Deteksi Ulang Hardware" kini juga meng-invalidate cache profile.
+
+### 🔍 Diagnostic Center (baru — `UI/Elements/Settings/Pages/DiagnosticCenterWindow.*`)
+
+- Menggantikan MessageBox diagnostik. Window 560×620 merender 10 seksi sekali di
+saat dibuka: Hardware, Storage, Roblox, Performance, Security, Game Session,
+FastFlags, FPS, Warnings, Recommendations. Setiap entri berglyph ✓ / ⚠ / ✕ / ?.
+- Tanpa chart, tanpa WebView, tanpa animasi, tanpa polling — setelah render awal,
+window tidak memakan CPU. Tombol Copy Report + Close.
+- Seksi Security menjalankan `Detector.Refresh()` on-demand dan **tidak pernah**
+menyembunyikan peringatan: teks eksplisit "BoneFish will NOT automatically
+suppress or bypass this warning". Cek flag deprecated disertakan.
+
+### 🖥️ Tray menu status-oriented (`UI/Elements/ContextMenu/MenuContainer.*`)
+
+- Header status 4 baris non-interaktif: Roblox (PID / Not running), Performance
+(preset + catatan ForceExtremeMode), Storage (SSD/HDD/Unknown 3-state), Security
+(Protected/Degraded/Unknown — selalu tampil, bold, tidak pernah disembunyikan).
+- Item kontekstual: **Launch Roblox** hanya tampil saat Roblox tidak berjalan
+(via `LaunchHandler.LaunchRoblox(LaunchMode.Player)` — jalur patch/channel utama,
+bukan protokol mentah); **Close Roblox** hanya saat berjalan.
+- Item **Diagnostics** membuka Diagnostic Center yang sama dengan halaman settings.
+- Refresh HANYA saat menu dibuka (`ContextMenu.Opened`, pola yang sudah ada) —
+tanpa timer, tanpa rebuild menu, hanya toggle Visibility + set teks.
+
+### 🛡️ Hardening security & memori (`Integrations/AutoOptimizeService.cs`)
+
+- Skip list TrimBackgroundProcesses diperluas dengan stack security Windows
+(MsMpEng, MsSense, NisSrv, MsMpEngCP, SecurityHealthService, SecurityHealthSystray,
+wscsvc, WinDefend, Sense* — L5 CIM nullable-safe) + proses audio/Realtek —
+aditif, tidak mengubah logika trim yang ada.
+- Accessor memori publik dibuka untuk HardwareProfileEngine (tanpa duplikasi WMI).
+
+### ✅ Yang TIDAK diubah
+
+Proteksi Game Session (ProcessClassifier.IsAlwaysProtected berjalan sebelum rule
+user; kegagalan deteksi = fail-closed kecuali opt-in eksplisit, default OFF),
+deteksi storage 3-state + cache/versioning, FramerateCap handling FPS Unlocker,
+proteksi Realtek/audio/Voice Chat, crosshair centering, external watcher, cleanup
+FastFlag deprecated, TDR mitigation. Tidak ada polling baru, tidak ada WebView,
+tidak ada flag deprecated dikembalikan, tidak ada yang menonaktifkan Windows
+Security.
+
+### ⚠️ Keterbatasan
+
+Runtime testing (tray, GUI, Game Session, matriks HDD/SSD/Unknown, tier) belum
+dilakukan — lingkungan build Linux. MSB4011 pada submodule wpfui adalah warning
+pre-existing CentralPackageVersions di luar cakupan (tidak muncul di build ini).
+
+## v7.7.2 — FPS Audit Fase 2: LOD Aman saat Storage Unknown, ForceExtreme Tanpa Silent No-Op, FramerateCap Hardening
+
+Release date: 2026-09-30
+
+Latar: hasil *forensic audit* FPS (lihat `docs/FPS-FORENSIC-AUDIT.txt`) menemukan tiga
+kandidat regresi yang bisa diperbaiki TANPA mengembalikan FastFlag deprecated.
+**Belum ada benchmark terkontrol** — perubahan ini belum diklaim menaikkan FPS.
+
+### 🎯 Fix 1 — LOD tidak lagi memakai jalur terberat saat storage Unknown
+
+Dulu pengecualian LOD 500/750 hanya untuk `confirmed HDD` (`isHDD`), sehingga
+storage **Unknown** — yang sengaja TIDAK menebak — justru mendapat jalur TERBERAT.
+Sekarang satu sumber kebenaran `AutoOptimizeService.GetExtremeLodValues()`:
+
+| Storage | LOD L23 / L34 |
+|---------|---------------|
+| Confirmed SSD | 500 / 750 (general LOD) |
+| Confirmed HDD | 250 / 250 (HDD-aware) |
+| **Unknown** | **250 / 250 (safe low-end LOD)** |
+
+- Dipakai oleh **dua** jalur sekaligus (boot auto-optimize **dan** preset UI
+  Extreme/Anti Not-Responding) supaya tidak drift.
+- Detektor storage **tidak diubah**. Status tetap **Unknown** — tidak pernah
+dipaksa jadi HDD, dan `System Info` tetap menampilkan Unknown.
+- **HANYA LOD** yang berubah: thread limit, tuning I/O HDD, FPS cap, preset HDD,
+dan telemetry **tidak** ikut diaktifkan saat storage Unknown.
+
+### 🔔 Fix 2 — ForceExtremeMode tidak lagi bisa jadi silent no-op
+
+`bypassLowEndGuard` dulu bergantung pada `GetStorageType() == Hdd`, sehingga dengan
+storage Unknown guard preset manual bisa membatalkan intent user **tanpa pesan apa pun**.
+Sekarang dipisah tegas:
+
+- `bypassLowEndGuard` mengikuti **intent eksplisit** `ForceExtremeMode`.
+- `hddIoTweaks` (tuning I/O HDD) **tetap** butuh storage terkonfirmasi HDD.
+- Ada log eksplisit saat bypass aktif tanpa tuning HDD.
+
+### 🔒 Fix 3 — FramerateCap hardening (FPS Unlocker)
+
+- Nilai `FramerateCap` user dicatat (`FpsUnlockerPreviousCap`) **sebelum** ditimpa;
+  ditandai `FpsUnlockerCapManaged`.
+- Toggle OFF → nilai user **dipulihkan**, bukan dihapus.
+- Elemen hanya dihapus bila nilainya memang nilai tulisan BoneFish (240) —
+  konfigurasi yang bukan milik BoneFish **tidak** disentuh.
+- Logika refresh-rate **tidak** diubah.
+
+### 🔍 Fitur — Diagnostik Performa (READ-ONLY)
+
+Tombol **🔍 Diagnostik** di kartu System Info (halaman FastFlag New). On-demand,
+**bukan** background polling, dan tidak menulis apa pun: versi BoneFish, preset,
+ForceExtremeMode/OptimizeForLowEnd, tier asli vs efektif, CPU cores, GPU, refresh
+rate, storage type + confidence + model + bus, LOD aktif, Fast Loading/TDR/FPS
+Unlocker, `FramerateCap` efektif + nilai sebelumnya + graphics level Roblox, dan
+priority proses Roblox.
+
+### ✅ Yang TIDAK diubah
+
+Game Session + proteksi (Windows/security/audio/Realtek/mic/Voice Chat), verifikasi
+suspend, storage detection 3-state, Discord RPC, crosshair, RAM leak fix, Fast
+Loading (nilainya dipertahankan sampai ada benchmark). Tidak ada FastFlag
+deprecated/unsafe yang dikembalikan.
+
 ## v7.7.1 — Discord RPC Update, Tray & Suspend Fixes, RAM Leak Fixes, Storage Detection v5
 
 Release date: 2026-09-30

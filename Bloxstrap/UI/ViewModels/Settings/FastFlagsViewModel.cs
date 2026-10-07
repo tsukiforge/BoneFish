@@ -17,6 +17,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private Dictionary<string, object>? _preResetFlags;
 
         private bool _isApplying;
+        private bool _presetGraphicsQualityWarning;
         public bool IsApplying
         {
             get => _isApplying;
@@ -59,6 +60,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private void OnRequestPageReload()
         {
             RefreshSystemInfo();
+            RefreshSystemDashboard();   // Phase 5: dashboard adaptif ikut segar tiap reload
             _requestPageReloadEvent?.Invoke(this, EventArgs.Empty);
         }
 
@@ -109,20 +111,208 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        public IReadOnlyDictionary<MSAAMode, string?> MSAALevels => FastFlagManager.MSAAModes;
+        public IReadOnlyDictionary<RenderingMode, string> RenderingModes => FastFlagManager.RenderingModes;
 
-        public MSAAMode SelectedMSAALevel
+        public bool EnableLegacyFastFlagsBeta
         {
-            get => MSAALevels.FirstOrDefault(x => x.Value == App.FastFlags.GetPreset("Rendering.MSAA")).Key;
+            get => App.Settings.Prop.EnableLegacyFastFlagsBeta;
             set
             {
-                App.FastFlags.SetPreset("Rendering.MSAA", MSAALevels[value]);
-                // ★ FIX: simpan seketika agar pilihan bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
+                if (App.Settings.Prop.EnableLegacyFastFlagsBeta == value)
+                    return;
+
+                App.Settings.Prop.EnableLegacyFastFlagsBeta = value;
+                if (!value)
+                {
+                    foreach (string flag in FastFlagManager.BetaTestableLegacyFlags)
+                        App.FastFlags.SetValue(flag, null);
+                }
+
+                SaveLegacyBetaSettings();
+                OnPropertyChanged(nameof(EnableLegacyFastFlagsBeta));
+                OnPropertyChanged(nameof(CanApplyBetaMSAA));
+                OnPropertyChanged(nameof(SelectedBetaMSAA));
+                OnPropertyChanged(nameof(BetaFRMQualityEnabled));
+                OnPropertyChanged(nameof(BetaFRMQuality));
+                OnPropertyChanged(nameof(SelectedBetaTextureQuality));
+                Notify(value
+                    ? "FastFlags beta tester aktif. Nilai hanya diterapkan setelah memilih opsi; flag Mesh LOD yang ditolak tetap diblokir."
+                    : "FastFlags beta tester dinonaktifkan dan flag beta yang dikelola BoneFish dihapus.");
             }
         }
 
-        public IReadOnlyDictionary<RenderingMode, string> RenderingModes => FastFlagManager.RenderingModes;
+        public bool EnableRejectedLegacyFastFlags
+        {
+            get => App.Settings.Prop.EnableRejectedLegacyFastFlags;
+            set
+            {
+                if (App.Settings.Prop.EnableRejectedLegacyFastFlags == value)
+                    return;
+
+                if (value)
+                {
+                    MessageBoxResult result = Frontend.ShowMessageBox(
+                        "BoneFish akan menulis nilai FastFlag historis dari preset v6.3.1, termasuk 19 flag yang pernah ditolak pada log Roblox yang dianalisis. Flag dapat diabaikan Roblox, menyebabkan gangguan visual/jaringan, atau memperburuk performa. Ini tidak memilih salah satu preset performa dan tidak dapat memaksa Roblox menerima flag. Lanjutkan?",
+                        MessageBoxImage.Warning,
+                        MessageBoxButton.YesNo);
+
+                    if (result != MessageBoxResult.Yes)
+                    {
+                        OnPropertyChanged(nameof(EnableRejectedLegacyFastFlags));
+                        return;
+                    }
+
+                    App.Settings.Prop.EnableRejectedLegacyFastFlags = true;
+                    App.Settings.Prop.UseFastFlagManager = true;
+                    App.FastFlags.Prop.Clear();
+                    foreach ((string flag, string flagValue) in FastFlagManager.RejectedLegacyFlagValues)
+                        App.FastFlags.SetValue(flag, flagValue);
+                    OnPropertyChanged(nameof(UseFastFlagManager));
+                }
+                else
+                {
+                    App.Settings.Prop.EnableRejectedLegacyFastFlags = false;
+                    foreach (string flag in FastFlagManager.RejectedLegacyFlagValues.Keys)
+                        App.FastFlags.SetValue(flag, null);
+                }
+
+                SaveLegacyBetaSettings();
+                OnPropertyChanged(nameof(EnableRejectedLegacyFastFlags));
+                Notify(value
+                    ? "FastFlag BoneFish yang lama dibersihkan, lalu paket 19 FastFlag historis disimpan. Roblox masih dapat mengabaikannya; mulai ulang Roblox untuk mencoba."
+                    : "Paket FastFlag yang ditolak dinonaktifkan dan nilainya dihapus dari konfigurasi BoneFish.");
+            }
+        }
+
+        public bool CanApplyBetaMSAA =>
+            EnableLegacyFastFlagsBeta && !App.Settings.Prop.EnableTdrMitigation;
+
+        public IReadOnlyList<string> BetaMSAAOptions { get; } =
+            new[] { "Roblox default", "1x", "2x", "4x" };
+
+        public string SelectedBetaMSAA
+        {
+            get => App.FastFlags.GetValue(FastFlagManager.BetaMSAAFlag) switch
+            {
+                "1" => "1x",
+                "2" => "2x",
+                "4" => "4x",
+                _ => "Roblox default"
+            };
+            set
+            {
+                if (!EnableLegacyFastFlagsBeta)
+                    return;
+
+                if (!CanApplyBetaMSAA && value != "Roblox default")
+                {
+                    Notify("MSAA beta tidak bisa diterapkan selama TDR Mitigation aktif; matikan TDR Mitigation terlebih dahulu jika ingin mengujinya.");
+                    OnPropertyChanged(nameof(SelectedBetaMSAA));
+                    return;
+                }
+
+                string? samples = value switch
+                {
+                    "1x" => "1",
+                    "2x" => "2",
+                    "4x" => "4",
+                    _ => null
+                };
+                App.FastFlags.SetValue(FastFlagManager.BetaMSAAFlag, samples);
+                SaveLegacyBetaSettings();
+            }
+        }
+
+        public bool BetaFRMQualityEnabled
+        {
+            get => EnableLegacyFastFlagsBeta
+                && App.FastFlags.GetValue(FastFlagManager.BetaFRMQualityFlag) is not null;
+            set
+            {
+                if (!EnableLegacyFastFlagsBeta)
+                    return;
+
+                string? currentValue = App.FastFlags.GetValue(FastFlagManager.BetaFRMQualityFlag);
+                App.FastFlags.SetValue(
+                    FastFlagManager.BetaFRMQualityFlag,
+                    value ? currentValue ?? "1" : null);
+                SaveLegacyBetaSettings();
+                OnPropertyChanged(nameof(BetaFRMQualityEnabled));
+                OnPropertyChanged(nameof(BetaFRMQuality));
+            }
+        }
+
+        public int BetaFRMQuality
+        {
+            get => Int32.TryParse(
+                App.FastFlags.GetValue(FastFlagManager.BetaFRMQualityFlag),
+                out int quality) ? Math.Clamp(quality, 1, 21) : 1;
+            set
+            {
+                if (!EnableLegacyFastFlagsBeta || !BetaFRMQualityEnabled)
+                    return;
+
+                App.FastFlags.SetValue(
+                    FastFlagManager.BetaFRMQualityFlag,
+                    Math.Clamp(value, 1, 21));
+                SaveLegacyBetaSettings();
+            }
+        }
+
+        public IReadOnlyList<string> BetaTextureQualityOptions { get; } =
+            new[] { "Roblox default", "0", "1", "2", "3" };
+
+        public string SelectedBetaTextureQuality
+        {
+            get
+            {
+                if (App.FastFlags.GetValue(FastFlagManager.BetaTextureQualityEnabledFlag) != "True")
+                    return "Roblox default";
+
+                return App.FastFlags.GetValue(FastFlagManager.BetaTextureQualityFlag) ?? "Roblox default";
+            }
+            set
+            {
+                if (!EnableLegacyFastFlagsBeta)
+                    return;
+
+                if (value == "Roblox default")
+                {
+                    App.FastFlags.SetValue(FastFlagManager.BetaTextureQualityEnabledFlag, null);
+                    App.FastFlags.SetValue(FastFlagManager.BetaTextureQualityFlag, null);
+                }
+                else
+                {
+                    App.FastFlags.SetValue(FastFlagManager.BetaTextureQualityEnabledFlag, "True");
+                    App.FastFlags.SetValue(FastFlagManager.BetaTextureQualityFlag, value);
+                }
+
+                SaveLegacyBetaSettings();
+            }
+        }
+
+        public string BetaFastFlagFeedbackUrl =>
+            $"https://github.com/{App.ProjectRepository}/issues/new?template=beta_fastflag_feedback.yaml";
+
+        public string RejectedLegacyFastFlags => String.Join(
+            Environment.NewLine,
+            FastFlagManager.RejectedLegacyFlagValues
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => $"{pair.Key} = {pair.Value}"));
+
+        private void SaveLegacyBetaSettings()
+        {
+            try
+            {
+                App.FastFlags.Save();
+                App.Settings.Save();
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("FastFlagsViewModel::SaveLegacyBetaSettings", ex);
+                Notify($"Gagal menyimpan pengaturan FastFlags beta: {ex.Message}");
+            }
+        }
 
         public RenderingMode SelectedRenderingMode
         {
@@ -145,107 +335,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.FastFlags.SetPreset("Rendering.DisableScaling", value ? "True" : null);
                 // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
-        public IReadOnlyDictionary<TextureQuality, string?> TextureQualities => FastFlagManager.TextureQualityLevels;
-
-        public TextureQuality SelectedTextureQuality
-        {
-            get => TextureQualities.Where(x => x.Value == App.FastFlags.GetPreset("Rendering.TextureQuality.Level")).FirstOrDefault().Key;
-            set
-            {
-                if (value == TextureQuality.Default)
-                {
-                    App.FastFlags.SetPreset("Rendering.TextureQuality", null);
-                }
-                else
-                {
-                    App.FastFlags.SetPreset("Rendering.TextureQuality.OverrideEnabled", "True");
-                    App.FastFlags.SetPreset("Rendering.TextureQuality.Level", TextureQualities[value]);
-                }
-                // ★ FIX: simpan seketika agar pilihan bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
-        private static readonly string[] LODLevels = { "L0", "L12", "L23", "L34" };
-
-        public bool FRMQualityOverrideEnabled
-        {
-            get => App.FastFlags.GetPreset("Rendering.FRMQualityOverride") != null;
-            set
-            {
-                if (value)
-                    FRMQualityOverride = 21;
-                else
-                    App.FastFlags.SetPreset("Rendering.FRMQualityOverride", null);
-
-                OnPropertyChanged(nameof(FRMQualityOverride));
-                OnPropertyChanged(nameof(FRMQualityOverrideEnabled));
-                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
-        public int FRMQualityOverride
-        {
-            get => int.TryParse(App.FastFlags.GetPreset("Rendering.FRMQualityOverride"), out var x) ? x : 21;
-            set
-            {
-                App.FastFlags.SetPreset("Rendering.FRMQualityOverride", value);
-
-                OnPropertyChanged(nameof(FRMQualityOverride));
-                // ★ FIX: simpan seketika agar nilai slider bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
-        public bool MeshQualityEnabled
-        {
-            get => App.FastFlags.GetPreset("Geometry.MeshLOD.Static") != null;
-            set
-            {
-                if (value)
-                {
-                    // we enable level 3 by default
-                    MeshQuality = 3;
-                }
-                else
-                {
-                    foreach (string level in LODLevels)
-                        App.FastFlags.SetPreset($"Geometry.MeshLOD.{level}", null);
-
-                    App.FastFlags.SetPreset("Geometry.MeshLOD.Static", null);
-                }
-
-                OnPropertyChanged(nameof(MeshQualityEnabled));
-                // ★ FIX: simpan seketika agar toggle bertahan setelah restart.
-                try { App.FastFlags.Save(); } catch { }
-            }
-        }
-
-        public int MeshQuality
-        {
-            get => int.TryParse(App.FastFlags.GetPreset("Geometry.MeshLOD.Static"), out var x) ? x : 0;
-            set
-            {
-                // holy..
-                int clamped = Math.Clamp(value, 0, LODLevels.Length - 1);
-
-                for (int i = 0; i < LODLevels.Length; i++)
-                {
-                    int lodValue = (Math.Clamp(clamped - i, 0, 3) + 1) * 250;
-                    string lodLevel = LODLevels[i];
-
-                    App.FastFlags.SetPreset($"Geometry.MeshLOD.{lodLevel}", lodValue);
-                }
-
-                App.FastFlags.SetPreset("Geometry.MeshLOD.Static", clamped);
-                OnPropertyChanged(nameof(MeshQuality));
-                OnPropertyChanged(nameof(MeshQualityEnabled));
-                // ★ FIX: simpan seketika agar nilai slider bertahan setelah restart.
                 try { App.FastFlags.Save(); } catch { }
             }
         }
@@ -276,14 +365,19 @@ namespace Bloxstrap.UI.ViewModels.Settings
             get => App.Settings.Prop.DisableRobloxAnimations;
             set
             {
-                App.Settings.Prop.DisableRobloxAnimations = value;
                 if (value)
-                    Integrations.AutoOptimizeService.ApplyDisableRobloxAnimations();
-                else
-                    Integrations.AutoOptimizeService.RemoveDisableRobloxAnimations();
+                {
+                    Notify("Roblox menolak flag animasi lokal pada log yang dianalisis. Toggle ini tidak dapat diterapkan dan tetap nonaktif.");
+                    App.Settings.Prop.DisableRobloxAnimations = false;
+                    OnPropertyChanged(nameof(DisableRobloxAnimations));
+                    return;
+                }
+
+                App.Settings.Prop.DisableRobloxAnimations = value;
+                Integrations.AutoOptimizeService.RemoveDisableRobloxAnimations();
                 OnPropertyChanged(nameof(DisableRobloxAnimations));
                 // ★ FIX: simpan seketika — state toggle disimpan TERPISAH di Settings
-                // (bukan cuma dibaca dari FastFlags) supaya survive PurgeAllKnownFlags
+                // (bukan cuma dibaca dari FastFlags) supaya survive renderer cleanup
                 // yang jalan setiap Play. FastFlags tetap ditulis untuk efek langsung.
                 try { App.Settings.Save(); } catch { }
                 try { App.FastFlags.Save(); } catch { }
@@ -295,11 +389,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
             get => App.Settings.Prop.EnableLowMemoryMode;
             set
             {
-                App.Settings.Prop.EnableLowMemoryMode = value;
                 if (value)
-                    Integrations.AutoOptimizeService.ApplyLowMemoryMode();
-                else
-                    Integrations.AutoOptimizeService.RemoveLowMemoryMode();
+                {
+                    Notify("Roblox menolak flag Low Memory lokal pada log yang dianalisis. Toggle ini tidak dapat diterapkan dan tetap nonaktif.");
+                    App.Settings.Prop.EnableLowMemoryMode = false;
+                    OnPropertyChanged(nameof(EnableLowMemoryMode));
+                    return;
+                }
+
+                App.Settings.Prop.EnableLowMemoryMode = value;
+                Integrations.AutoOptimizeService.RemoveLowMemoryMode();
                 OnPropertyChanged(nameof(EnableLowMemoryMode));
                 // ★ FIX: simpan seketika — state toggle disimpan TERPISAH di Settings.
                 try { App.Settings.Save(); } catch { }
@@ -329,8 +428,29 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private void RefreshHardwareDetection()
         {
             Integrations.AutoOptimizeService.ForceRefreshHardwareCache();
+            Integrations.HardwareProfileEngine.Invalidate();   // Phase 3: profil tier ikut dihitung ulang
             RefreshSystemInfo();
+            OnPropertyChanged(nameof(SystemDashboard));        // dashboard ikut refresh
             Notify(Strings.FastFlags_SystemInfo_HardwareRedetected);
+        }
+
+        // ── Diagnostik Performa (audit FPS Fase 6) ─────────────────────────────────
+        // READ-ONLY & ON-DEMAND: hanya menyusun teks dari service lalu menampilkannya.
+        // Tidak ada background polling, tidak ada penulisan FastFlag/Settings.
+        // ★ Phase 6: MessageBox teks diganti Diagnostic Center terstruktur
+        // (10 seksi, status ✓/⚠/✕/?, tanpa chart/WebView/polling — HDD+4GB safe).
+        public ICommand ShowPerformanceDiagnosticsCommand => new RelayCommand(ShowPerformanceDiagnostics);
+
+        private void ShowPerformanceDiagnostics()
+        {
+            try
+            {
+                new UI.Elements.Settings.Pages.DiagnosticCenterWindow().ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Notify($"Diagnostik gagal: {ex.Message}");
+            }
         }
 
         private static string LoadSystemInfo()
@@ -342,6 +462,131 @@ namespace Bloxstrap.UI.ViewModels.Settings
             catch
             {
                 return "System info unavailable";
+            }
+        }
+
+        // ── Adaptive Hardware Dashboard (Phase 5) ─────────────────────────────────
+        // Menggantikan satu baris SystemInfoText dengan dashboard ringkas:
+        // DEVICE / PROFILE / HEALTH / OPTIMIZATION / SECURITY — all data is on-demand.
+        // Tidak ada polling: dashboard di-refresh HANYA saat page reload / tombol refresh.
+        public AdaptiveSystemDashboard SystemDashboard { get; private set; } = AdaptiveSystemDashboard.Load();
+
+        public void RefreshSystemDashboard()
+        {
+            SystemDashboard = AdaptiveSystemDashboard.Load();
+            OnPropertyChanged(nameof(SystemDashboard));
+        }
+
+        /// <summary>
+        /// Model tampilan ringkas untuk dashboard hardware adaptif (Phase 5).
+        /// Semua property berupa string siap-tampil — tanpa timer, tanpa live update.
+        /// </summary>
+        public sealed class AdaptiveSystemDashboard
+        {
+            public string Cpu { get; init; } = "";
+            public string Ram { get; init; } = "";
+            public string Gpu { get; init; } = "";
+            public string Storage { get; init; } = "";
+            public string Display { get; init; } = "";
+            public string Os { get; init; } = "";
+            public string Tier { get; init; } = "";
+            public string TierReason { get; init; } = "";
+            public string PerformanceMode { get; init; } = "";
+            public string StorageConfidence { get; init; } = "";
+            public string MemoryHealth { get; init; } = "";
+            public string RobloxStatus { get; init; } = "";
+            public string Preset { get; init; } = "";
+            public string FpsCap { get; init; } = "";
+            public string FastLoading { get; init; } = "";
+            public string TdrMitigation { get; init; } = "";
+            public string MemoryMode { get; init; } = "";
+            public string SecurityState { get; init; } = "";
+            public string SecurityDetail { get; init; } = "";
+            public string ProtectedProcessCount { get; init; } = "";
+
+            public static AdaptiveSystemDashboard Load()
+            {
+                Integrations.HardwareProfile profile;
+                try { profile = Integrations.HardwareProfileEngine.GetProfile(); }
+                catch { profile = new Integrations.HardwareProfile { CpuName = "(unavailable)" }; }
+
+                string preset = App.Settings.Prop.SelectedPerformancePreset ?? "None";
+                string performanceMode = App.Settings.Prop.ForceExtremeMode
+                    ? $"Extreme (forced — tier asli {profile.TierDisplay})"
+                    : App.Settings.Prop.OptimizeForLowEnd ? $"Low-end optimize ({profile.TierDisplay})" : "Default";
+
+                string robloxStatus;
+                try
+                {
+                    Process[] procs = Process.GetProcessesByName("RobloxPlayerBeta");
+                    robloxStatus = procs.Length > 0 ? $"Running (PID {procs[0].Id})" : "Not running";
+                    foreach (Process p in procs) { try { p.Dispose(); } catch { } }
+                }
+                catch { robloxStatus = "Unknown"; }
+
+                string securityState;
+                string securityDetail;
+                string protectedCount;
+                try
+                {
+                    var detector = App.GameSession.Detector;
+                    securityState = detector.State switch
+                    {
+                        GameSession.Models.SecurityDetectionState.Ok => "Protected",
+                        GameSession.Models.SecurityDetectionState.Degraded => "Degraded",
+                        _ => "Unknown"
+                    };
+                    securityDetail = detector.Message;
+                    protectedCount = $"{detector.KnownSecurityProcessNames.Count} nama + {detector.KnownSecurityExecutablePaths.Count} path";
+                }
+                catch
+                {
+                    securityState = "Unknown";
+                    securityDetail = "Security detection belum berjalan";
+                    protectedCount = "guard tetap aktif";
+                }
+
+                string fpsCap = "(default Roblox)";
+                try
+                {
+                    if (!App.GlobalSettings.Loaded)
+                        App.GlobalSettings.Load();
+                    string? cap = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
+                    if (!String.IsNullOrWhiteSpace(cap))
+                        fpsCap = $"{cap} FPS";
+                }
+                catch { }
+
+                string memoryMode =
+                    profile.StorageType == "SSD" && profile.TotalRamMb < 5120
+                        ? "Trim aktif (SSD + RAM <5GB)"
+                        : $"Trim tidak aktif (storage {Integrations.HardwareProfile.StorageDisplay(profile.StorageType)})";
+
+                return new AdaptiveSystemDashboard
+                {
+                    Cpu = $"{profile.CpuName} — {profile.LogicalProcessors} logical{(profile.PhysicalCores > 0 ? $" / {profile.PhysicalCores} physical" : "")}",
+                    Ram = $"{profile.TotalRamMb / 1024} GB total, {profile.AvailableRamMb / 1024} GB tersedia",
+                    Gpu = $"{profile.GpuName} ({(profile.GpuDetectionComplete ? (profile.HasDedicatedGpu ? "dedicated" : "integrated") : "tipe tidak pasti")})",
+                    Storage = $"{Integrations.HardwareProfile.StorageDisplay(profile.StorageType)} — {profile.SystemDrive} ({profile.StorageConfidence})",
+                    Display = String.IsNullOrEmpty(profile.DisplayResolution)
+                        ? "(tidak terbaca)"
+                        : $"{profile.DisplayResolution} @ {profile.DisplayRefreshRate} Hz",
+                    Os = profile.OsVersion,
+                    Tier = $"{profile.TierDisplay}",
+                    TierReason = profile.TierReason,
+                    PerformanceMode = performanceMode,
+                    StorageConfidence = profile.StorageConfidence,
+                    MemoryHealth = $"Tekanan memori {profile.MemoryPressure switch { Integrations.HardwareProfile.MemoryPressureLevel.High => "TINGGI", Integrations.HardwareProfile.MemoryPressureLevel.Moderate => "moderate", _ => "rendah" }}",
+                    RobloxStatus = robloxStatus,
+                    Preset = preset,
+                    FpsCap = fpsCap,
+                    FastLoading = App.Settings.Prop.EnableFastLoadingFlags ? "ON" : "OFF",
+                    TdrMitigation = App.Settings.Prop.EnableTdrMitigation ? "ON" : "OFF",
+                    MemoryMode = memoryMode,
+                    SecurityState = securityState,
+                    SecurityDetail = securityDetail,
+                    ProtectedProcessCount = protectedCount
+                };
             }
         }
 
@@ -377,6 +622,26 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.Settings.Prop.ForceExtremeMode = value;
                 OnPropertyChanged(nameof(ForceExtremeMode));
+
+                if (value)
+                {
+                    ApplyPresetGraphicsQuality(1);
+                }
+                else
+                {
+                    int? selectedPresetQuality = App.Settings.Prop.SelectedPerformancePreset switch
+                    {
+                        "Balanced" => 5,
+                        "AutoOptimize" or "Stable" or "UltraLow" or "ExtremePerformance" => 1,
+                        _ => null
+                    };
+
+                    if (selectedPresetQuality.HasValue)
+                        ApplyPresetGraphicsQuality(selectedPresetQuality.Value);
+                    else
+                        RestorePresetGraphicsQuality();
+                }
+
                 try { App.Settings.Save(); } catch { }
             }
         }
@@ -400,7 +665,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 App.Settings.Prop.EnableFastLoadingFlags = value;
                 if (value)
+                {
                     Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
+                    if (!App.Settings.Prop.EnableFastLoadingFlags)
+                        Notify("Fast Loading tidak memiliki flag yang dapat diterapkan pada jumlah core CPU ini dan flag compositor ditolak Roblox; toggle tetap nonaktif.");
+                }
                 else
                     Integrations.AutoOptimizeService.RemoveFastLoadingFlags();
                 OnPropertyChanged(nameof(EnableFastLoadingFlags));
@@ -410,11 +679,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
 
         /// <summary>
-        /// TDR Mitigation — toggle independen untuk KURANGI freeze/layar putih pada
-        /// GPU legacy (Intel iGPU TDR, Event ID 4101). Menurunkan beban render GPU
-        /// (MSAA off, FRM rendah, texture rendah, FPS cap konsisten) — di luar itu
-        /// BUKAN menghilangkan total: akar masalah ada di driver GPU legacy yang
-        /// tidak punya update lagi. Stack dengan preset visual apa pun.
+        /// TDR Mitigation lowers Roblox's saved graphics quality and removes the old
+        /// MSAA renderer FastFlag. It can reduce render load but cannot guarantee that
+        /// driver/device hangs stop.
         /// </summary>
         public bool EnableTdrMitigation
         {
@@ -427,6 +694,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 else
                     Integrations.AutoOptimizeService.RemoveTdrMitigationFlags();
                 OnPropertyChanged(nameof(EnableTdrMitigation));
+                OnPropertyChanged(nameof(CanApplyBetaMSAA));
+                OnPropertyChanged(nameof(SelectedBetaMSAA));
                 try { App.FastFlags.Save(); } catch { }
                 try { App.Settings.Save(); } catch { }
             }
@@ -475,7 +744,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 return;
 
             IsApplying = true;
-            ApplyingText = "⏳ Mendeteksi refresh rate monitor & menulis FramerateCap...";
+            ApplyingText = "⏳ Mendeteksi hardware & refresh rate monitor...";
 
             try
             {
@@ -498,11 +767,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     }
                     else if (result.Deferred)
                     {
-                        _fpsUnlockerStatus = $"Status: Siap — batas {result.Cap} FPS, diterapkan saat Roblox dijalankan";
+                        _fpsUnlockerStatus = $"Status: Siap — cap otomatis {result.Cap} FPS, diterapkan saat Roblox dijalankan";
                     }
                     else
                     {
-                        _fpsUnlockerStatus = $"Status: Aktif — batas hingga {result.Cap} FPS (FPS aktual bergantung perangkat)";
+                        _fpsUnlockerStatus = $"Status: Aktif — cap otomatis {result.Cap} FPS mengikuti hardware & refresh rate monitor";
                     }
                 }
 
@@ -512,6 +781,38 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 IsApplying = false;
                 ApplyingText = "⏳ Menerapkan FastFlag & menulis ke disk...";
+            }
+        }
+
+        private void ApplyPresetGraphicsQuality(int qualityLevel)
+        {
+            try
+            {
+                if (!Integrations.AutoOptimizeService.ApplySafeRobloxGraphicsQuality(qualityLevel))
+                {
+                    _presetGraphicsQualityWarning = true;
+                    Notify("Kualitas grafis Roblox belum bisa diubah. Buka Roblox sekali, lalu terapkan ulang preset.");
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("FastFlagsViewModel::ApplyPresetGraphicsQuality", ex);
+                _presetGraphicsQualityWarning = true;
+                Notify("Kualitas grafis gagal disimpan. Perubahan preset lainnya tetap diterapkan.");
+            }
+        }
+
+        private void RestorePresetGraphicsQuality()
+        {
+            try
+            {
+                Integrations.AutoOptimizeService.RestoreSafeRobloxGraphicsQuality();
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("FastFlagsViewModel::RestorePresetGraphicsQuality", ex);
+                _presetGraphicsQualityWarning = true;
+                Notify("Kualitas grafis Roblox gagal dipulihkan.");
             }
         }
 
@@ -531,7 +832,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
             // ForceExtremeMode harus di-reset saat pindah ke preset lain,
@@ -542,13 +843,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x1;
-            SelectedTextureQuality = TextureQuality.Level0;
-            MeshQualityEnabled = true;
-            MeshQuality = 0;
-            FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 21;
+            ApplyPresetGraphicsQuality(1);
             // Manual flags ditulis langsung (bukan via toggle property) supaya preset
             // TIDAK membalik state manual user di Settings — flag manual & preset
             // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
@@ -584,7 +879,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
-            Notify("Auto-optimize jaringan & No Delay telah diterapkan.");
+            Notify("Preferensi matchmaking disimpan. Flag jaringan lokal ditolak oleh Roblox dan ping tidak diubah.");
             OnRequestPageReload();
         }
 
@@ -600,7 +895,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
@@ -609,13 +904,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // ── AutoOptimize base ────────────────────────────────────────────────────────
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x1;
-            SelectedTextureQuality = TextureQuality.Level0;
-            MeshQualityEnabled = true;
-            MeshQuality = 0;
-            FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 21;
+            ApplyPresetGraphicsQuality(1);
             // Manual flags ditulis langsung (bukan via toggle property) supaya preset
             // TIDAK membalik state manual user di Settings — flag manual & preset
             // sekarang terpisah. Nilai flag yang ditulis identik dengan sebelumnya.
@@ -664,7 +953,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
@@ -672,31 +961,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x1;
-            // Texture Level1 (bukan Level0) sejak rombak v7.2.7: texture paksa 0
-            // (DFIntTextureQualityOverride=0) terbukti merusak render di iGPU tua
-            // (audit layar-putih 8/18/2026). Level1 tetap rendah tapi aman.
-            SelectedTextureQuality = TextureQuality.Level1;
-            MeshQualityEnabled = true;
-            MeshQuality = 0;
-            // FRMQualityOverride TIDAK dipaksa di preset sejak rombak v7.2.7 —
-            // render quality override (DFIntDebugFRMQualityLevelOverride) adalah
-            // komponen kombinasi layar-putih; user bisa set manual di dropdown Rendering.
-            FRMQualityOverrideEnabled = false;
-            FRMQualityOverride = 1;
-
-            // LOD — semua level 250 sesuai ultra low-spec.json
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
-
-            // Anti-crash: batasi texture compositor jobs.
-            // (DFIntTaskSchedulerTargetFps & FIntRenderLocalLightUpdatesMax/Min
-            // DIBUANG di rombak v7.2.7 — tidak di allowlist / di-deny client 0.734.)
-            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
+            ApplyPresetGraphicsQuality(1);
 
             // Manual flags ditulis langsung (bukan via toggle property) supaya preset
             // TIDAK membalik state manual user di Settings — flag manual & preset
@@ -711,9 +976,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
-            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif (priority
-            // HIGHEST) — override nilai MSAA/FRM/texture/FPS-cap dari preset di atas
-            // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
+            // Re-apply the independent MSAA mitigation after clearing preset flags.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
 
@@ -726,11 +989,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.Settings.Prop.BackgroundUpdatesEnabled = false;
             App.Settings.Prop.FakeBorderlessFullscreen = false;
 
-            // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
-            // Agar value "UltraLow" tertulis ke disk. Saat bootstrapper restart,
-            // AutoOptimizeService.CheckAndApply() baca SelectedPerformancePreset dari disk.
-            // Jika "UltraLow" tidak ada di disk, service ini OVERWRITE semua flag
-            // dengan FRM=1 + shadow=0 + voxelizer=True → game GELAP.
+            // Save the selected preset so diagnostics and boot-time policy stay in sync.
             SelectedPreset = "UltraLow";
 
             // Save semua flag ke disk SEBELUM page reload agar tidak ada flag yang hilang
@@ -758,7 +1017,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
             App.Settings.Prop.ForceExtremeMode = false;
@@ -766,17 +1025,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x2;
-            SelectedTextureQuality = TextureQuality.Level1;
-            MeshQualityEnabled = true;
-            MeshQuality = 1;
-            FRMQualityOverrideEnabled = true;
-            FRMQualityOverride = 15;
-
-            // Balanced lighting
-            App.FastFlags.SetPreset("Rendering.LightingMode", "Default");
-            App.FastFlags.SetPreset("Terrain.GridV2", "False");
+            ApplyPresetGraphicsQuality(5);
 
             // Network flags — panggil method reusable (ApplyNetworkOptimizations tidak trigger reload)
             Integrations.AutoOptimizeService.ApplyNetworkOptimizations();
@@ -785,9 +1034,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
-            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif (priority
-            // HIGHEST) — override nilai MSAA/FRM/texture/FPS-cap dari preset di atas
-            // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
+            // Re-apply the independent MSAA mitigation after clearing preset flags.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
 
@@ -810,54 +1057,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         }
 
         /// <summary>
-        /// Preset "ExtremePerformance" (Potato Mode).
-        ///
-        /// Filosofi: SAMA dengan UltraLow sebagai base, ditambah:
-        ///  - Anti not-responding (telemetry off, animation tracks, light fade)
-        ///  - FPS cap yang bisa dikonfigurasi user (default 30, min 24)
-        ///  - Rendering asset lebih cepat muncul (LOD distance diperbesar, bukan 0)
-        ///    sehingga objek dekat tidak tembus/pop-in
-        ///
-        /// Yang TIDAK dilakukan (beda dari versi sebelumnya yang bermasalah):
-        ///  - TIDAK paksa Voxel lighting → layar hitam di game ShadowMap/Future
-        ///  - TIDAK disable PostFx → visual game rusak
-        ///  - TIDAK SkyGray → atmosphere game berubah
-        ///  - TIDAK ubah LightAttenuation → model lighting game berubah
-        ///
-        /// ═══════════════════════════════════════════════════════════════════
-        /// ★ AUDIT: Anti Not-Responding (Long Session) — Laporan Lengkap
-        /// ═══════════════════════════════════════════════════════════════════
-        ///
-        /// 1. STATUS ACTIVE:
-        ///    - Hanya aktif melalui klik manual user (button "Anti Not-Responding").
-        ///    - TIDAK auto-activated oleh CheckAndApply()/DetectSystemTier().
-        ///    - Dapat juga aktif via ForceExtremeMode toggle + launch restart.
-        ///
-        /// 2. FLAG VISUAL (sengaja disertakan, tidak dipisah jadi toggle):
-        ///    - FFlagDebugSSAOForce=False   — SSAO dimatikan
-        ///    - FIntSSAOMipLevels=0         — SSAO kualitas 0
-        ///    - FIntRobloxGuiBlurIntensity=0 — Blur UI mati
-        ///    Alasan: Preset ini didesain untuk device dual-core, RAM <4GB,
-        ///    di mana SEMUA post-processing ringan pun membebani CPU/GPU.
-        ///    Label "PALING AGRESIF" sudah memperingatkan user.
-        ///    Visual yang dimatikan hanya efek kosmetik (blur, SSAO)
-        ///    — TIDAK memengaruhi gameplay, lighting, atau shadow.
-        ///    (FIntRenderGrainScale dihapus dari preset di rombak v7.2.7 —
-        ///    di-deny client Roblox 0.734.)
-        ///
-        /// 3. FLAG ANTI-FREEZE/STABILITY:
-        ///    ★ AUDIT v7.x: DFIntMaxActiveAnimationTracks, FIntRenderLocalLightFadeInMs
-        ///    dan 7 flag telemetry off TIDAK ADA di Fast Flag Allowlist resmi Roblox
-        ///    (aktif sejak 2025-09-29; devforum 3966569) → client mengabaikannya.
-        ///    Flag-flag itu TIDAK LAGI ditulis oleh preset (nilai lama dibersihkan
-        ///    oleh purge AllKnownManagedFlags).
-        ///
-        /// 4. KEPUTUSAN FINAL:
-        ///    - Tidak dibuat toggle EnableAntiFreezeMode terpisah.
-        ///    - Preset tetap sebagai SATU PAKET untuk target pengguna
-        ///      spesifik (low-end extreme).
-        ///    - Dokumentasi ini untuk transparansi — bukan dead code.
-        /// ═══════════════════════════════════════════════════════════════════
+        /// Applies the lowest Roblox graphics quality without renderer FastFlag overrides.
         /// </summary>
         private async Task ApplyExtremePerformancePreset()
         {
@@ -871,88 +1071,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
             });
             // NightVisionEnabled = false — dihapus (GAP 4)
 
             UseFastFlagManager = true;
             FixDisplayScaling = true;
-            SelectedRenderingMode = RenderingMode.D3D11;
-            SelectedMSAALevel = MSAAMode.x1;
-            // Texture Level1 (bukan Level0) sejak rombak v7.2.7: texture paksa 0
-            // (DFIntTextureQualityOverride=0) terbukti merusak render di iGPU tua
-            // (audit layar-putih 8/18/2026). Level1 tetap rendah tapi aman.
-            SelectedTextureQuality = TextureQuality.Level1;
-            MeshQualityEnabled = true;
-            MeshQuality = 0;
-            // FRMQualityOverride TIDAK dipaksa di preset sejak rombak v7.2.7 —
-            // DFIntDebugFRMQualityLevelOverride adalah komponen kombinasi layar-putih
-            // di iGPU tua; user bisa set manual di dropdown Rendering.
-            FRMQualityOverrideEnabled = false;
-            FRMQualityOverride = 1;
-
-            // ── Shadow: TIDAK dimatikan sepenuhnya ──────────────────────────────────────
-            // CATATAN SEBELUMNYA (PENYEBAB GAME GELAP):
-            // FIntRenderShadowIntensity=0 + DFFlagDebugPauseVoxelizer=True + FRM=1
-            // menghapus SEMUA bayangan dan lighting baked → game jadi HITAM.
-            // Terutama parah di game ShadowMap/Future (Phasmophobia, horror games).
-            //
-            // FIX: FRM override dihapus (rombak v7.2.7) — lighting pipeline default.
-            // Shadow intensity DIHAPUS (biarkan default Roblox), voxelizer TIDAK dipause.
-            //
-            // Light updates Max/Min (FIntRenderLocalLightUpdates*) DIBUANG — di-deny
-            // client 0.734 ("Denied local configuration"), menulisnya sia-sia.
-
-            // ── Post-processing ringan: hanya yang tidak merusak visual game ────────────
-            App.FastFlags.SetValue("FFlagDebugSSAOForce", "False");
-            App.FastFlags.SetValue("FIntSSAOMipLevels", "0");
-            App.FastFlags.SetValue("FIntRobloxGuiBlurIntensity", "0");
-            // FIntRenderGrainScale DIBUANG di rombak v7.2.7 — di-deny client 0.734.
-
-            // ── Grass & wind: dibiarkan default — tidak memengaruhi rendering speed ──────
-
-            // ── LOD / Asset rendering cepat ───────────────────────────────────────────────
-            // Nilai 250 (bukan 0!) agar objek dekat tetap high-poly, tidak tembus/pop-in.
-            // Nilai 0 menyebabkan semua objek jadi low-poly dari jarak 0 — itulah yang
-            // bikin aset "tembus" saat didekati. 250 = switch ke low-poly mulai ~250 studs.
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistance",       "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL12",    "250");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL23",    "500");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceL34",    "750");
-            App.FastFlags.SetValue("DFIntCSGLevelOfDetailSwitchingDistanceStatic", "0");
-            App.FastFlags.SetValue("DFIntCSGv2LodsToGenerate", "0");
-
-            // ── Texture & terrain ────────────────────────────────────────────────────────
-            App.FastFlags.SetValue("FIntTerrainArraySliceSize", "0");
-            // FIntTextureCompositorLowResFactor DIBUANG di rombak v7.2.7 — komponen
-            // kombinasi layar-putih di iGPU tua.
-            App.FastFlags.SetValue("DFIntTextureCompositorActiveJobs", "1");
-
-            // ── Render batch: kurangi draw-call overhead ─────────────────────────────────
-            App.FastFlags.SetValue("FIntMaxBatchesPerFlush", "5000");
-            App.FastFlags.SetValue("FIntRomarkStartWithGraphicQualityLevel", "1");
-
-            // ── Rendering speed: percepat render aset ────────────────────────────────────
-            // DFIntMaxFrameBufferSize & FIntRuntimeMaxNumOfThreads DIBUANG di rombak
-            // v7.2.7 — frame buffer 4 + thread render dibatasi terbukti memicu artefak/
-            // layar putih di iGPU tua; manfaatnya tidak terukur pada dual/quad core.
-
-            // DFFlagEnableRequestAsyncCompression=True: aktifkan kompresi async untuk
-            // request aset ke server Roblox — aset lebih cepat di-download saat join game,
-            // mengurangi delay "tembus/pop-in" saat aset belum selesai load.
-            // Sumber: Firebladedoge229 gist (confirmed 2026).
-            App.FastFlags.SetValue("DFFlagEnableRequestAsyncCompression", "True");
-
-            // ── Anti Not-Responding ───────────────────────────────────────────────────────
-            // ★ AUDIT v7.x: DFIntMaxActiveAnimationTracks dan 7 flag telemetry
-            // (FFlagDebugDisableTelemetry*) TIDAK ADA di Fast Flag Allowlist resmi Roblox
-            // yang aktif sejak 29 Sep 2025 → client mengabaikannya. Tidak ditulis lagi;
-            // nilai lama tetap dihapus lewat purge (AllKnownManagedFlags).
-
-            // ── FPS Cap DIBUANG di rombak v7.2.7 ─────────────────────────────────────────
-            // DFIntTaskSchedulerTargetFps TIDAK ada di allowlist sejak 2025-09-29 — client
-            // mengabaikannya. FPS cap manual di-set user di pengaturan Roblox
-            // (GlobalBasicSettings FramerateCap), bukan lewat FastFlag.
+            ApplyPresetGraphicsQuality(1);
 
             // ── BoneFish settings ────────────────────────────────────────────────────────
             // CATATAN: ForceExtremeMode TIDAK di-hardcode true di sini.
@@ -977,9 +1102,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableFastLoadingFlags)
                 Integrations.AutoOptimizeService.ApplyFastLoadingFlags();
 
-            // TDR Mitigation: re-apply PALING AKHIR jika toggle aktif (priority
-            // HIGHEST) — override nilai MSAA/FRM/texture/FPS-cap dari preset di atas
-            // agar tidak ada "gap" yang membiarkan beban GPU naik saat transisi.
+            // Re-apply the independent MSAA mitigation after clearing preset flags.
             if (App.Settings.Prop.EnableTdrMitigation)
                 Integrations.AutoOptimizeService.ApplyTdrMitigationFlags();
 
@@ -989,8 +1112,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (App.Settings.Prop.EnableLowMemoryMode)
                 Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
-            // CRITICAL: SelectedPreset HARUS di-set SEBELUM App.Settings.Save()
-            // Agar value "ExtremePerformance" tertulis ke disk. Lihat komentar di ApplyUltraLowSpecPreset.
+            // Save the selected preset so diagnostics and boot-time policy stay in sync.
             SelectedPreset = "ExtremePerformance";
 
             // Save semua flag ke disk SEBELUM page reload agar tidak ada flag yang hilang
@@ -1009,30 +1131,33 @@ namespace Bloxstrap.UI.ViewModels.Settings
         // ── Flag Verification ──────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Verifikasi bahwa semua FastFlag benar-benar tertulis ke disk.
-        /// Membaca kembali ClientAppSettings.json dan menghitung jumlah flag.
-        /// Memberikan notifikasi detail ke user agar yakin flag sudah diterapkan.
+        /// Report how many local settings were saved without implying that Roblox accepted them.
         /// </summary>
         private void VerifyAndNotify(string presetName)
         {
             try
             {
                 string filePath = Path.Combine(Paths.Modifications, "ClientSettings", "ClientAppSettings.json");
+                int count = App.FastFlags.Prop.Count;
+                int blockedCount = App.Settings.Prop.EnableRejectedLegacyFastFlags
+                    ? 0
+                    : FastFlagManager.FlagsRejectedByRobloxLogs.Count;
                 if (File.Exists(filePath))
                 {
-                    string json = File.ReadAllText(filePath);
-                    var flags = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
-                    int count = flags?.Count ?? 0;
-                    Notify($"✅ {presetName} aktif — {count} FastFlag berhasil ditulis ke disk.");
+                    string rejectedStatus = App.Settings.Prop.EnableRejectedLegacyFastFlags
+                        ? " Paket FastFlag lawas dipaksa masuk ke konfigurasi, tetapi Roblox masih dapat mengabaikannya."
+                        : $" {blockedCount} flag yang terbukti ditolak Roblox diblokir.";
+                    Notify($"{presetName} tersimpan ({count} entri konfigurasi).{rejectedStatus} Roblox menentukan konfigurasi yang diterapkan.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil diubah." : "")}");
                 }
                 else
                 {
-                    Notify($"✅ {presetName} aktif — file ClientAppSettings.json akan dibuat saat Roblox launch.");
+                    Notify($"{presetName} tersimpan. File konfigurasi dibuat saat Roblox dijalankan; penerapan flag ditentukan oleh Roblox.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil diubah." : "")}");
                 }
+                _presetGraphicsQualityWarning = false;
             }
             catch (Exception ex)
             {
-                Notify($"✅ {presetName} aktif — (verifikasi gagal: {ex.Message})");
+                Notify($"{presetName} tersimpan, tetapi file konfigurasi tidak dapat diverifikasi: {ex.Message}");
             }
         }
 
@@ -1147,17 +1272,16 @@ namespace Bloxstrap.UI.ViewModels.Settings
         // ── Clear ClientAppSettings ───────────────────────────────────────────────────────
 
         /// <summary>
-        /// Hapus semua flag dari ClientAppSettings.json di path BoneFish DAN path Roblox.
+        /// Hapus flag renderer lama yang sudah digantikan kualitas grafis resmi Roblox.
         /// Berguna saat terjadi bug visual (gelap, aneh) akibat akumulasi flag lama.
         /// Setelah clear, user bisa pilih ulang preset yang diinginkan.
         /// </summary>
         private async Task ClearClientAppSettings()
         {
             var result = System.Windows.MessageBox.Show(
-                "Ini akan menghapus SEMUA FastFlag dari ClientAppSettings.json\n" +
-                "di folder BoneFish dan folder Roblox.\n\n" +
-                "Roblox akan berjalan dengan setting default sampai kamu\n" +
-                "pilih preset lagi.\n\n" +
+                "Ini akan menghapus seluruh FastFlag dari profil BoneFish, serta flag renderer lama " +
+                "dan flag yang ditolak Roblox dari konfigurasi klien Roblox.\n\n" +
+                "Pengaturan grafis tersimpan Roblox akan dipulihkan ke nilai sebelumnya.\n\n" +
                 "Lanjutkan?",
                 "Clear ClientAppSettings",
                 System.Windows.MessageBoxButton.YesNo,
@@ -1167,6 +1291,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (result != System.Windows.MessageBoxResult.Yes)
                 return;
 
+            App.Settings.Prop.EnableRejectedLegacyFastFlags = false;
+            OnPropertyChanged(nameof(EnableRejectedLegacyFastFlags));
+
             // ★ FIX freeze: CleanupLegacyRobloxFlags() men-scan SEMUA folder
             // Roblox/Versions/version-* lalu baca & tulis JSON tiap folder.
             // Di HDD ini bisa butuh beberapa detik — synchronous di UI thread
@@ -1174,7 +1301,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             await Task.Run(() =>
             {
                 // 1. Clear via FastFlagManager (path BoneFish) — bersihkan MEMORY
-                Integrations.AutoOptimizeService.PurgeAllKnownFlags();
+                Integrations.AutoOptimizeService.PurgeLegacyRendererFlags();
                 App.FastFlags.Prop.Clear();
                 try { App.FastFlags.Save(); } catch { }
 
@@ -1187,10 +1314,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
             SelectedPreset = "None";
+            RestorePresetGraphicsQuality();
 
             try { App.Settings.Save(); } catch { }
 
-            Notify("✅ ClientAppSettings berhasil dibersihkan. Pilih preset untuk memulai ulang.");
+            Notify($"✅ ClientAppSettings berhasil dibersihkan. Pilih preset untuk memulai ulang.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil dipulihkan." : "")}");
+            _presetGraphicsQualityWarning = false;
             OnRequestPageReload();
         }
 

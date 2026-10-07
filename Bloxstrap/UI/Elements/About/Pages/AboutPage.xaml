@@ -54,6 +54,18 @@
             <ui:Anchor Margin="0,0,0,8" Content="{x:Static resources:Strings.Menu_About_DiscordServer}" Icon="Chat48" NavigateUri="https://discord.gg/xSsamjAU84" />
         </WrapPanel>
 
+        <ui:CardControl Margin="0,8,0,16">
+            <ui:CardControl.Header>
+                <StackPanel>
+                    <TextBlock FontSize="16" FontWeight="Medium" Text="Rollback BoneFish" />
+                    <TextBlock Margin="0,2,0,0" FontSize="12" Text="{Binding RollbackAvailabilityText}"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </ui:CardControl.Header>
+            <ui:Button Content="Kembali ke versi sebelumnya" Icon="ArrowUndo24"
+                       Command="{Binding RollbackCommand}" IsEnabled="{Binding RollbackAvailable}" />
+        </ui:CardControl>
+
         <StackPanel Visibility="{Binding BuildInformationVisibility, Mode=OneTime}">
             <TextBlock Text="Build Information" FontWeight="Medium" FontSize="20" Margin="0,16,0,0" />
 
