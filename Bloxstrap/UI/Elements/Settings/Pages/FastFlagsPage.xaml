@@ -295,6 +295,17 @@
                     Description="{Binding FpsUnlockerStatusText}">
                     <ui:ToggleSwitch IsChecked="{Binding FpsUnlockerEnabled, Mode=TwoWay}" />
                 </controls:OptionControl>
+                <controls:OptionControl
+                    Header="Batas FPS BoneFish (50–144)"
+                    Description="Default 50 FPS lebih ringan. Roblox tetap boleh mengubah FPS selama sesi; saat Roblox diluncurkan lagi, BoneFish menerapkan kembali nilai di sini. Cap OFF mengembalikan pengaturan sebelumnya dan membiarkan Roblox mengatur FPS. Pada monitor 60 Hz, nilai di atas 60 dapat menambah beban tanpa menaikkan refresh panel.">
+                    <StackPanel Orientation="Horizontal" MinWidth="230">
+                        <Slider Width="170" Minimum="50" Maximum="144" TickFrequency="1"
+                                IsSnapToTickEnabled="True" IsEnabled="{Binding IsNotApplying}"
+                                Value="{Binding FpsUnlockerCap, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=300}" />
+                        <TextBlock Margin="10,0,0,0" VerticalAlignment="Center"
+                                   Text="{Binding FpsUnlockerCap, StringFormat={}{0} FPS}" />
+                    </StackPanel>
+                </controls:OptionControl>
 
                 <!-- TDR MITIGATION TOGGLE -->
                 <controls:OptionControl
@@ -355,7 +366,7 @@
                         </StackPanel>
                         <TextBlock Margin="0,6,0,10" FontSize="12"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Text="Tag v6.3.1 memperbaiki ikon dan font; kontrol di bawah adalah flag lama yang sudah ada di kode saat itu, bukan FastFlag baru dari rilis tersebut. Uji hanya jika bersedia menerima kemungkinan flag diabaikan, kualitas gambar berubah, atau performa memburuk." />
+                                   Text="Tag v6.3.1 memperbaiki ikon dan font; kontrol di bawah adalah flag lama yang sudah ada di kode saat itu, bukan FastFlag baru dari rilis tersebut. Roblox dapat mengabaikan flag atau hasilnya berbeda." />
 
                         <controls:OptionControl
                             Header="Aktifkan kontrol FastFlags beta"
@@ -363,11 +374,9 @@
                             <ui:ToggleSwitch IsChecked="{Binding EnableLegacyFastFlagsBeta, Mode=TwoWay}" />
                         </controls:OptionControl>
 
-                        <controls:OptionControl
-                            Header="Paksa paket 19 FastFlag lawas v6.3.1"
-                            Description="Saat diaktifkan, FastFlag BoneFish yang lama dibersihkan lalu 19 flag historis v6.3.1 ditulis. Flag/settings langsung Roblox tidak disentuh. Otomatis mengaktifkan FastFlag Manager; Roblox tetap dapat mengabaikan flag.">
-                            <ui:ToggleSwitch IsChecked="{Binding EnableRejectedLegacyFastFlags, Mode=TwoWay}" />
-                        </controls:OptionControl>
+                        <TextBlock Margin="0,4,0,8" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="19 FastFlag yang dilaporkan 'Denied local configuration' pada log Roblox kamu telah dihapus dari paket beta dan akan tetap diblokir/dibersihkan. BoneFish tidak lagi menawarkan untuk memaksakannya." />
 
                         <controls:OptionControl
                             Header="MSAA samples (FIntDebugForceMSAASamples)"
@@ -414,19 +423,10 @@
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                    Text="DFIntCSGLevelOfDetailSwitchingDistance* (Mesh LOD): log Roblox yang dianalisis melaporkan penolakan pada flag LOD; flag ini tetap diblokir dan hanya ditampilkan sebagai informasi. Texture quality beta di atas hanya boleh diuji karena belum terverifikasi, bukan karena sudah terbukti diterima. Alternatifnya gunakan Graphics Quality di Roblox." />
 
-                        <TextBlock Margin="0,8,0,0" FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="19 nama dan nilai historis yang ditulis oleh paket di atas (Roblox mungkin tetap menolak):" />
-                        <TextBlock Margin="0,4,0,0" FontSize="11"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Text="{Binding RejectedLegacyFastFlags}" />
-
                         <TextBlock Margin="0,10,0,0" FontSize="12"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Text="Preset Auto-optimize, Stable, Balanced, dan Extreme Performance di atas adalah pilihan performa terpisah—tidak perlu memilih salah satunya untuk menyalakan paket FastFlag lawas. Mengaktifkan paket hanya menulis nilai lokal; BoneFish tidak dapat melewati allowlist Roblox." />
+                                   Text="Preset performa berada di atas. FastFlag yang disimpan secara lokal belum tentu diterapkan Roblox; penerimaan perlu dikonfirmasi dari log klien." />
 
                         <ui:Anchor Margin="0,8,0,0" Padding="0"
                                    Content="Laporkan hasil uji ke GitHub issue"

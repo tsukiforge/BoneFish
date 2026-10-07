@@ -66,7 +66,6 @@ namespace Bloxstrap.Models.Persistable
 
         // experimental features
         public bool EnableLegacyFastFlagsBeta { get; set; } = false;
-        public bool EnableRejectedLegacyFastFlags { get; set; } = false;
         public bool EnableSystemTrayOnClose { get; set; } = false;
         public bool EnableRobloxNotifications { get; set; } = false;
         public bool EnableFriendOnlineNotifications { get; set; } = false;
@@ -135,10 +134,9 @@ namespace Bloxstrap.Models.Persistable
         // Fast Loading — toggle independen untuk percepat loading aset
         public bool EnableFastLoadingFlags { get; set; } = false;
 
-        // FPS Unlocker — toggle INDEPENDEN (bisa stack dengan preset apa pun):
-        // cap otomatis berdasarkan tier hardware dan refresh rate monitor.
-        // Terpisah dari preset potato/ExtremeMode yang bertujuan menurunkan beban.
+        // FPS cap toggle; selecting a performance preset enables the configured cap.
         public bool FpsUnlockerEnabled { get; set; } = false;
+        public int FpsUnlockerCap { get; set; } = 50;
 
         // ★ Hardening FPS Unlocker (audit FPS Fase 5): BoneFish menandai nilai
         // FramerateCap yang IA tulis, supaya cap manual user tidak dihancurkan

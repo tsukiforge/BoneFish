@@ -1176,7 +1176,7 @@ namespace Bloxstrap.Integrations
                 sb.AppendLine("-- Toggle performa --");
                 Line("Fast Loading", App.Settings.Prop.EnableFastLoadingFlags ? "ON" : "OFF");
                 Line("TDR Mitigation", App.Settings.Prop.EnableTdrMitigation ? "ON" : "OFF");
-                Line("FPS Unlocker", App.Settings.Prop.FpsUnlockerEnabled ? "ON" : "OFF");
+                Line("FPS cap BoneFish", App.Settings.Prop.FpsUnlockerEnabled ? "ON" : "OFF");
                 sb.AppendLine();
 
                 sb.AppendLine("-- FPS cap --");
@@ -1440,15 +1440,12 @@ namespace Bloxstrap.Integrations
 
         private static IEnumerable<string> GetRendererFlagsToRemove()
         {
-            bool keepRejectedLegacyFlags = App.Settings.Prop.EnableRejectedLegacyFastFlags;
             bool keepOtherBetaFlags = App.Settings.Prop.EnableLegacyFastFlagsBeta;
-            if (!keepRejectedLegacyFlags && !keepOtherBetaFlags)
+            if (!keepOtherBetaFlags)
                 return RendererFlagsToRemove;
 
             return RendererFlagsToRemove.Where(flag =>
-                !(keepRejectedLegacyFlags && FastFlagManager.IsFlagRejectedByRobloxLogs(flag))
-                && !(keepOtherBetaFlags
-                    && FastFlagManager.BetaTestableLegacyFlags.Contains(flag)
+                !(FastFlagManager.BetaTestableLegacyFlags.Contains(flag)
                     && !FastFlagManager.IsFlagRejectedByRobloxLogs(flag)));
         }
 

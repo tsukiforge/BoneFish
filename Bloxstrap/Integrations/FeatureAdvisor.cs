@@ -5,8 +5,7 @@ namespace Bloxstrap.Integrations
     /// Classifies every BoneFish feature against the detected hardware profile.
     /// Features are NEVER hard-disabled by tier — the classification only drives
     /// guidance in the UI (Recommended / Optional / Advanced / NotRecommended /
-    /// Unavailable). Unavailable is reserved for objectively impossible states
-    /// (e.g. FPS Unlocker with no readable refresh rate).
+    /// Unavailable). Unavailable is reserved for objectively impossible states.
     /// </summary>
     public enum FeatureAvailability
     {
@@ -67,35 +66,28 @@ namespace Bloxstrap.Integrations
             };
         }
 
-        public static FeatureAdvice FpsUnlocker(HardwareProfile profile, bool currentlyEnabled, bool refreshRateKnown)
+        public static FeatureAdvice FpsUnlocker(HardwareProfile profile, bool currentlyEnabled)
         {
-            if (!refreshRateKnown || profile.DisplayRefreshRate <= 0)
-            {
-                return new FeatureAdvice
-                {
-                    Feature = "FPS Unlocker",
-                    Availability = FeatureAvailability.Unavailable,
-                    Reason = "Refresh rate monitor tidak bisa dibaca, sehingga cap FPS otomatis tidak bisa dihitung dengan aman.",
-                    Recommendation = "Recommended: tidak tersedia di konfigurasi display ini."
-                };
-            }
-
             bool integrated = profile.GpuDetectionComplete && !profile.HasDedicatedGpu;
             bool lowEnd = profile.Tier is HardwareProfile.HardwareTier.UltraLow or HardwareProfile.HardwareTier.Low;
-            int cap = FpsUnlockerService.GetRecommendedFramerateCap(profile);
+            int cap = FpsUnlockerService.GetConfiguredFramerateCap();
 
             string why = lowEnd || (profile.PhysicalCores is > 0 and <= 2 && profile.TotalRamMb <= 8192 && integrated)
-                ? $"Hardware tier {profile.TierDisplay}{(integrated ? " dengan GPU integrated" : "")}. Cap otomatis {cap} FPS membatasi beban agar lebih sesuai dengan kemampuan hardware dan refresh rate monitor."
+                ? $"Hardware tier {profile.TierDisplay}{(integrated ? " dengan GPU integrated" : "")}. Cap tetap {cap} FPS membatasi beban rendering."
                 : integrated
-                    ? $"GPU integrated ({profile.GpuName}), tier {profile.TierDisplay}. Cap otomatis {cap} FPS mengikuti tier dan refresh rate monitor ({profile.DisplayRefreshRate} Hz)."
-                    : $"GPU dedicated terdeteksi ({profile.GpuName}), tier {profile.TierDisplay}. Cap otomatis {cap} FPS mengikuti tier dan refresh rate monitor ({profile.DisplayRefreshRate} Hz).";
+                    ? $"GPU integrated ({profile.GpuName}), tier {profile.TierDisplay}. Cap {cap} FPS dipakai pada semua preset."
+                    : $"GPU dedicated terdeteksi ({profile.GpuName}), tier {profile.TierDisplay}. Cap {cap} FPS dipakai pada semua preset.";
 
             return new FeatureAdvice
             {
-                Feature = "FPS Unlocker",
+                Feature = "FPS cap BoneFish",
                 Availability = lowEnd || integrated ? FeatureAvailability.Optional : FeatureAvailability.Recommended,
                 Reason = why,
-                Recommendation = lowEnd || integrated ? "Recommended: optional — biarkan OFF jika FPS sudah stabil." : "Status: cocok untuk hardware ini."
+                Recommendation = currentlyEnabled
+                    ? $"Status: ON — cap {cap} FPS."
+                    : lowEnd || integrated
+                        ? "Recommended: optional — cap dapat mengurangi beban, tetapi tidak menjamin FPS stabil."
+                        : $"Recommended: ON — cap saat ini {cap} FPS."
             };
         }
 

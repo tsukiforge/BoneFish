@@ -2,16 +2,15 @@ using System.Runtime.InteropServices;
 
 namespace Bloxstrap.Integrations
 {
-    // FPS Unlocker — independen dari preset visual (bisa stack dengan apa pun):
-    // deteksi refresh rate monitor lalu tulis FramerateCap di GlobalBasicSettings_13.xml.
+    // FPS cap diterapkan independen dari preset visual:
+    // tulis FramerateCap di GlobalBasicSettings_13.xml.
     // DFIntTaskSchedulerTargetFps TIDAK dipakai: tidak ada di allowlist sejak 2025-09-29.
 
     public static class FpsUnlockerService
     {
         private const string LOG_IDENT = "FpsUnlocker";
-        private const int MaximumRobloxFramerateCap = 120;
-        private const int LegacyRobloxFramerateCap = 240;
-
+        public const int MinimumRobloxFramerateCap = 50;
+        public const int MaximumRobloxFramerateCap = 144;
         private const int ENUM_CURRENT_SETTINGS = -1;
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -57,60 +56,18 @@ namespace Bloxstrap.Integrations
             return devMode.dmDisplayFrequency;
         }
 
-        public static int GetRecommendedFramerateCap(HardwareProfile.HardwareTier tier, int refreshRate)
-        {
-            if (refreshRate <= 0)
-                return 0;
-
-            int tierCap = tier switch
-            {
-                HardwareProfile.HardwareTier.UltraLow => 30,
-                HardwareProfile.HardwareTier.Low => 45,
-                HardwareProfile.HardwareTier.Balanced => 60,
-                HardwareProfile.HardwareTier.Mid => 90,
-                HardwareProfile.HardwareTier.High => MaximumRobloxFramerateCap,
-                _ => 60
-            };
-
-            return Math.Min(tierCap, refreshRate);
-        }
-
-        public static int GetRecommendedFramerateCap(HardwareProfile profile)
-        {
-            if (profile.DisplayRefreshRate <= 0)
-                return 0;
-
-            bool constrainedIntegratedSystem =
-                profile.PhysicalCores is > 0 and <= 2
-                && profile.TotalRamBytes > 0
-                && profile.TotalRamMb <= 8192
-                && profile.GpuDetectionComplete
-                && !profile.HasDedicatedGpu;
-
-            if (constrainedIntegratedSystem)
-                return Math.Min(30, profile.DisplayRefreshRate);
-
-            return GetRecommendedFramerateCap(profile.Tier, profile.DisplayRefreshRate);
-        }
+        public static int GetConfiguredFramerateCap() =>
+            Math.Clamp(App.Settings.Prop.FpsUnlockerCap, MinimumRobloxFramerateCap, MaximumRobloxFramerateCap);
 
         public static FpsUnlockerResult Apply()
         {
-            HardwareProfile profile = HardwareProfileEngine.GetProfile();
+            App.GlobalSettings.Load();
             int refreshRate = GetPrimaryDisplayRefreshRate();
-            if (refreshRate <= 0)
-            {
-                App.Logger.WriteLine(LOG_IDENT, "Gagal mendeteksi refresh rate monitor");
-                return new FpsUnlockerResult(false, false, 0);
-            }
-
-            profile = profile with { DisplayRefreshRate = refreshRate };
-            int cap = GetRecommendedFramerateCap(profile);
+            int cap = GetConfiguredFramerateCap();
 
             App.Logger.WriteLine(LOG_IDENT,
-                $"Menerapkan FramerateCap={cap} (tier={profile.TierDisplay}, refresh rate monitor={refreshRate} Hz)");
-
-            if (!App.GlobalSettings.Loaded)
-                App.GlobalSettings.Load();
+                $"Menerapkan FramerateCap={cap}" +
+                (refreshRate > 0 ? $" (refresh rate monitor={refreshRate} Hz)" : " (refresh rate monitor tidak terbaca)"));
 
             if (App.GlobalSettings.Document is null)
             {
@@ -157,8 +114,7 @@ namespace Bloxstrap.Integrations
 
         public static void Revert()
         {
-            if (!App.GlobalSettings.Loaded)
-                App.GlobalSettings.Load();
+            App.GlobalSettings.Load();
 
             if (App.GlobalSettings.Document is null)
             {
@@ -169,6 +125,8 @@ namespace Bloxstrap.Integrations
 
             string? previous = App.Settings.Prop.FpsUnlockerPreviousCap;
             bool managed = App.Settings.Prop.FpsUnlockerCapManaged;
+            string? current = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
+            int? appliedCap = App.Settings.Prop.FpsUnlockerAppliedCap;
 
             if (managed && !String.IsNullOrWhiteSpace(previous))
             {
@@ -181,12 +139,9 @@ namespace Bloxstrap.Integrations
             {
                 // Tidak ada nilai user yang tercatat. Hapus HANYA bila nilainya memang
                 // nilai tulisan BoneFish; selain itu jangan sentuh.
-                string? current = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
-                int? appliedCap = App.Settings.Prop.FpsUnlockerAppliedCap;
-
                 bool isManagedValue = managed && (
                     (appliedCap.HasValue && current == appliedCap.Value.ToString())
-                    || (!appliedCap.HasValue && current is "120" or "240"));
+                    || (!appliedCap.HasValue && current is "30" or "45" or "50" or "60" or "75" or "90" or "120" or "144" or "240"));
 
                 if (isManagedValue)
                 {

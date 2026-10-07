@@ -1534,10 +1534,10 @@ Beralih ke {1}.</value>
     <value>Roblox crash terdeteksi! Klik notifikasi ini untuk menyambung ulang ke game terakhir.</value>
   </data>
   <data name="Menu.FastFlags.FpsUnlocker.Title" xml:space="preserve">
-    <value>FPS Cap Otomatis (Menyesuaikan Hardware)</value>
+    <value>FPS Cap BoneFish (50–144)</value>
   </data>
   <data name="Menu.FastFlags.FpsUnlocker.Description" xml:space="preserve">
-    <value>Atur cap FPS otomatis berdasarkan tier hardware dan refresh rate monitor. Hardware lebih kuat dapat memakai cap lebih tinggi (maksimal 120 FPS); cap tidak melebihi refresh rate monitor. Nonaktifkan untuk memulihkan cap sebelumnya.</value>
+    <value>Roblox tetap dapat mengubah FPS selama sesi, tetapi BoneFish menerapkan kembali cap terpilih saat peluncuran berikutnya. Nonaktifkan untuk memulihkan nilai sebelumnya dan membiarkan Roblox mengatur FPS.</value>
   </data>
   <data name="Watcher.CrashDetected.Message" xml:space="preserve">
     <value>Roblox mengalami crash. Apakah Anda ingin menyambung ulang ke game terakhir?</value>

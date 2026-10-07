@@ -136,51 +136,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 OnPropertyChanged(nameof(BetaFRMQuality));
                 OnPropertyChanged(nameof(SelectedBetaTextureQuality));
                 Notify(value
-                    ? "FastFlags beta tester aktif. Nilai hanya diterapkan setelah memilih opsi; flag Mesh LOD yang ditolak tetap diblokir."
+                    ? "FastFlags beta tester aktif. Nilai hanya diterapkan setelah memilih opsi; flag yang tercatat ditolak Roblox tetap diblokir."
                     : "FastFlags beta tester dinonaktifkan dan flag beta yang dikelola BoneFish dihapus.");
-            }
-        }
-
-        public bool EnableRejectedLegacyFastFlags
-        {
-            get => App.Settings.Prop.EnableRejectedLegacyFastFlags;
-            set
-            {
-                if (App.Settings.Prop.EnableRejectedLegacyFastFlags == value)
-                    return;
-
-                if (value)
-                {
-                    MessageBoxResult result = Frontend.ShowMessageBox(
-                        "BoneFish akan menulis nilai FastFlag historis dari preset v6.3.1, termasuk 19 flag yang pernah ditolak pada log Roblox yang dianalisis. Flag dapat diabaikan Roblox, menyebabkan gangguan visual/jaringan, atau memperburuk performa. Ini tidak memilih salah satu preset performa dan tidak dapat memaksa Roblox menerima flag. Lanjutkan?",
-                        MessageBoxImage.Warning,
-                        MessageBoxButton.YesNo);
-
-                    if (result != MessageBoxResult.Yes)
-                    {
-                        OnPropertyChanged(nameof(EnableRejectedLegacyFastFlags));
-                        return;
-                    }
-
-                    App.Settings.Prop.EnableRejectedLegacyFastFlags = true;
-                    App.Settings.Prop.UseFastFlagManager = true;
-                    App.FastFlags.Prop.Clear();
-                    foreach ((string flag, string flagValue) in FastFlagManager.RejectedLegacyFlagValues)
-                        App.FastFlags.SetValue(flag, flagValue);
-                    OnPropertyChanged(nameof(UseFastFlagManager));
-                }
-                else
-                {
-                    App.Settings.Prop.EnableRejectedLegacyFastFlags = false;
-                    foreach (string flag in FastFlagManager.RejectedLegacyFlagValues.Keys)
-                        App.FastFlags.SetValue(flag, null);
-                }
-
-                SaveLegacyBetaSettings();
-                OnPropertyChanged(nameof(EnableRejectedLegacyFastFlags));
-                Notify(value
-                    ? "FastFlag BoneFish yang lama dibersihkan, lalu paket 19 FastFlag historis disimpan. Roblox masih dapat mengabaikannya; mulai ulang Roblox untuk mencoba."
-                    : "Paket FastFlag yang ditolak dinonaktifkan dan nilainya dihapus dari konfigurasi BoneFish.");
             }
         }
 
@@ -293,12 +250,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public string BetaFastFlagFeedbackUrl =>
             $"https://github.com/{App.ProjectRepository}/issues/new?template=beta_fastflag_feedback.yaml";
-
-        public string RejectedLegacyFastFlags => String.Join(
-            Environment.NewLine,
-            FastFlagManager.RejectedLegacyFlagValues
-                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(pair => $"{pair.Key} = {pair.Value}"));
 
         private void SaveLegacyBetaSettings()
         {
@@ -649,8 +600,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         // ── FPS Target Extreme DIBUANG di rombak v7.2.7 ─────────────────────────
         // DFIntTaskSchedulerTargetFps TIDAK ada di allowlist sejak 2025-09-29 — client
         // modern mengabaikannya (pengganti: GlobalBasicSettings_13.xml FramerateCap).
-        // Property ExtremeModeFpsTarget + UI slider dihapus; FPS cap manual di-set user
-        // langsung di pengaturan Roblox (FramerateCap).
+        // ExtremeModeFpsTarget was removed; use the supported FramerateCap setting.
 
         /// <summary>
         /// Fast Loading — toggle independen untuk percepat loading aset.
@@ -701,9 +651,8 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
-        // ── FPS Unlocker — toggle INDEPENDEN (stack dengan preset apa pun) ───────
-        // Aktifkan → loading configuration (IsApplying) → deteksi refresh rate monitor
-        // → tulis FramerateCap di GlobalBasicSettings_13.xml → langsung aktif.
+        // ── FPS cap — toggle independen; preset menerapkan nilai yang dipilih ─────
+        // FramerateCap disimpan di GlobalBasicSettings_13.xml.
         // Tidak dipakai DFIntTaskSchedulerTargetFps (bukan allowlist sejak 2025-09-29).
 
         private string _fpsUnlockerStatus = "";
@@ -722,6 +671,32 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 try { App.Settings.Save(); } catch { }
 
                 _ = ToggleFpsUnlockerAsync(value);
+            }
+        }
+
+        public int FpsUnlockerCap
+        {
+            get => Integrations.FpsUnlockerService.GetConfiguredFramerateCap();
+            set
+            {
+                int cap = Math.Clamp(
+                    value,
+                    Integrations.FpsUnlockerService.MinimumRobloxFramerateCap,
+                    Integrations.FpsUnlockerService.MaximumRobloxFramerateCap);
+                if (App.Settings.Prop.FpsUnlockerCap == cap)
+                    return;
+
+                App.Settings.Prop.FpsUnlockerCap = cap;
+                OnPropertyChanged(nameof(FpsUnlockerCap));
+                try { App.Settings.Save(); }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteException("FastFlagsViewModel::FpsUnlockerCap", ex);
+                    Notify($"Gagal menyimpan batas FPS: {ex.Message}");
+                }
+
+                if (FpsUnlockerEnabled)
+                    _ = ApplyChangedFpsCapAsync();
             }
         }
 
@@ -744,7 +719,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 return;
 
             IsApplying = true;
-            ApplyingText = "⏳ Mendeteksi hardware & refresh rate monitor...";
+            ApplyingText = "⏳ Menerapkan cap FPS...";
 
             try
             {
@@ -762,20 +737,48 @@ namespace Bloxstrap.UI.ViewModels.Settings
                         App.Settings.Prop.FpsUnlockerEnabled = false;
                         try { App.Settings.Save(); } catch { }
 
-                        _fpsUnlockerStatus = "Status: Gagal — tidak bisa mendeteksi refresh rate monitor";
+                        _fpsUnlockerStatus = "Status: Gagal menerapkan cap FPS.";
                         OnPropertyChanged(nameof(FpsUnlockerEnabled));
                     }
                     else if (result.Deferred)
                     {
-                        _fpsUnlockerStatus = $"Status: Siap — cap otomatis {result.Cap} FPS, diterapkan saat Roblox dijalankan";
+                        _fpsUnlockerStatus = $"Status: Siap — cap {result.Cap} FPS diterapkan saat Roblox dijalankan";
                     }
                     else
                     {
-                        _fpsUnlockerStatus = $"Status: Aktif — cap otomatis {result.Cap} FPS mengikuti hardware & refresh rate monitor";
+                        _fpsUnlockerStatus = $"Status: Aktif — cap {result.Cap} FPS";
                     }
                 }
 
                 OnPropertyChanged(nameof(FpsUnlockerStatusText));
+            }
+            finally
+            {
+                IsApplying = false;
+                ApplyingText = "⏳ Menerapkan FastFlag & menulis ke disk...";
+            }
+        }
+
+        private async Task ApplyChangedFpsCapAsync()
+        {
+            if (IsApplying)
+                return;
+
+            IsApplying = true;
+            ApplyingText = "⏳ Menerapkan cap FPS...";
+            try
+            {
+                Integrations.FpsUnlockerService.FpsUnlockerResult result =
+                    await Task.Run(Integrations.FpsUnlockerService.Apply);
+                _fpsUnlockerStatus = result.Deferred
+                    ? $"Status: cap {result.Cap} FPS siap diterapkan saat Roblox dijalankan."
+                    : $"Status: cap {result.Cap} FPS aktif.";
+                OnPropertyChanged(nameof(FpsUnlockerStatusText));
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("FastFlagsViewModel::ApplyChangedFpsCapAsync", ex);
+                Notify($"Gagal menerapkan cap FPS {FpsUnlockerCap}: {ex.Message}");
             }
             finally
             {
@@ -813,6 +816,45 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 App.Logger.WriteException("FastFlagsViewModel::RestorePresetGraphicsQuality", ex);
                 _presetGraphicsQualityWarning = true;
                 Notify("Kualitas grafis Roblox gagal dipulihkan.");
+            }
+        }
+
+        private async Task ApplyPresetFramerateCapAsync()
+        {
+            App.Settings.Prop.FpsUnlockerEnabled = true;
+            OnPropertyChanged(nameof(FpsUnlockerEnabled));
+
+            try
+            {
+                Integrations.FpsUnlockerService.FpsUnlockerResult result =
+                    await Task.Run(Integrations.FpsUnlockerService.Apply);
+
+                if (!result.Ok)
+                {
+                    App.Settings.Prop.FpsUnlockerEnabled = false;
+                    _fpsUnlockerStatus = "Status: gagal menerapkan cap FPS.";
+                    OnPropertyChanged(nameof(FpsUnlockerEnabled));
+                    Notify("Preset tersimpan, tetapi cap FPS gagal diterapkan.");
+                }
+                else
+                {
+                    OnPropertyChanged(nameof(FpsUnlockerCap));
+                    _fpsUnlockerStatus = result.Deferred
+                        ? $"Status: cap {result.Cap} FPS siap diterapkan saat Roblox dijalankan."
+                        : $"Status: cap {result.Cap} FPS aktif.";
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteException("FastFlagsViewModel::ApplyPresetFramerateCapAsync", ex);
+                App.Settings.Prop.FpsUnlockerEnabled = false;
+                _fpsUnlockerStatus = $"Status: gagal menerapkan cap FPS ({ex.Message}).";
+                OnPropertyChanged(nameof(FpsUnlockerEnabled));
+                Notify($"Preset tersimpan, tetapi cap FPS gagal diterapkan: {ex.Message}");
+            }
+            finally
+            {
+                OnPropertyChanged(nameof(FpsUnlockerStatusText));
             }
         }
 
@@ -861,6 +903,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             SelectedPreset = "AutoOptimize";
+            await ApplyPresetFramerateCapAsync();
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
             VerifyAndNotify("Auto-Optimize");
@@ -930,6 +973,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             // ── Finalize: save sekali, notify sekali, reload sekali ──────────────────
             SelectedPreset = "Stable";
+            await ApplyPresetFramerateCapAsync();
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
             VerifyAndNotify("Stable");
@@ -991,6 +1035,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             // Save the selected preset so diagnostics and boot-time policy stay in sync.
             SelectedPreset = "UltraLow";
+            await ApplyPresetFramerateCapAsync();
 
             // Save semua flag ke disk SEBELUM page reload agar tidak ada flag yang hilang
             try { App.FastFlags.Save(); } catch { }
@@ -1045,6 +1090,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 Integrations.AutoOptimizeService.ApplyLowMemoryMode();
 
             SelectedPreset = "Balanced";
+            await ApplyPresetFramerateCapAsync();
             try { App.FastFlags.Save(); } catch { }
             try { App.Settings.Save(); } catch { }
             VerifyAndNotify("Balanced");
@@ -1114,6 +1160,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
             // Save the selected preset so diagnostics and boot-time policy stay in sync.
             SelectedPreset = "ExtremePerformance";
+            await ApplyPresetFramerateCapAsync();
 
             // Save semua flag ke disk SEBELUM page reload agar tidak ada flag yang hilang
             try { App.FastFlags.Save(); } catch { }
@@ -1139,15 +1186,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
             {
                 string filePath = Path.Combine(Paths.Modifications, "ClientSettings", "ClientAppSettings.json");
                 int count = App.FastFlags.Prop.Count;
-                int blockedCount = App.Settings.Prop.EnableRejectedLegacyFastFlags
-                    ? 0
-                    : FastFlagManager.FlagsRejectedByRobloxLogs.Count;
                 if (File.Exists(filePath))
                 {
-                    string rejectedStatus = App.Settings.Prop.EnableRejectedLegacyFastFlags
-                        ? " Paket FastFlag lawas dipaksa masuk ke konfigurasi, tetapi Roblox masih dapat mengabaikannya."
-                        : $" {blockedCount} flag yang terbukti ditolak Roblox diblokir.";
-                    Notify($"{presetName} tersimpan ({count} entri konfigurasi).{rejectedStatus} Roblox menentukan konfigurasi yang diterapkan.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil diubah." : "")}");
+                    int blockedCount = FastFlagManager.FlagsRejectedByRobloxLogs.Count;
+                    Notify($"{presetName} tersimpan ({count} entri konfigurasi). {blockedCount} flag yang terbukti ditolak Roblox diblokir. Roblox menentukan konfigurasi yang diterapkan.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil diubah." : "")}");
                 }
                 else
                 {
@@ -1291,8 +1333,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
             if (result != System.Windows.MessageBoxResult.Yes)
                 return;
 
-            App.Settings.Prop.EnableRejectedLegacyFastFlags = false;
-            OnPropertyChanged(nameof(EnableRejectedLegacyFastFlags));
 
             // ★ FIX freeze: CleanupLegacyRobloxFlags() men-scan SEMUA folder
             // Roblox/Versions/version-* lalu baca & tulis JSON tiap folder.

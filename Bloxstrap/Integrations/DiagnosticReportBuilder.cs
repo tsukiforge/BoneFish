@@ -420,17 +420,15 @@ namespace Bloxstrap.Integrations
             entries.Add(new DiagnosticEntry
             {
                 Status = DiagnosticStatus.Ok,
-                Text = $"Cap dikelola BoneFish: {(App.Settings.Prop.FpsUnlockerCapManaged ? $"ya (unlocker {(App.Settings.Prop.FpsUnlockerEnabled ? "ON" : "OFF")})" : "tidak")}"
+                Text = $"Cap dikelola BoneFish: {(App.Settings.Prop.FpsUnlockerCapManaged ? $"ya ({(App.Settings.Prop.FpsUnlockerEnabled ? "ON" : "OFF")})" : "tidak")}"
                     + (App.Settings.Prop.FpsUnlockerPreviousCap is { } prev ? $", cap user sebelumnya: {prev}" : "")
             });
-            int recommendedCap = FpsUnlockerService.GetRecommendedFramerateCap(profile);
+            int configuredCap = FpsUnlockerService.GetConfiguredFramerateCap();
             entries.Add(new DiagnosticEntry
             {
-                Status = App.Settings.Prop.FpsUnlockerEnabled && recommendedCap == 0
-                    ? DiagnosticStatus.Unknown
-                    : DiagnosticStatus.Ok,
-                Text = $"FPS Unlocker: {(App.Settings.Prop.FpsUnlockerEnabled
-                    ? recommendedCap > 0 ? $"ON — cap otomatis {recommendedCap} FPS" : "ON — menunggu refresh rate monitor terbaca"
+                Status = DiagnosticStatus.Ok,
+                Text = $"FPS cap BoneFish: {(App.Settings.Prop.FpsUnlockerEnabled
+                    ? $"ON — cap {configuredCap} FPS"
                     : "OFF")}"
             });
 

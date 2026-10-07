@@ -1,6 +1,6 @@
 # BoneFish Changelog
 
-## Unreleased — Game Session removal
+## 7.7.8  — Game Session removal
 
 ### Removed
 
@@ -21,14 +21,13 @@
   Roblox's saved graphics-quality setting instead. Supported options such as the FPS
   cap and unrelated client settings remain intact.
 - Restore the FastFlags page to a single vertical scrolling layout.
-- Add opt-in Beta Tester controls for selected legacy v6.3.1-era renderer flags that
-  were not reported rejected in the analyzed logs, plus a separate opt-in switch to
-  write historical v6.3.1 values for 19 flags previously rejected in analyzed Roblox
-  logs. Roblox may still ignore or reject these values. Include a manual GitHub issue
-  form for testers to report results.
-- Recommend a 30 FPS cap for confirmed systems with at most two physical CPU cores,
-  up to 8 GB RAM, and integrated graphics to reduce render load; other hardware keeps
-  the existing tier-based recommendation.
+- Keep opt-in Beta Tester controls only for selected legacy v6.3.1-era renderer flags
+  that were not reported rejected in the analyzed logs. Remove the option to force
+  historical values for 19 flags that Roblox explicitly denied; continue blocking
+  and cleaning those flags.
+- Apply the selected 50–144 FPS cap whenever a performance preset is selected. The
+  default remains 50 FPS; users can change it in BoneFish or turn the cap off to use
+  Roblox's own setting.
 - Preserve the installed BoneFish executable before upgrades and add an About-page
   one-step rollback. Rollback only replaces the BoneFish executable; older builds may
   not recognize or preserve newer BoneFish settings.
