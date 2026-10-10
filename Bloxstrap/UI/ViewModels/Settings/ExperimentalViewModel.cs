@@ -293,7 +293,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         /// <summary>
         /// ★ FIX 1.3: Deteksi apakah Watcher process sedang berjalan.
-        /// Watcher bikin EventWaitHandle "BoneFish-WatcherExitEvent" pas startup.
+        /// Watcher bikin event exit saat startup.
         /// EventWaitHandle bisa diakses lintas-proses — sempurna buat deteksi ini.
         /// Jangan pakai DoesMutexExist karena ini EventWaitHandle, bukan Mutex.
         /// Kalau Watcher aktif, jangan buat instance CrosshairService/HotkeyService baru
@@ -303,7 +303,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         {
             try
             {
-                using var evt = System.Threading.EventWaitHandle.OpenExisting("BoneFish-WatcherExitEvent");
+                using var evt = System.Threading.EventWaitHandle.OpenExisting(Watcher.ExitEventName);
                 return evt != null;
             }
             catch (System.Threading.WaitHandleCannotBeOpenedException)
@@ -311,8 +311,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 // Watcher process tidak ada — boleh buat instance lokal
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                App.Logger.WriteLine("ExperimentalViewModel", $"Watcher state check failed: {ex.Message}");
                 return false;
             }
         }

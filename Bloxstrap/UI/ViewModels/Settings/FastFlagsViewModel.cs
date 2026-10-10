@@ -1278,9 +1278,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.Logger.WriteLine(LOG_IDENT, "Signalling watcher to exit...");
             try
             {
-                using var exitEvent = System.Threading.EventWaitHandle.OpenExisting("BoneFish-WatcherExitEvent");
+                using var exitEvent = System.Threading.EventWaitHandle.OpenExisting(Watcher.ExitEventName);
                 exitEvent.Set();
                 App.Logger.WriteLine(LOG_IDENT, "Watcher exit event signalled.");
+            }
+            catch (System.Threading.WaitHandleCannotBeOpenedException)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "No active watcher exit event was found; continuing with the bootstrapper restart.");
             }
             catch (Exception ex)
             {

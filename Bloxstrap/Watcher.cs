@@ -11,9 +11,11 @@ namespace Bloxstrap
 {
     public class Watcher : IDisposable
     {
+        public const string ExitEventName = "BoneFish-WatcherExitEvent";
+
         private readonly InterProcessLock _lock = new("Watcher");
 
-        private readonly System.Threading.EventWaitHandle _exitEvent = new(false, System.Threading.EventResetMode.AutoReset, "BoneFish-WatcherExitEvent");
+        private readonly System.Threading.EventWaitHandle _exitEvent = new(false, System.Threading.EventResetMode.AutoReset, ExitEventName);
 
         private readonly WatcherData? _watcherData;
         
