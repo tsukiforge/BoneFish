@@ -135,24 +135,18 @@ namespace Bloxstrap.Integrations
                 App.GlobalSettings.Save();
                 App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap dipulihkan ke nilai sebelumnya ({previous})");
             }
+            else if (managed && appliedCap.HasValue && current == appliedCap.Value.ToString())
+            {
+                // Hanya hapus bila nilai saat ini memang benar-benar hasil tulisan BoneFish.
+                // Kita tidak menebak dari daftar angka yang di-hardcode; keputusan didasarkan
+                // pada state yang sudah dicatat saat Apply() dijalankan.
+                App.GlobalSettings.RemovePreset("Rendering.FramerateCap");
+                App.GlobalSettings.Save();
+                App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap tulisan BoneFish ({current}) dihapus (kembali ke default Roblox)");
+            }
             else
             {
-                // Tidak ada nilai user yang tercatat. Hapus HANYA bila nilainya memang
-                // nilai tulisan BoneFish; selain itu jangan sentuh.
-                bool isManagedValue = managed && (
-                    (appliedCap.HasValue && current == appliedCap.Value.ToString())
-                    || (!appliedCap.HasValue && current is "30" or "45" or "50" or "60" or "75" or "90" or "120" or "144" or "240"));
-
-                if (isManagedValue)
-                {
-                    App.GlobalSettings.RemovePreset("Rendering.FramerateCap");
-                    App.GlobalSettings.Save();
-                    App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap tulisan BoneFish ({current}) dihapus (kembali ke default Roblox)");
-                }
-                else
-                {
-                    App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap ({current ?? "<tidak ada>"}) bukan nilai tulisan BoneFish, tidak diubah");
-                }
+                App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap ({current ?? "<tidak ada>"}) bukan nilai tulisan BoneFish, tidak diubah");
             }
 
             ResetManagedState();
