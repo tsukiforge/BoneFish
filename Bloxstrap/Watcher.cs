@@ -61,7 +61,17 @@ namespace Bloxstrap
         private ActivityWatcher? _externalActivityWatcher;
         private Task? _externalMonitorTask;
         private readonly Dictionary<int, DateTime> _externalLogRetryAfterUtc = new();
+        private DateTime _externalAttachCooldownUntilUtc = DateTime.MinValue;
+        private int _watcherProcessUnexpectedFailureCount;
+        private int? _externalProcessFailurePid;
+        private int _externalProcessUnexpectedFailureCount;
         private const string RobloxPlayerProcessName = "RobloxPlayerBeta";
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "GetSystemTimes", SetLastError = true)]
+        private static extern bool GetSystemTimesNative(
+            out System.Runtime.InteropServices.ComTypes.FILETIME idleTime,
+            out System.Runtime.InteropServices.ComTypes.FILETIME kernelTime,
+            out System.Runtime.InteropServices.ComTypes.FILETIME userTime);
 
         private void EnsureExternalGameMonitor()
         {
@@ -702,10 +712,23 @@ namespace Bloxstrap
             {
                 using var trackedProcess = Process.GetProcessById(_watcherData!.ProcessId);
                 processAlive = !trackedProcess.HasExited;
+                _watcherProcessUnexpectedFailureCount = 0;
             }
-            catch
+            catch (ArgumentException)
+            {
+                processAlive = false; // proses tidak ditemukan / sudah mati
+            }
+            catch (InvalidOperationException)
             {
                 processAlive = false; // proses sudah mati / PID didaur ulang
+            }
+            catch (Exception ex)
+            {
+                _watcherProcessUnexpectedFailureCount++;
+                processAlive = _watcherProcessUnexpectedFailureCount < 10;
+                if (_watcherProcessUnexpectedFailureCount == 1)
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Pengecekan proses PID={_watcherData!.ProcessId} gagal (diasumsikan hidup): {ex.Message}");
             }
 
             if (!processAlive)
@@ -774,6 +797,8 @@ namespace Bloxstrap
                 string sysInfo = "";
                 try { sysInfo = Integrations.AutoOptimizeService.GetSystemInfo(); } catch { }
 
+                _ = Task.Run(LogRenderStallDiagnosticPlus);
+
                 App.Logger.WriteLine(LOG_IDENT,
                     "RENDER STALL TERDETEKSI (Roblox hang, proses MASIH HIDUP — bukan crash) | " +
                     $"PID={_watcherData!.ProcessId} | windowHandle={_watcherData.Handle} | " +
@@ -781,13 +806,110 @@ namespace Bloxstrap
                     $"OptimizeForLowEnd={App.Settings.Prop.OptimizeForLowEnd} | " +
                     $"FakeBorderless={App.Settings.Prop.FakeBorderlessFullscreen} | " +
                     $"FpsMonitor={App.Settings.Prop.EnableFpsMonitor} | Crosshair={App.Settings.Prop.EnableCrosshair} | " +
-                    $"TdrMitigation={App.Settings.Prop.EnableTdrMitigation} | " +
-                    $"System={sysInfo}");
+                    $"TdrMitigation={App.Settings.Prop.EnableTdrMitigation} | System={sysInfo}");
             }
             catch (Exception ex)
             {
                 App.Logger.WriteLine(LOG_IDENT, $"Gagal menulis diagnostik stall: {ex.Message}");
             }
+        }
+
+        private async Task LogRenderStallDiagnosticPlus()
+        {
+            const string LOG_IDENT = "Watcher::StallDetector";
+            string availablePhysicalMemoryMB = "n/a";
+            string systemCpuPercent = "n/a";
+            string diskTimePercent = "n/a";
+            string diskQueueLength = "n/a";
+            string sessionPhase = "n/a";
+            try
+            {
+                ulong availableBytes = Integrations.AutoOptimizeService.GetAvailablePhysicalMemoryPublic();
+                if (availableBytes != 0)
+                    availablePhysicalMemoryMB = $"{availableBytes / 1024 / 1024:F0}";
+            }
+            catch { }
+
+            try
+            {
+                Task<string> cpuTask = Task.Run(GetSystemCpuPercent);
+                Task<(string DiskTime, string QueueLength)> diskTask = Task.Run(GetDiskMetrics);
+                await Task.WhenAny(Task.WhenAll(cpuTask, diskTask), Task.Delay(2000));
+                if (cpuTask.IsCompletedSuccessfully)
+                    systemCpuPercent = cpuTask.Result;
+                if (diskTask.IsCompletedSuccessfully)
+                    (diskTimePercent, diskQueueLength) = diskTask.Result;
+            }
+            catch { }
+
+            try
+            {
+                ActivityWatcher? activityWatcher = _externalActivityWatcher ?? ActivityWatcher;
+                if (activityWatcher is not null)
+                {
+                    if (activityWatcher.InGame)
+                        sessionPhase = "joined";
+                    else if (activityWatcher.History.Count > 0
+                        && activityWatcher.History[0].TimeLeft is DateTime timeLeft
+                        && (DateTime.Now - timeLeft).TotalSeconds <= 30)
+                        sessionPhase = "teleport";
+                    else if (activityWatcher.Data.PlaceId != 0)
+                        sessionPhase = "joining";
+                    else
+                        sessionPhase = "lobby";
+                }
+            }
+            catch { }
+
+            try
+            {
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"StallDiagnostic+ | availablePhysicalMemory={availablePhysicalMemoryMB}MB | " +
+                    $"systemCpu={systemCpuPercent}% | diskTime={diskTimePercent}% | " +
+                    $"diskQueueLength={diskQueueLength} | sessionPhase={sessionPhase}");
+            }
+            catch { }
+        }
+
+        private static string GetSystemCpuPercent()
+        {
+            try
+            {
+                if (!GetSystemTimesNative(out var idle1, out var kernel1, out var user1))
+                    return "n/a";
+                Thread.Sleep(300);
+                if (!GetSystemTimesNative(out var idle2, out var kernel2, out var user2))
+                    return "n/a";
+                ulong idleDelta = FileTimeToUInt64(idle2) - FileTimeToUInt64(idle1);
+                ulong totalDelta = FileTimeToUInt64(kernel2) + FileTimeToUInt64(user2)
+                    - FileTimeToUInt64(kernel1) - FileTimeToUInt64(user1);
+                if (totalDelta == 0)
+                    return "n/a";
+                return $"{Math.Clamp((1.0 - (double)idleDelta / totalDelta) * 100, 0, 100):F1}";
+            }
+            catch { return "n/a"; }
+        }
+
+        private static ulong FileTimeToUInt64(System.Runtime.InteropServices.ComTypes.FILETIME value) =>
+            ((ulong)(uint)value.dwHighDateTime << 32) | (uint)value.dwLowDateTime;
+
+        private static (string DiskTime, string QueueLength) GetDiskMetrics()
+        {
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    "SELECT PercentDiskTime, CurrentDiskQueueLength FROM " +
+                    "Win32_PerfFormattedData_PerfDisk_PhysicalDisk WHERE Name='_Total'");
+                using var results = searcher.Get();
+                foreach (System.Management.ManagementObject item in results)
+                {
+                    string diskTime = Convert.ToString(item["PercentDiskTime"]) ?? "n/a";
+                    string queueLength = Convert.ToString(item["CurrentDiskQueueLength"]) ?? "n/a";
+                    return (diskTime, queueLength);
+                }
+            }
+            catch { }
+            return ("n/a", "n/a");
         }
 
         // A pending record means a previous restore only partially succeeded. Only
@@ -859,12 +981,13 @@ namespace Bloxstrap
 
             App.Logger.WriteLine(LOG_IDENT, "Tray watcher active — monitoring external Roblox clients for activity details");
 
+            int nextWaitMilliseconds = 2000;
             while (true)
             {
                 try
                 {
                     // A newer watcher will restore any remaining legacy session.
-                    if (_exitEvent.WaitOne(2000))
+                    if (_exitEvent.WaitOne(nextWaitMilliseconds))
                     {
                         App.Logger.WriteLine(LOG_IDENT, "Watcher baru mengambil alih — menutup activity watcher eksternal");
                         CleanupExternalGame(endSession: false);
@@ -893,10 +1016,29 @@ namespace Bloxstrap
                     {
                         using var tracked = Process.GetProcessById(trackedPid);
                         alive = !tracked.HasExited;
+                        _externalProcessFailurePid = trackedPid;
+                        _externalProcessUnexpectedFailureCount = 0;
                     }
-                    catch
+                    catch (ArgumentException)
                     {
                         alive = false;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        alive = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (_externalProcessFailurePid != trackedPid)
+                        {
+                            _externalProcessFailurePid = trackedPid;
+                            _externalProcessUnexpectedFailureCount = 0;
+                        }
+                        _externalProcessUnexpectedFailureCount++;
+                        alive = _externalProcessUnexpectedFailureCount < 10;
+                        if (_externalProcessUnexpectedFailureCount == 1)
+                            App.Logger.WriteLine(LOG_IDENT,
+                                $"Pengecekan proses PID={trackedPid} gagal (diasumsikan hidup): {ex.Message}");
                     }
 
                     if (alive)
@@ -904,19 +1046,18 @@ namespace Bloxstrap
 
                     App.Logger.WriteLine(LOG_IDENT, $"External Roblox client (pid={trackedPid}) exited");
                     CleanupExternalGame(endSession: true);
+                    _externalAttachCooldownUntilUtc = DateTime.UtcNow.AddSeconds(10);
                     continue;
                 }
 
-                // FIX (audit RAM): dulu seluruh daftar proses diambil tiap iterasi (tiap
-                // 2 detik) tanpa dispose. Cukup daftar PID (int) — jauh lebih ringan.
-                HashSet<int> livePids = Utilities.GetProcessesSafe()
-                    .Select(process => { try { return process.Id; } finally { process.Dispose(); } })
-                    .ToHashSet();
+                // Satu enumerasi menyusun livePids sekaligus mencari kandidat attach.
+                int? candidate = FindUntrackedRobloxProcess(out HashSet<int> livePids);
                 foreach (int retryProcessId in _externalLogRetryAfterUtc.Keys.Where(processId => !livePids.Contains(processId)).ToList())
                     _externalLogRetryAfterUtc.Remove(retryProcessId);
 
-                int? candidate = FindUntrackedRobloxProcess();
-                if (candidate is int pid)
+                int watcherPid = _watcherData?.ProcessId ?? -1;
+                nextWaitMilliseconds = livePids.Contains(watcherPid) ? 5000 : 2000;
+                if (candidate is int pid && DateTime.UtcNow >= _externalAttachCooldownUntilUtc)
                     AttachExternalGame(pid);
             }
         }
@@ -926,9 +1067,11 @@ namespace Bloxstrap
         /// diluncurkan watcher ini, bukan game eksternal yang sedang dipantau,
         /// dan tidak masuk daftar ignore. Kembalikan null jika tidak ada.
         /// </summary>
-        private int? FindUntrackedRobloxProcess()
+        private int? FindUntrackedRobloxProcess(out HashSet<int> livePids)
         {
             const string LOG_IDENT = "Watcher::ExternalMonitor::FindProcess";
+            livePids = new();
+            int? candidate = null;
 
             try
             {
@@ -939,10 +1082,10 @@ namespace Bloxstrap
                     int pid;
                     try
                     {
+                        pid = process.Id;
+                        livePids.Add(pid);
                         if (!String.Equals(process.ProcessName, RobloxPlayerProcessName, StringComparison.OrdinalIgnoreCase))
                             continue;
-
-                        pid = process.Id;
                     }
                     finally
                     {
@@ -955,7 +1098,7 @@ namespace Bloxstrap
                             && retryAfter > DateTime.UtcNow))
                         continue;
 
-                    return pid;
+                    candidate ??= pid;
                 }
             }
             catch (Exception ex)
@@ -963,7 +1106,7 @@ namespace Bloxstrap
                 App.Logger.WriteLine(LOG_IDENT, $"Scan proses Roblox gagal (non-fatal): {ex.Message}");
             }
 
-            return null;
+            return candidate;
         }
 
         /// <summary>
@@ -997,6 +1140,8 @@ namespace Bloxstrap
                 foreach (FileInfo file in new DirectoryInfo(logDirectory).GetFiles())
                 {
                     if (!file.Name.Contains("Player", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (file.Name.Contains("CrashHandler", StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     if (processStartUtc is DateTime start && file.LastWriteTimeUtc < start.AddSeconds(-30))
@@ -1034,6 +1179,8 @@ namespace Bloxstrap
 
                 _externalLogRetryAfterUtc.Remove(pid);
                 _externalGamePid = pid;
+                _externalProcessFailurePid = pid;
+                _externalProcessUnexpectedFailureCount = 0;
                 var externalWatcher = new ActivityWatcher(logFile, attachExisting: true);
                 SetExternalActivityWatcher(externalWatcher);
                 // Reconstruct the current game state before notifying tray consumers.
