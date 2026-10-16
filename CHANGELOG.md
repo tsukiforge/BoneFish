@@ -1,5 +1,12 @@
 # BoneFish Changelog
 
+## 8.0.1 — Low-end FPS default correction
+
+Release date: 2026-10-16
+
+- Restore the default and minimum FPS cap to **50 FPS** for older laptops and integrated graphics, while keeping the maximum at 144 FPS.
+- Keep Roblox version checking separate from BoneFish version updates; Roblox packages are reused when their signature matches the manifest.
+
 ## 8.0.0 — Watcher reliability, diagnostics, and save performance
 
 Release date: 2026-10-16
@@ -15,7 +22,7 @@ Release date: 2026-10-16
 
 - Skip JSON and GlobalBasicSettings writes when the effective content has not changed.
 - Prevent overlapping auto-optimization passes.
-- Raise the supported BoneFish FPS cap range and default from 50–144 to 60–144 FPS.
+- Keep the supported BoneFish FPS cap range at 50–144 FPS, with 50 FPS as the low-end-friendly default.
 
 ## 7.7.8  — Game Session removal
 

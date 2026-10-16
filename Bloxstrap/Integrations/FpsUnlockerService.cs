@@ -9,7 +9,7 @@ namespace Bloxstrap.Integrations
     public static class FpsUnlockerService
     {
         private const string LOG_IDENT = "FpsUnlocker";
-        public const int MinimumRobloxFramerateCap = 60;
+        public const int MinimumRobloxFramerateCap = 50;
         public const int MaximumRobloxFramerateCap = 144;
         private const int ENUM_CURRENT_SETTINGS = -1;
 

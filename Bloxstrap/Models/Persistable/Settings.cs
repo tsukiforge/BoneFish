@@ -136,7 +136,7 @@ namespace Bloxstrap.Models.Persistable
 
         // FPS cap toggle; selecting a performance preset enables the configured cap.
         public bool FpsUnlockerEnabled { get; set; } = false;
-        public int FpsUnlockerCap { get; set; } = 60;
+        public int FpsUnlockerCap { get; set; } = 50;
 
         // ★ Hardening FPS Unlocker (audit FPS Fase 5): BoneFish menandai nilai
         // FramerateCap yang IA tulis, supaya cap manual user tidak dihancurkan
