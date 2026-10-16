@@ -45,6 +45,8 @@ namespace Bloxstrap
 
         public bool Loaded { get; set; } = false;
 
+        private bool _dirty;
+
         public string FileLocation => Path.Combine(Paths.Roblox, "GlobalBasicSettings_13.xml");
 
         public void SetPreset(string prefix, object? value)
@@ -69,14 +71,24 @@ namespace Bloxstrap
             if (element is null)
                 return;
 
-            element.Value = value?.ToString()!;
+            string newValue = value?.ToString() ?? String.Empty;
+            if (element.Value == newValue)
+                return;
+
+            element.Value = newValue;
+            _dirty = true;
         }
 
         public void RemoveValue(string path)
         {
             path = ResolvePath(path);
 
-            Document?.XPathSelectElement(path)?.Remove();
+            XElement? element = Document?.XPathSelectElement(path);
+            if (element is null)
+                return;
+
+            element.Remove();
+            _dirty = true;
         }
 
         public void RemovePreset(string prefix)
@@ -142,6 +154,7 @@ namespace Bloxstrap
             {
                 Document = XDocument.Load(FileLocation);
                 Loaded = true;
+                _dirty = false;
 
                 previousReadOnlyState = GetReadOnly();
             }
@@ -156,12 +169,19 @@ namespace Bloxstrap
         {
             string LOG_IDENT = "GBSEditor::Save";
 
+            if (!_dirty)
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Skipped unchanged save to {FileLocation}.");
+                return;
+            }
+
             App.Logger.WriteLine(LOG_IDENT, $"Saving to {FileLocation}...");
 
             try
             {
                 SetReadOnly(false, true);
                 Document?.Save(FileLocation);
+                _dirty = false;
 
                 SetReadOnly(previousReadOnlyState);
             }

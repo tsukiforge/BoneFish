@@ -183,6 +183,7 @@ namespace Bloxstrap
                 App.Logger.WriteLine(LOG_IDENT, "Render-stall detector INACTIVE: window handle = 0 (stall tidak akan terdeteksi)");
 
             WindowManipulation = new(_watcherData.Handle, _watcherData.ProcessId);
+            WindowManipulation.WindowTransition += OnWindowTransition;
 
             // Initialize DNS resilience for network stability.
             // (Performance FastFlags are now applied by the Bootstrapper before launch.)
@@ -277,6 +278,25 @@ namespace Bloxstrap
             }
 
             RestoreLegacyGameSession();
+        }
+
+        private void OnWindowTransition(object? sender, WindowTransitionEventArgs e)
+        {
+            try
+            {
+                string activityPhase = ActivityWatcher is null
+                    ? "unavailable"
+                    : ActivityWatcher.InGame
+                        ? "joined"
+                        : ActivityWatcher.Data.PlaceId != 0 ? "joining/teleport" : "menu/disconnected";
+
+                App.Logger.WriteLine("Watcher::WindowTransition",
+                    $"transition={e.Transition} pid={e.ProcessId} utc={e.TimestampUtc:O} phase={activityPhase}");
+            }
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine("Watcher::WindowTransition", $"diagnostic failed (non-fatal): {ex.Message}");
+            }
         }
 
         /// <summary>Restore applications left suspended by an older BoneFish version.</summary>

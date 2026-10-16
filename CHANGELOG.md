@@ -1,5 +1,22 @@
 # BoneFish Changelog
 
+## 8.0.0 — Watcher reliability, diagnostics, and save performance
+
+Release date: 2026-10-16
+
+### Watcher and diagnostics
+
+- Narrow process-exit detection so only expected process-lifecycle exceptions are treated as an exited Roblox process; unexpected access or Win32 failures are treated as alive with bounded consecutive-failure handling.
+- Skip `CrashHandler` log files when selecting a Roblox Player log, avoid duplicate process enumeration, and add attach cooldown protection for rapid exit/relaunch cycles.
+- Add best-effort stall diagnostics for available physical memory, system CPU, disk activity/queue, and ActivityWatcher session phase without adding work to normal ticks.
+- Add event-driven Roblox window focus and minimize transition logging with process ID, timestamp, and session phase.
+
+### Configuration and performance
+
+- Skip JSON and GlobalBasicSettings writes when the effective content has not changed.
+- Prevent overlapping auto-optimization passes.
+- Raise the supported BoneFish FPS cap range and default from 50–144 to 60–144 FPS.
+
 ## 7.7.8  — Game Session removal
 
 ### Removed

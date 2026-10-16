@@ -965,7 +965,27 @@ namespace Bloxstrap.Integrations
             return preset is "UltraLow" or "Balanced" or "Stable" or "ExtremePerformance";
         }
 
+        private static int _checkAndApplyRunning;
+
         public static bool CheckAndApply()
+        {
+            if (Interlocked.Exchange(ref _checkAndApplyRunning, 1) != 0)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "CheckAndApply skipped because another optimization pass is already running.");
+                return false;
+            }
+
+            try
+            {
+                return CheckAndApplyCore();
+            }
+            finally
+            {
+                Volatile.Write(ref _checkAndApplyRunning, 0);
+            }
+        }
+
+        private static bool CheckAndApplyCore()
         {
             try
             {

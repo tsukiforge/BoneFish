@@ -88,14 +88,21 @@ namespace Bloxstrap
         public virtual void Save()
         {
             string LOG_IDENT = $"{LOG_IDENT_CLASS}::Save";
-            
-            App.Logger.WriteLine(LOG_IDENT, $"Saving to {FileLocation}...");
-
-            Directory.CreateDirectory(Path.GetDirectoryName(FileLocation)!);
 
             try
             {
                 string contents = JsonSerializer.Serialize(Prop, new JsonSerializerOptions { WriteIndented = true });
+
+                if (File.Exists(FileLocation)
+                    && String.Equals(File.ReadAllText(FileLocation), contents, StringComparison.Ordinal))
+                {
+                    LastFileHash = MD5Hash.FromString(contents);
+                    App.Logger.WriteLine(LOG_IDENT, $"Skipped unchanged save to {FileLocation}.");
+                    return;
+                }
+
+                App.Logger.WriteLine(LOG_IDENT, $"Saving to {FileLocation}...");
+                Directory.CreateDirectory(Path.GetDirectoryName(FileLocation)!);
 
                 File.WriteAllText(FileLocation, contents);
 

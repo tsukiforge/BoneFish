@@ -296,10 +296,10 @@
                     <ui:ToggleSwitch IsChecked="{Binding FpsUnlockerEnabled, Mode=TwoWay}" />
                 </controls:OptionControl>
                 <controls:OptionControl
-                    Header="Batas FPS BoneFish (50–144)"
-                    Description="Default 50 FPS lebih ringan. Roblox tetap boleh mengubah FPS selama sesi; saat Roblox diluncurkan lagi, BoneFish menerapkan kembali nilai di sini. Cap OFF mengembalikan pengaturan sebelumnya dan membiarkan Roblox mengatur FPS. Pada monitor 60 Hz, nilai di atas 60 dapat menambah beban tanpa menaikkan refresh panel.">
+                    Header="Batas FPS BoneFish (60–144)"
+                    Description="Default 60 FPS. Roblox tetap boleh mengubah FPS selama sesi; saat Roblox diluncurkan lagi, BoneFish menerapkan kembali nilai di sini. Cap OFF mengembalikan pengaturan sebelumnya dan membiarkan Roblox mengatur FPS. Pada monitor 60 Hz, nilai di atas 60 dapat menambah beban tanpa menaikkan refresh panel.">
                     <StackPanel Orientation="Horizontal" MinWidth="230">
-                        <Slider Width="170" Minimum="50" Maximum="144" TickFrequency="1"
+                        <Slider Width="170" Minimum="60" Maximum="144" TickFrequency="1"
                                 IsSnapToTickEnabled="True" IsEnabled="{Binding IsNotApplying}"
                                 Value="{Binding FpsUnlockerCap, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=300}" />
                         <TextBlock Margin="10,0,0,0" VerticalAlignment="Center"

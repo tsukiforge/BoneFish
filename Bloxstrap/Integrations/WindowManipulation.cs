@@ -10,6 +10,7 @@ namespace Bloxstrap.Integrations
     public class WindowManipulation
     {
         private WINEVENTPROC? _setTitleHook;
+        private WINEVENTPROC? _windowTransitionHook;
 
         private HWND _hWnd;
         private uint _robloxPID;
@@ -24,6 +25,8 @@ namespace Bloxstrap.Integrations
         }
 
         public static bool WindowManipulationAvailable => App.Settings.Prop.EnableActivityTracking;
+
+        public event EventHandler<WindowTransitionEventArgs>? WindowTransition;
 
         public void FakeBorderless()
         {
@@ -60,12 +63,23 @@ namespace Bloxstrap.Integrations
             const string LOG_IDENT = "WindowManipulation::ApplyWindowModifications";
             const int WINEVENT_OUTOFCONTEXT = 0x0;
             const int EVENT_OBJECT_NAMECHANGE = 0x800C;
+            const int EVENT_SYSTEM_FOREGROUND = 0x0003;
+            const int EVENT_SYSTEM_MINIMIZEEND = 0x0017;
             const int WM_SETICON = 0x0080;
 
             App.Logger.WriteLine(LOG_IDENT, "Applying window modifications");
 
             var setTitleHook = new WINEVENTPROC(SetWindowTitleHook);
             _setTitleHook = setTitleHook;
+            _windowTransitionHook = new WINEVENTPROC(WindowTransitionHook);
+            App.Current.Dispatcher.Invoke(() => PInvoke.SetWinEventHook(
+                EVENT_SYSTEM_FOREGROUND,
+                EVENT_SYSTEM_MINIMIZEEND,
+                null,
+                _windowTransitionHook,
+                _robloxPID,
+                0,
+                WINEVENT_OUTOFCONTEXT));
 
             // icon
             App.Logger.WriteLine(LOG_IDENT, "Setting Roblox icon");
@@ -107,5 +121,28 @@ namespace Bloxstrap.Integrations
                 PInvoke.SetWindowText(_hWnd, robloxTitle);
             }
         }
+
+        private void WindowTransitionHook(HWINEVENTHOOK hWinEventHook, uint iEvent, HWND hWnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
+        {
+            const int EVENT_SYSTEM_FOREGROUND = 0x0003;
+            const int EVENT_SYSTEM_MINIMIZESTART = 0x0016;
+            const int EVENT_SYSTEM_MINIMIZEEND = 0x0017;
+
+            if (hWnd != _hWnd)
+                return;
+
+            string? transition = iEvent switch
+            {
+                EVENT_SYSTEM_FOREGROUND => "foreground",
+                EVENT_SYSTEM_MINIMIZESTART => "minimize-start",
+                EVENT_SYSTEM_MINIMIZEEND => "minimize-end",
+                _ => null
+            };
+
+            if (transition is not null)
+                WindowTransition?.Invoke(this, new WindowTransitionEventArgs(transition, DateTime.UtcNow, (int)_robloxPID));
+        }
     }
+
+    public sealed record WindowTransitionEventArgs(string Transition, DateTime TimestampUtc, int ProcessId);
 }
