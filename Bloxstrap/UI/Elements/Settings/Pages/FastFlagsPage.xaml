@@ -306,6 +306,12 @@
                                    Text="{Binding FpsUnlockerCap, StringFormat={}{0} FPS}" />
                     </StackPanel>
                 </controls:OptionControl>
+                <controls:OptionControl
+                    Header="Adaptive FPS (50–60)"
+                    Description="Opsional untuk laptop lama. Mulai pada 50 FPS, naik ke 60 FPS hanya setelah stabil, dan kembali ke 50 FPS jika terdeteksi render stall. Tidak mengubah FastFlag.">
+                    <ui:ToggleSwitch IsChecked="{Binding FpsUnlockerAdaptiveMode, Mode=TwoWay}"
+                                     IsEnabled="{Binding FpsUnlockerEnabled}" />
+                </controls:OptionControl>
 
                 <!-- TDR MITIGATION TOGGLE -->
                 <controls:OptionControl

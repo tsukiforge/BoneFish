@@ -137,6 +137,9 @@ namespace Bloxstrap.Models.Persistable
         // FPS cap toggle; selecting a performance preset enables the configured cap.
         public bool FpsUnlockerEnabled { get; set; } = false;
         public int FpsUnlockerCap { get; set; } = 50;
+        // Adaptive mode starts at 50 FPS and may rise to 60 only after a stable
+        // window; a render stall immediately returns it to 50 FPS.
+        public bool FpsUnlockerAdaptiveMode { get; set; } = false;
 
         // ★ Hardening FPS Unlocker (audit FPS Fase 5): BoneFish menandai nilai
         // FramerateCap yang IA tulis, supaya cap manual user tidak dihancurkan

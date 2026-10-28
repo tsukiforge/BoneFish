@@ -246,8 +246,15 @@ namespace Bloxstrap
 
                 await SetupPackageDictionaries(); // mods also require it
 
-                if (AppData.State.VersionGuid != _latestVersionGuid || _mustUpgrade)
+                bool playerVersionMismatch = !String.Equals(AppData.State.VersionGuid, _latestVersionGuid, StringComparison.OrdinalIgnoreCase);
+                bool mustUpgrade = _mustUpgrade;
+                if (playerVersionMismatch || mustUpgrade)
                 {
+                    App.Logger.WriteLine(LOG_IDENT,
+                        $"Upgrade decision: localVersion={AppData.State.VersionGuid ?? "<empty>"}, " +
+                        $"remoteVersion={_latestVersionGuid}, versionMismatch={playerVersionMismatch}, " +
+                        $"mustUpgrade={mustUpgrade}, executableExists={File.Exists(AppData.ExecutablePath)}, " +
+                        $"forceReinstall={App.State.Prop.ForceReinstall}");
                     bool backgroundUpdaterMutexOpen = Utilities.DoesMutexExist("Bloxstrap-BackgroundUpdater");
                     if (App.LaunchSettings.BackgroundUpdaterFlag.Active)
                         backgroundUpdaterMutexOpen = false; // we want to actually update lol
@@ -261,8 +268,7 @@ namespace Bloxstrap
                     //
                     // Studio launch tidak kena masalah ini (server handshake lebih
                     // permissive), jadi studio boleh tetap pakai background updater.
-                    bool forceSyncUpgrade = !IsStudioLaunch
-                        && AppData.State.VersionGuid != _latestVersionGuid;
+                    bool forceSyncUpgrade = !IsStudioLaunch && playerVersionMismatch;
 
                     App.Logger.WriteLine(LOG_IDENT,
                         $"Background updater running: {backgroundUpdaterMutexOpen}, " +
@@ -1738,14 +1744,20 @@ namespace Bloxstrap
             {
                 // let's cheat! if the stock bootstrapper already previously downloaded the file,
                 // then we can just copy the one from there
+                string calculatedMD5 = MD5Hash.FromFile(robloxPackageLocation);
+                if (calculatedMD5 == package.Signature)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Found valid existing copy at '{robloxPackageLocation}'! Copying to Downloads folder...");
+                    File.Copy(robloxPackageLocation, package.DownloadPath);
 
-                App.Logger.WriteLine(LOG_IDENT, $"Found existing copy at '{robloxPackageLocation}'! Copying to Downloads folder...");
-                File.Copy(robloxPackageLocation, package.DownloadPath);
+                    _totalDownloadedBytes += package.PackedSize;
+                    UpdateProgressBar();
 
-                _totalDownloadedBytes += package.PackedSize;
-                UpdateProgressBar();
+                    return;
+                }
 
-                return;
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"Ignoring invalid stock cache '{robloxPackageLocation}' ({calculatedMD5} != {package.Signature}); downloading a clean copy...");
             }
 
             if (File.Exists(package.DownloadPath))

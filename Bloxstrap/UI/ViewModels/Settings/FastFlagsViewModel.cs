@@ -700,12 +700,35 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        public bool FpsUnlockerAdaptiveMode
+        {
+            get => App.Settings.Prop.FpsUnlockerAdaptiveMode;
+            set
+            {
+                if (App.Settings.Prop.FpsUnlockerAdaptiveMode == value)
+                    return;
+
+                App.Settings.Prop.FpsUnlockerAdaptiveMode = value;
+                OnPropertyChanged(nameof(FpsUnlockerAdaptiveMode));
+                OnPropertyChanged(nameof(FpsUnlockerStatusText));
+                try { App.Settings.Save(); } catch { }
+
+                if (FpsUnlockerEnabled)
+                    _ = ApplyChangedFpsCapAsync();
+            }
+        }
+
         public string FpsUnlockerStatusText
         {
             get
             {
                 if (!App.Settings.Prop.FpsUnlockerEnabled)
                     return Strings.Menu_FastFlags_FpsUnlocker_Description;
+
+                if (App.Settings.Prop.FpsUnlockerAdaptiveMode)
+                    return String.IsNullOrEmpty(_fpsUnlockerStatus)
+                        ? "Status: Adaptive aktif — mulai 50 FPS, dapat naik ke 60 FPS setelah stabil."
+                        : _fpsUnlockerStatus;
 
                 return String.IsNullOrEmpty(_fpsUnlockerStatus)
                     ? Strings.Menu_FastFlags_FpsUnlocker_Description

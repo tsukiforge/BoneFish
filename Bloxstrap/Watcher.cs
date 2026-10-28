@@ -773,6 +773,7 @@ namespace Bloxstrap
                 if (_stallCheckCount >= StallCheckThreshold && !_stallLogged)
                 {
                     _stallLogged = true;
+                    Integrations.FpsUnlockerService.NotifyRenderStall();
                     LogRenderStallDiagnostic();
                 }
             }
@@ -787,6 +788,7 @@ namespace Bloxstrap
                 _stallCheckCount = 0;
                 _stallStartUtc = null;
                 _stallLogged = false;
+                Integrations.FpsUnlockerService.NotifyHealthyTick();
             }
 
             return true;

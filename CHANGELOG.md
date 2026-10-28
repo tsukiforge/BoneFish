@@ -1,5 +1,13 @@
 # BoneFish Changelog
 
+## 8.0.2 — Stable adaptive FPS and Roblox cache diagnostics
+
+Release date: 2026-10-28
+
+- Add optional Adaptive FPS mode: starts at 50 FPS, rises to 60 FPS only after a stable window, and falls back to 50 FPS after a render stall.
+- Avoid rewriting `GlobalBasicSettings_13.xml` when the requested cap is already active.
+- Log the exact Roblox upgrade decision and validate stock package cache hashes before reuse.
+
 ## 8.0.1 — Low-end FPS default correction
 
 Release date: 2026-10-16

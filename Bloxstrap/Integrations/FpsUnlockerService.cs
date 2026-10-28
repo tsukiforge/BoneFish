@@ -5,12 +5,20 @@ namespace Bloxstrap.Integrations
     // FPS cap diterapkan independen dari preset visual:
     // tulis FramerateCap di GlobalBasicSettings_13.xml.
     // DFIntTaskSchedulerTargetFps TIDAK dipakai: tidak ada di allowlist sejak 2025-09-29.
-
     public static class FpsUnlockerService
     {
         private const string LOG_IDENT = "FpsUnlocker";
         public const int MinimumRobloxFramerateCap = 50;
         public const int MaximumRobloxFramerateCap = 144;
+        private const int AdaptiveBaseCap = 50;
+        private const int AdaptiveUpperCap = 60;
+        private static readonly TimeSpan AdaptiveStableWindow = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan AdaptiveChangeCooldown = TimeSpan.FromSeconds(30);
+        private static readonly object AdaptiveSync = new();
+        private static DateTime? _adaptiveHealthySinceUtc;
+        private static DateTime _adaptiveLastChangeUtc = DateTime.MinValue;
+        private static bool _adaptiveApplyInProgress;
+        private static int? _adaptiveAppliedCap;
         private const int ENUM_CURRENT_SETTINGS = -1;
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -49,73 +57,186 @@ namespace Bloxstrap.Integrations
         {
             DEVMODE devMode = new();
             devMode.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
-
             if (!EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref devMode))
                 return 0;
-
             return devMode.dmDisplayFrequency;
         }
 
         public static int GetConfiguredFramerateCap() =>
             Math.Clamp(App.Settings.Prop.FpsUnlockerCap, MinimumRobloxFramerateCap, MaximumRobloxFramerateCap);
 
+        public static bool IsAdaptiveMode =>
+            App.Settings.Prop.FpsUnlockerEnabled && App.Settings.Prop.FpsUnlockerAdaptiveMode;
+
+        public static int GetCurrentAdaptiveCap()
+        {
+            lock (AdaptiveSync)
+                return _adaptiveAppliedCap ?? AdaptiveBaseCap;
+        }
+
         public static FpsUnlockerResult Apply()
         {
-            App.GlobalSettings.Load();
-            int refreshRate = GetPrimaryDisplayRefreshRate();
-            int cap = GetConfiguredFramerateCap();
+            int cap = App.Settings.Prop.FpsUnlockerAdaptiveMode ? AdaptiveBaseCap : GetConfiguredFramerateCap();
+            lock (AdaptiveSync)
+            {
+                _adaptiveHealthySinceUtc = null;
+                _adaptiveLastChangeUtc = DateTime.UtcNow;
+                _adaptiveAppliedCap = cap;
+            }
+            return ApplyCap(cap, "manual");
+        }
 
+        /// <summary>
+        /// Called by the watcher only on a healthy, responsive tick. It is intentionally
+        /// cheap: no IO occurs until the stable window and cooldown have both elapsed.
+        /// </summary>
+        public static void NotifyHealthyTick()
+        {
+            if (!IsAdaptiveMode)
+                return;
+
+            bool shouldRaise = false;
+            lock (AdaptiveSync)
+            {
+                DateTime now = DateTime.UtcNow;
+                _adaptiveHealthySinceUtc ??= now;
+                shouldRaise = _adaptiveAppliedCap == AdaptiveBaseCap
+                    && !_adaptiveApplyInProgress
+                    && now - _adaptiveHealthySinceUtc.Value >= AdaptiveStableWindow
+                    && now - _adaptiveLastChangeUtc >= AdaptiveChangeCooldown;
+                if (shouldRaise)
+                    _adaptiveApplyInProgress = true;
+            }
+
+            if (!shouldRaise)
+                return;
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    if (IsAdaptiveMode)
+                        ApplyCap(AdaptiveUpperCap, "adaptive-stable");
+                }
+                catch (Exception ex)
+                {
+                    try { App.Logger.WriteException(LOG_IDENT, ex); } catch { }
+                }
+                finally
+                {
+                    lock (AdaptiveSync)
+                    {
+                        _adaptiveApplyInProgress = false;
+                        _adaptiveLastChangeUtc = DateTime.UtcNow;
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// Called when the watcher confirms a render stall. It immediately schedules a
+        /// single safe fallback; repeated stall ticks do not cause repeated disk writes.
+        /// </summary>
+        public static void NotifyRenderStall()
+        {
+            if (!IsAdaptiveMode)
+                return;
+
+            bool shouldLower = false;
+            lock (AdaptiveSync)
+            {
+                _adaptiveHealthySinceUtc = null;
+                shouldLower = _adaptiveAppliedCap != AdaptiveBaseCap && !_adaptiveApplyInProgress;
+                if (shouldLower)
+                    _adaptiveApplyInProgress = true;
+            }
+
+            if (!shouldLower)
+                return;
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    if (IsAdaptiveMode)
+                        ApplyCap(AdaptiveBaseCap, "adaptive-stall");
+                }
+                catch (Exception ex)
+                {
+                    try { App.Logger.WriteException(LOG_IDENT, ex); } catch { }
+                }
+                finally
+                {
+                    lock (AdaptiveSync)
+                    {
+                        _adaptiveApplyInProgress = false;
+                        _adaptiveLastChangeUtc = DateTime.UtcNow;
+                    }
+                }
+            });
+        }
+
+        private static FpsUnlockerResult ApplyCap(int cap, string reason)
+        {
+            cap = Math.Clamp(cap, MinimumRobloxFramerateCap, MaximumRobloxFramerateCap);
+            int refreshRate = GetPrimaryDisplayRefreshRate();
             App.Logger.WriteLine(LOG_IDENT,
-                $"Menerapkan FramerateCap={cap}" +
+                $"Menerapkan FramerateCap={cap} reason={reason}" +
                 (refreshRate > 0 ? $" (refresh rate monitor={refreshRate} Hz)" : " (refresh rate monitor tidak terbaca)"));
 
+            App.GlobalSettings.Load();
             if (App.GlobalSettings.Document is null)
             {
-                // file dibuat Roblox setelah pertama kali jalan; Bootstrapper re-apply tiap launch
                 App.Logger.WriteLine(LOG_IDENT, "GlobalBasicSettings_13.xml belum ada — deferred ke launch berikutnya");
                 return new FpsUnlockerResult(true, true, cap);
             }
 
-            // ★ HARDENING (audit FPS Fase 5): jangan hancurkan cap manual user tanpa jejak.
-            // Catat nilai FramerateCap yang ada sebelum BoneFish menimpanya — hanya sekali.
-            // Nilai ini dipakai Revert() untuk memulihkan konfigurasi user saat toggle OFF.
+            string? current = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
             if (!App.Settings.Prop.FpsUnlockerCapManaged)
             {
-                string? existing = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
-
-                if (!String.IsNullOrWhiteSpace(existing))
-                {
-                    App.Settings.Prop.FpsUnlockerPreviousCap = existing;
-                    App.Logger.WriteLine(LOG_IDENT, $"FramerateCap user terdeteksi ({existing}) — disimpan untuk dipulihkan saat toggle OFF");
-                }
-                else
-                {
-                    App.Settings.Prop.FpsUnlockerPreviousCap = null;
-                }
-
+                App.Settings.Prop.FpsUnlockerPreviousCap = String.IsNullOrWhiteSpace(current) ? null : current;
                 App.Settings.Prop.FpsUnlockerCapManaged = true;
                 try { App.Settings.Save(); } catch { }
+                if (!String.IsNullOrWhiteSpace(current))
+                    App.Logger.WriteLine(LOG_IDENT, $"FramerateCap user terdeteksi ({current}) — disimpan untuk dipulihkan saat toggle OFF");
+            }
+
+            if (current == cap.ToString())
+            {
+                lock (AdaptiveSync)
+                    _adaptiveAppliedCap = cap;
+                App.Settings.Prop.FpsUnlockerAppliedCap = cap;
+                try { App.Settings.Save(); } catch { }
+                App.Logger.WriteLine(LOG_IDENT, $"FramerateCap sudah {cap}; penulisan GlobalBasicSettings dilewati");
+                return new FpsUnlockerResult(true, false, cap);
             }
 
             App.GlobalSettings.SetPreset("Rendering.FramerateCap", cap);
-
             bool applied = App.GlobalSettings.GetPreset("Rendering.FramerateCap") == cap.ToString();
-            if (applied)
+            if (!applied)
             {
-                App.GlobalSettings.Save();
-                App.Settings.Prop.FpsUnlockerAppliedCap = cap;
-                try { App.Settings.Save(); } catch { }
-            }
-            else
                 App.Logger.WriteLine(LOG_IDENT, "Elemen FramerateCap tidak ditemukan di GlobalBasicSettings_13.xml — deferred ke launch berikutnya");
+                return new FpsUnlockerResult(true, true, cap);
+            }
 
-            return new FpsUnlockerResult(true, !applied, cap);
+            App.GlobalSettings.Save();
+            App.Settings.Prop.FpsUnlockerAppliedCap = cap;
+            try { App.Settings.Save(); } catch { }
+            lock (AdaptiveSync)
+                _adaptiveAppliedCap = cap;
+            return new FpsUnlockerResult(true, false, cap);
         }
 
         public static void Revert()
         {
-            App.GlobalSettings.Load();
+            lock (AdaptiveSync)
+            {
+                _adaptiveHealthySinceUtc = null;
+                _adaptiveAppliedCap = null;
+                _adaptiveApplyInProgress = false;
+            }
 
+            App.GlobalSettings.Load();
             if (App.GlobalSettings.Document is null)
             {
                 App.Logger.WriteLine(LOG_IDENT, "Mematikan FPS Unlocker — GlobalBasicSettings_13.xml tidak ada, tidak ada yang diubah");
@@ -127,19 +248,15 @@ namespace Bloxstrap.Integrations
             bool managed = App.Settings.Prop.FpsUnlockerCapManaged;
             string? current = App.GlobalSettings.GetPreset("Rendering.FramerateCap");
             int? appliedCap = App.Settings.Prop.FpsUnlockerAppliedCap;
-
             if (managed && !String.IsNullOrWhiteSpace(previous))
             {
-                // Pulihkan cap milik user — JANGAN hapus konfigurasi yang bukan milik BoneFish.
                 App.GlobalSettings.SetPreset("Rendering.FramerateCap", previous);
-                App.GlobalSettings.Save();
+                if (current != previous)
+                    App.GlobalSettings.Save();
                 App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap dipulihkan ke nilai sebelumnya ({previous})");
             }
             else if (managed && appliedCap.HasValue && current == appliedCap.Value.ToString())
             {
-                // Hanya hapus bila nilai saat ini memang benar-benar hasil tulisan BoneFish.
-                // Kita tidak menebak dari daftar angka yang di-hardcode; keputusan didasarkan
-                // pada state yang sudah dicatat saat Apply() dijalankan.
                 App.GlobalSettings.RemovePreset("Rendering.FramerateCap");
                 App.GlobalSettings.Save();
                 App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap tulisan BoneFish ({current}) dihapus (kembali ke default Roblox)");
@@ -148,7 +265,6 @@ namespace Bloxstrap.Integrations
             {
                 App.Logger.WriteLine(LOG_IDENT, $"Mematikan FPS Unlocker — FramerateCap ({current ?? "<tidak ada>"}) bukan nilai tulisan BoneFish, tidak diubah");
             }
-
             ResetManagedState();
         }
 
