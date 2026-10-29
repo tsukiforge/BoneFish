@@ -185,6 +185,8 @@ namespace Bloxstrap.UI.Elements
                 };
                 _lockTimer.Tick += (_, _) => LockToRobloxCenter();
                 _lockTimer.Start();
+                // Jangan menunggu tick pertama (150 ms) setelah shortcut/launch.
+                LockToRobloxCenter();
                 App.Logger.WriteLine(LOG_IDENT, "Lock-to-Roblox timer started");
             }
             else if (!shouldRun && _lockTimer is not null)
@@ -303,7 +305,9 @@ namespace Bloxstrap.UI.Elements
                 DisableLock();
 
                 _isDragging = true;
+                CaptureMouse();
                 _lastMousePos = PointToScreen(e.GetPosition(this));
+                e.Handled = true;
             }
         }
 
@@ -322,6 +326,9 @@ namespace Bloxstrap.UI.Elements
         private void Window_MouseUp(object sender, MouseButtonEventArgs e)
         {
             _isDragging = false;
+            if (IsMouseCaptured)
+                ReleaseMouseCapture();
+            e.Handled = true;
         }
 
         private void SavePosition()

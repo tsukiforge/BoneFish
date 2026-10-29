@@ -27,6 +27,8 @@ namespace Bloxstrap.Integrations
         public static async Task<int> CleanupOldCache(int maxAgeDays = 14, long maxSizeBytes = 500L * 1024 * 1024)
         {
             const string METHOD_IDENT = "CacheCleanerService::CleanupOldCache";
+            maxAgeDays = Math.Clamp(maxAgeDays, 1, 365);
+            maxSizeBytes = Math.Clamp(maxSizeBytes, 64L * 1024 * 1024, 10L * 1024 * 1024 * 1024);
 
             // ★ AMAN: Cek dulu apakah Roblox sedang berjalan — jangan cleanup kalo lagi main
             if (IsRobloxRunning())
@@ -70,12 +72,13 @@ namespace Bloxstrap.Integrations
 
                     long totalSize = files.Sum(f => f!.Length);
                     DateTime cutoffDate = DateTime.Now.AddDays(-maxAgeDays);
+                    DateTime safetyWindow = DateTime.Now.AddMinutes(-5);
 
                     int deletedCount = 0;
                     long freedBytes = 0;
 
                     // Fase 1: Hapus file yang lebih tua dari maxAgeDays
-                    var oldFiles = files.Where(f => f!.LastWrite < cutoffDate).Select(f => f!).ToList();
+                    var oldFiles = files.Where(f => f!.LastWrite < cutoffDate && f.LastWrite < safetyWindow).Select(f => f!).ToList();
 
                     foreach (var file in oldFiles)
                     {
@@ -97,6 +100,7 @@ namespace Bloxstrap.Integrations
                     {
                         var remainingFiles = files
                             .Where(f => !oldFiles.Any(o => o.Path == f!.Path))
+                            .Where(f => f!.LastWrite < safetyWindow)
                             .Select(f => f!)
                             .OrderBy(f => f.LastWrite)
                             .ToList();

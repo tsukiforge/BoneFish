@@ -273,6 +273,39 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        public bool EnableCacheCleanupAfterRobloxExit
+        {
+            get => App.Settings.Prop.EnableCacheCleanupAfterRobloxExit;
+            set
+            {
+                App.Settings.Prop.EnableCacheCleanupAfterRobloxExit = value;
+                OnPropertyChanged(nameof(EnableCacheCleanupAfterRobloxExit));
+                try { App.Settings.Save(); } catch { }
+            }
+        }
+
+        public int CacheCleanupMaxAgeDays
+        {
+            get => App.Settings.Prop.CacheCleanupMaxAgeDays;
+            set
+            {
+                App.Settings.Prop.CacheCleanupMaxAgeDays = Math.Clamp(value, 1, 365);
+                OnPropertyChanged(nameof(CacheCleanupMaxAgeDays));
+                try { App.Settings.Save(); } catch { }
+            }
+        }
+
+        public int CacheCleanupMaxSizeMb
+        {
+            get => App.Settings.Prop.CacheCleanupMaxSizeMb;
+            set
+            {
+                App.Settings.Prop.CacheCleanupMaxSizeMb = Math.Clamp(value, 64, 10_240);
+                OnPropertyChanged(nameof(CacheCleanupMaxSizeMb));
+                try { App.Settings.Save(); } catch { }
+            }
+        }
+
         // ── Battery Saver for Wallpaper (Fitur D) ──────────────────────────────
         /// <summary>
         /// Apakah device ini punya baterai? (false = PC desktop).
@@ -477,21 +510,13 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
                 if (value)
                 {
-                    // Turbo Mode ON: use Roblox's lowest graphics quality and clear
-                    // legacy renderer FastFlags.
-                    App.Settings.Prop.OptimizeForLowEnd = true;
-                    App.Settings.Prop.ForceExtremeMode = true;
-                    OnPropertyChanged(nameof(OptimizeForLowEnd));
-
+                    // Turbo adalah override terpisah; jangan menimpa preferensi
+                    // OptimizeForLowEnd/ForceExtremeMode milik user.
                     AutoOptimizeService.ApplyAggressiveOptimizations(bypassLowEndGuard: true);
                 }
                 else
                 {
                     // Turbo Mode OFF: restore the selected preset or the original quality.
-                    App.Settings.Prop.OptimizeForLowEnd = false;
-                    App.Settings.Prop.ForceExtremeMode = false;
-                    OnPropertyChanged(nameof(OptimizeForLowEnd));
-
                     int? selectedPresetQuality = App.Settings.Prop.SelectedPerformancePreset switch
                     {
                         "Balanced" => 5,

@@ -61,7 +61,7 @@
   - ⚖️ **Balanced** — Middle ground between performance and visuals
 - **Fast Loading Toggle** — Accelerate asset loading by increasing texture compositor parallelism and thread limits (conditional: activates based on CPU core count)
 - **Smart Preset Combination** (v7.0.2+) — Presets stack safely: Force Extreme + HDD/low-end is now HDD-aware (keeps ultra-aggressive LOD & disk-friendly compositor jobs), Fast Loading keeps top priority on every launch, and only officially allowlisted flags are written to the client
-- **Turbo Mode** — One-click performance burst: forces Extreme Performance preset, applies aggressive FastFlags, resets on restart (non-permanent)
+- **Turbo Mode** — One-click performance burst: applies the aggressive optimization path at launch without overwriting the user's Low-End or Force Extreme profile settings
 - **HDD/SSD Auto-Detection** — 100% accurate detection via `DeviceIoControl` + `IOCTL_STORAGE_QUERY_PROPERTY`, with automatic HDD Balanced preset for low-end HDD systems
 - **Anti Not-Responding System** — 3-layer protection: FastFlags (Roblox allowlist-compliant since v7.0.2), process priority boost, and RAM trimming for low-end devices
 - **FPS Unlocker** — Independent toggle that detects your monitor's refresh rate and lifts the frame cap on high-Hz displays (120/144/240Hz)
@@ -72,7 +72,7 @@
 - **Server History Tracking** — Keep track of servers you've joined during the session, with one-click rejoin
 - **Auto-Reconnect After Crash** — Detects Roblox crashes via exit code, and offers a reconnect button to rejoin the exact same server (PlaceId + JobId), with automatic fallback to a new server if the old one is full
 - **Game Session Manager** — Approve individual background applications for per-session suspension while Roblox runs (Settings → Game Session Manager). New rules are disabled by default, critical/security processes are never touched, suspension is fail-safe when security detection is unavailable, and restore verifies process identity before resuming threads
-- **Auto-Cache Cleaner** — Automatic Roblox cache cleanup at startup (configurable max age, max size, with safety check for active Roblox processes)
+- **Smart Auto-Cache Cleaner** — Automatic cleanup at startup and optionally after Roblox exits; configurable max age and size, skips active Player/Studio sessions, and protects recently changed files
 - **Quick Repair Shortcuts** — One-click verification and repair of Desktop & Start Menu shortcuts
 - **Battery Saver Mode** — Skips auto-wallpaper refresh when laptop is on battery (PC desktops without battery auto-hide the toggle)
 - **Roblox Studio Support** — Full bootstrapper support for Studio with channel management

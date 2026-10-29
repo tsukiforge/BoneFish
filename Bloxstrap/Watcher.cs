@@ -598,6 +598,25 @@ namespace Bloxstrap
                     await Task.Delay(1000);
             }
 
+            // Titik paling aman untuk smart cleanup: sesi Roblox sudah selesai.
+            // Service tetap mengecek Player/Studio lain agar multi-instance aman.
+            if (App.Settings.Prop.EnableAutoCacheCleanup
+                && App.Settings.Prop.EnableCacheCleanupAfterRobloxExit)
+            {
+                try
+                {
+                    int deleted = await CacheCleanerService.CleanupOldCache(
+                        maxAgeDays: App.Settings.Prop.CacheCleanupMaxAgeDays,
+                        maxSizeBytes: Math.Clamp(App.Settings.Prop.CacheCleanupMaxSizeMb, 64, 10_240) * 1024L * 1024L);
+                    if (deleted > 0)
+                        App.Logger.WriteLine(LOG_IDENT, $"Post-session cache cleanup removed {deleted} file(s)");
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Post-session cache cleanup failed (non-fatal): {ex.Message}");
+                }
+            }
+
             // Restore a matching legacy session immediately after Roblox exits.
             try
             {

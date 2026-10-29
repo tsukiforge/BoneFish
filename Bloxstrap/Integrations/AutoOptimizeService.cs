@@ -1002,6 +1002,13 @@ namespace Bloxstrap.Integrations
                         ApplySafeRobloxGraphicsQuality(savedPresetQuality.Value);
                 }
 
+                if (App.Settings.Prop.EnableTurboMode)
+                {
+                    ApplyAggressiveOptimizations(bypassLowEndGuard: true);
+                    App.Logger.WriteLine(LOG_IDENT, "Turbo Mode active: aggressive launch optimization applied without changing user profile flags.");
+                    return true;
+                }
+
                 // ── v7.0.5: tier ASLI vs tier EFEKTIF ──────────────────────────────
                 // Bug (sebelum fix): DetectSystemTier() punya short-circuit
                 //   if (ForceExtremeMode) return ExtremePerformance;

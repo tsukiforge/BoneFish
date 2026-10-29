@@ -75,7 +75,7 @@ namespace Bloxstrap.Models.Persistable
         public double FpsMonitorY { get; set; } = 0;
         public bool OptimizeForLowEnd { get; set; } = false; // when true, reduce timers and visual updates to save CPU on older devices
 
-        // Turbo Mode — temporary performance boost, resets on restart
+        // Turbo Mode — override performa terpisah; tidak menimpa profil Optimize/Force.
         public bool EnableTurboMode { get; set; } = false;
 
         // performance preset
@@ -127,6 +127,8 @@ namespace Bloxstrap.Models.Persistable
         // Auto cache cleanup settings
         public bool EnableAutoCacheCleanup { get; set; } = true;
         public int CacheCleanupMaxAgeDays { get; set; } = 14;
+        public bool EnableCacheCleanupAfterRobloxExit { get; set; } = true;
+        public int CacheCleanupMaxSizeMb { get; set; } = 512;
 
         // Battery saver untuk auto-wallpaper
         public bool EnableBatterySaverForWallpaper { get; set; } = true;

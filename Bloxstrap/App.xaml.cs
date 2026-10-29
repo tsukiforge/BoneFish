@@ -485,7 +485,8 @@ namespace Bloxstrap
                         {
                             Logger.WriteLine(LOG_IDENT, "Running auto cache cleanup...");
                             int deleted = await CacheCleanerService.CleanupOldCache(
-                                maxAgeDays: App.Settings.Prop.CacheCleanupMaxAgeDays);
+                                maxAgeDays: App.Settings.Prop.CacheCleanupMaxAgeDays,
+                                maxSizeBytes: Math.Clamp(App.Settings.Prop.CacheCleanupMaxSizeMb, 64, 10_240) * 1024L * 1024L);
                             if (deleted > 0)
                                 Logger.WriteLine(LOG_IDENT, $"Auto cache cleanup removed {deleted} file(s)");
                         }

@@ -334,8 +334,32 @@
 
             <controls:OptionControl 
                 Header="Bersihkan cache otomatis"
-                Description="Bersihkan file cache Roblox yang sudah tua (&gt;14 hari) setiap kali aplikasi dibuka. Aman untuk HDD dan SSD.">
+                Description="Bersihkan cache lama saat BoneFish dibuka. File yang masih baru atau sedang dipakai akan dipertahankan.">
                 <ui:ToggleSwitch IsChecked="{Binding EnableAutoCacheCleanup, Mode=TwoWay}" />
+            </controls:OptionControl>
+
+            <controls:OptionControl
+                Header="Bersihkan setelah Roblox ditutup"
+                Description="Jalankan smart cleanup setelah sesi Roblox selesai. Jika ada instance Player/Studio lain, proses otomatis dilewati.">
+                <ui:ToggleSwitch IsChecked="{Binding EnableCacheCleanupAfterRobloxExit, Mode=TwoWay}" />
+            </controls:OptionControl>
+
+            <controls:OptionControl
+                Header="Umur cache maksimum"
+                Description="Hapus file yang lebih tua dari batas ini. Rentang 1-365 hari.">
+                <StackPanel Orientation="Horizontal">
+                    <Slider Minimum="1" Maximum="365" Value="{Binding CacheCleanupMaxAgeDays, Mode=TwoWay}" Width="180" TickFrequency="7" IsSnapToTickEnabled="True" />
+                    <TextBlock Text=" hari" VerticalAlignment="Center" Margin="8,0,0,0" />
+                </StackPanel>
+            </controls:OptionControl>
+
+            <controls:OptionControl
+                Header="Batas ukuran cache"
+                Description="Jika cache melewati batas, file paling lama dibuang lebih dulu. Rentang 64 MB-10 GB.">
+                <StackPanel Orientation="Horizontal">
+                    <Slider Minimum="64" Maximum="10240" Value="{Binding CacheCleanupMaxSizeMb, Mode=TwoWay}" Width="180" TickFrequency="64" IsSnapToTickEnabled="True" />
+                    <TextBlock Text=" MB" VerticalAlignment="Center" Margin="8,0,0,0" />
+                </StackPanel>
             </controls:OptionControl>
         </StackPanel>
     </Grid>

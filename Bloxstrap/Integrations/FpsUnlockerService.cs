@@ -68,6 +68,13 @@ namespace Bloxstrap.Integrations
         public static bool IsAdaptiveMode =>
             App.Settings.Prop.FpsUnlockerEnabled && App.Settings.Prop.FpsUnlockerAdaptiveMode;
 
+        // On low-end/forced-extreme profiles, changing GlobalBasicSettings between
+        // 50 and 60 FPS while Roblox is under render pressure adds disk writes and
+        // can amplify a stall on HDD systems. Keep the conservative base cap until
+        // the user explicitly selects a fixed cap or disables the adaptive mode.
+        private static bool IsConservativeHardwareProfile =>
+            App.Settings.Prop.OptimizeForLowEnd || App.Settings.Prop.ForceExtremeMode;
+
         public static int GetCurrentAdaptiveCap()
         {
             lock (AdaptiveSync)
@@ -93,6 +100,9 @@ namespace Bloxstrap.Integrations
         public static void NotifyHealthyTick()
         {
             if (!IsAdaptiveMode)
+                return;
+
+            if (IsConservativeHardwareProfile)
                 return;
 
             bool shouldRaise = false;
