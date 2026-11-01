@@ -26,12 +26,12 @@
         </Grid.RowDefinitions>
 
         <!-- ── INFO & LOADING ─────────────────────────────────────── -->
-        <TextBlock Grid.Row="0" Margin="0,0,0,12" 
-                   Text="{x:Static resources:Strings.Menu_FastFlags_Description}" 
+        <TextBlock Grid.Row="0" Margin="0,0,0,12"
+                   Text="{x:Static resources:Strings.Menu_FastFlags_Description}"
                    FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
-        <ui:Snackbar Grid.Row="0" x:Name="FastFlagsSnackbar" Title="Pemberitahuan" Message="" 
-                     Appearance="Success" Icon="CheckmarkCircle32" Timeout="5000" 
+        <ui:Snackbar Grid.Row="0" x:Name="FastFlagsSnackbar" Title="Pemberitahuan" Message=""
+                     Appearance="Success" Icon="CheckmarkCircle32" Timeout="5000"
                      Margin="0,0,0,8" Visibility="Collapsed" />
 
         <!-- Loading indicator saat apply preset -->
@@ -174,16 +174,16 @@
                     </StackPanel>
                 </Border>
 
-                <ui:InfoBar MouseDoubleClick="InfoBar_MouseDoubleClick" Margin="0,0,0,0" Padding="8" 
-                            Title="{x:Static resources:Strings.Common_Warning}" 
-                            Message="{x:Static resources:Strings.Menu_FastFlags_EditorInfo}" 
+                <ui:InfoBar MouseDoubleClick="InfoBar_MouseDoubleClick" Margin="0,0,0,0" Padding="8"
+                            Title="{x:Static resources:Strings.Common_Warning}"
+                            Message="{x:Static resources:Strings.Menu_FastFlags_EditorInfo}"
                             Severity="Warning" IsOpen="True" IsClosable="False" />
 
                 <ui:CardAction Margin="0,8,0,0" Icon="EditSettings24" Command="{Binding OpenFastFlagEditorCommand}">
                     <StackPanel>
                         <TextBlock FontSize="14" Text="{x:Static resources:Strings.Menu_FastFlagEditor_Title}" />
-                        <TextBlock Margin="0,2,0,0" FontSize="12" 
-                                   Text="{x:Static resources:Strings.Menu_FastFlags_Editor_Description}" 
+                        <TextBlock Margin="0,2,0,0" FontSize="12"
+                                   Text="{x:Static resources:Strings.Menu_FastFlags_Editor_Description}"
                                    Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                     </StackPanel>
                 </ui:CardAction>
@@ -204,58 +204,25 @@
                     </StackPanel>
                 </ui:CardAction>
 
-                <!-- PERFORMANCE PRESETS -->
-                <TextBlock Text="Performance &amp; Network Presets (Pilih Satu)" FontSize="20" FontWeight="Medium" Margin="0,16,0,4" />
-
-                <ui:CardAction Margin="0,4,0,0" Icon="Settings28" Command="{Binding ApplyRecommendedFastFlagsCommand}">
+                <!-- PERFORMANCE PROFILE: RECOMMENDED / MANUAL -->
+                <TextBlock Text="FastFlag Profile" FontSize="20" FontWeight="Medium" Margin="0,16,0,4" />
+                <Border Margin="0,4,0,0" Padding="14"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8">
                     <StackPanel>
-                        <TextBlock FontSize="14" Text="Auto-optimize FastFlags" />
-                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Set Roblox's saved graphics quality to low and clear legacy renderer overrides."
-                                   Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                        <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
-                                   Text="[ ACTIVE ]" Visibility="{Binding IsAutoOptimizeActive, Converter={StaticResource BoolToVis}}" />
-                    </StackPanel>
-                </ui:CardAction>
-
-                <ui:CardAction Margin="0,4,0,0" Icon="Wrench24" Command="{Binding ApplyRecommendedStabilityPresetCommand}">
-                    <StackPanel>
-                        <TextBlock FontSize="14" Text="Apply stable low-spec preset" />
-                        <TextBlock Margin="0,2,0,0" FontSize="12" 
-                                   Text="Set Roblox's saved graphics quality to low and clear legacy renderer overrides. Matchmaking preferences do not change ping."
-                                   Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                        <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
-                                   Text="[ ACTIVE ]" Visibility="{Binding IsStableActive, Converter={StaticResource BoolToVis}}" />
-                    </StackPanel>
-                </ui:CardAction>
-
-                <ui:CardAction Margin="0,4,0,0" Icon="AppsAddIn28" Command="{Binding ApplyBalancedPresetCommand}">
-                    <StackPanel>
-                        <TextBlock FontSize="14" Text="Balanced" />
-                        <TextBlock Margin="0,2,0,0" FontSize="12" Text="Keseimbangan visual dan performa; preferensi matchmaking tidak menurunkan ping."
-                                   Padding="0,0,16,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                        <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="LimeGreen" 
-                                   Text="[ ACTIVE ]" Visibility="{Binding IsBalancedActive, Converter={StaticResource BoolToVis}}" />
-                    </StackPanel>
-                </ui:CardAction>
-
-                <ui:CardAction Margin="0,4,0,0" Icon="Flash24" Command="{Binding ApplyExtremePerformancePresetCommand}"
-                               Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
-                    <StackPanel>
+                        <TextBlock FontSize="15" FontWeight="SemiBold" Text="Recommended" />
+                        <TextBlock Margin="0,3,0,8" FontSize="12" TextWrapping="Wrap"
+                                   Text="Mode aman BoneFish: membersihkan FastFlag lama/rejected, memakai kualitas Roblox yang konservatif, dan tidak menulis pengaturan FPS saat Roblox sedang berjalan."
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock FontSize="14" FontWeight="SemiBold" Text="🥔 Extreme Performance (Potato Mode)" />
-                            <Border Margin="8,0,0,0" Padding="6,2" Background="#CC3300" CornerRadius="4">
-                                <TextBlock FontSize="10" FontWeight="Bold" Foreground="White" Text="PALING AGRESIF" />
-                            </Border>
+                            <ui:Button Content="Aktifkan Recommended" Command="{Binding ApplyRecommendedFastFlagsCommand}" />
+                            <ui:Button Margin="8,0,0,0" Appearance="Secondary" Content="Buka Manual" Command="{Binding OpenFastFlagEditorCommand}" />
                         </StackPanel>
-                        <TextBlock Margin="0,2,0,0" FontSize="12" Padding="0,0,16,0"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Sets Roblox's saved graphics quality to the lowest level and removes legacy renderer overrides. This cannot guarantee that freezes will stop." />
-                        <TextBlock Margin="0,4,0,0" FontSize="12" FontWeight="Bold" Foreground="Orange"
-                                   Text="[ LOW ROBLOX GRAPHICS ]"
-                                   Visibility="{Binding IsExtremePerformanceActive, Converter={StaticResource BoolToVis}}" />
+                        <TextBlock Margin="0,8,0,0" FontSize="11" TextWrapping="Wrap"
+                                   Text="Recommended aktif otomatis pada instalasi baru. Manual hanya untuk pengguna yang memahami FastFlag."
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                     </StackPanel>
-                </ui:CardAction>
-
+                </Border>
                 <!-- CLEAR CLIENTAPPSETTINGS -->
                 <ui:CardAction Margin="0,12,0,0" Icon="Delete24" Command="{Binding ClearClientAppSettingsCommand}">
                     <StackPanel>
@@ -275,20 +242,7 @@
             <StackPanel>
                 <!-- NIGHT VISION — DIHAPUS (GAP 4: deprecated flags) -->
 
-                <!-- FORCE EXTREME MODE -->
-                <controls:OptionControl
-                    Header="Force Extreme Mode (Potato Mode Override)"
-                    Description="Gunakan kualitas grafis Roblox rendah dan bersihkan renderer FastFlags lama, tanpa memaksa override render eksperimental.">
-                    <ui:ToggleSwitch IsChecked="{Binding ForceExtremeMode, Mode=TwoWay}" />
-                </controls:OptionControl>
-
-                <!-- FAST LOADING TOGGLE -->
-                <controls:OptionControl
-                    Header="Fast Loading (Percepat Muncul Aset)"
-                    Description="Pada CPU 8+ logical processor menulis thread flag yang penerimaannya belum terverifikasi; Roblox menolak flag texture-compositor pada log yang dianalisis. Tidak menjamin loading lebih cepat.">
-                    <ui:ToggleSwitch IsChecked="{Binding EnableFastLoadingFlags, Mode=TwoWay}" />
-                </controls:OptionControl>
-
+                <!-- FPS is managed only through GlobalBasicSettings, not FastFlags. -->
                 <!-- FPS UNLOCKER TOGGLE -->
                 <controls:OptionControl
                     Header="{x:Static resources:Strings.Menu_FastFlags_FpsUnlocker_Title}"
@@ -306,13 +260,13 @@
                                    Text="{Binding FpsUnlockerCap, StringFormat={}{0} FPS}" />
                     </StackPanel>
                 </controls:OptionControl>
-                <controls:OptionControl
-                    Header="Adaptive FPS (50–60)"
-                    Description="Opsional untuk laptop lama. Mulai pada 50 FPS, naik ke 60 FPS hanya setelah stabil, dan kembali ke 50 FPS jika terdeteksi render stall. Tidak mengubah FastFlag.">
-                    <ui:ToggleSwitch IsChecked="{Binding FpsUnlockerAdaptiveMode, Mode=TwoWay}"
-                                     IsEnabled="{Binding FpsUnlockerEnabled}" />
-                </controls:OptionControl>
-
+                <Border Margin="0,4,0,0" Padding="10"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="6">
+                    <TextBlock FontSize="11" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               Text="Adaptive FPS dinonaktifkan agar BoneFish tidak menulis ulang GlobalBasicSettings saat Roblox stall. Gunakan satu cap tetap; cap diterapkan pada launch berikutnya." />
+                </Border>
                 <!-- TDR MITIGATION TOGGLE -->
                 <controls:OptionControl
                     Header="{x:Static resources:Strings.Menu_FastFlags_TdrMitigation_Title}"
@@ -323,31 +277,31 @@
                 <!-- MANUAL OVERRIDES -->
                 <TextBlock Text="Manual FastFlag Overrides" FontSize="20" FontWeight="Medium" Margin="0,16,0,4" />
 
-                <controls:OptionControl 
+                <controls:OptionControl
                     Header="{x:Static resources:Strings.Menu_FastFlags_ManagerEnabled_Title}"
                     Description="{x:Static resources:Strings.Menu_FastFlags_ManagerEnabled_Description}">
                     <ui:ToggleSwitch IsChecked="{Binding UseFastFlagManager, Mode=TwoWay}" />
                 </controls:OptionControl>
 
-                <controls:OptionControl 
+                <controls:OptionControl
                     Header="{x:Static resources:Strings.Menu_FastFlags_Reset_Title}">
                     <ui:ToggleSwitch IsChecked="{Binding ResetConfiguration, Mode=TwoWay}" />
                 </controls:OptionControl>
 
                 <!-- RENDERING -->
-                <TextBlock Text="{x:Static resources:Strings.Menu_FastFlags_Presets_Categories_Rendering}" 
+                <TextBlock Text="{x:Static resources:Strings.Menu_FastFlags_Presets_Categories_Rendering}"
                            FontSize="16" FontWeight="Medium" Margin="0,16,0,0" />
 
-                <controls:OptionControl 
-                    Header="{x:Static resources:Strings.Menu_FastFlags_Presets_FixDisplayScaling_Title}" 
-                    Description="{x:Static resources:Strings.Menu_FastFlags_Presets_FixDisplayScaling_Description}" 
+                <controls:OptionControl
+                    Header="{x:Static resources:Strings.Menu_FastFlags_Presets_FixDisplayScaling_Title}"
+                    Description="{x:Static resources:Strings.Menu_FastFlags_Presets_FixDisplayScaling_Description}"
                     HelpLink="https://github.com/bloxstraplabs/bloxstrap/wiki/A-guide-to-FastFlags#dpi-scaling-fixes">
                     <ui:ToggleSwitch IsChecked="{Binding FixDisplayScaling, Mode=TwoWay}" />
                 </controls:OptionControl>
 
                 <controls:OptionControl Header="{x:Static resources:Strings.Menu_FastFlags_Presets_RenderingMode_Title}">
-                    <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200" 
-                              ItemsSource="{Binding RenderingModes.Keys, Mode=OneTime}" 
+                    <ComboBox Margin="5,0,0,0" Padding="10,5,10,5" Width="200"
+                              ItemsSource="{Binding RenderingModes.Keys, Mode=OneTime}"
                               SelectedItem="{Binding SelectedRenderingMode, Mode=TwoWay}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>

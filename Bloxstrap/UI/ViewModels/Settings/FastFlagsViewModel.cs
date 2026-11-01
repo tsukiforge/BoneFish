@@ -904,6 +904,10 @@ namespace Bloxstrap.UI.ViewModels.Settings
             // agar AutoOptimizeService.DetectSystemTier() tidak memaksa ExtremePerformance
             // di launch berikutnya walau user sudah pilih preset lain.
             App.Settings.Prop.ForceExtremeMode = false;
+            App.Settings.Prop.EnableTurboMode = false;
+            App.Settings.Prop.OptimizeForLowEnd = false;
+            App.Settings.Prop.EnableFastLoadingFlags = false;
+            App.Settings.Prop.FpsUnlockerAdaptiveMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
 
             UseFastFlagManager = true;
@@ -1376,16 +1380,17 @@ namespace Bloxstrap.UI.ViewModels.Settings
                 Integrations.AutoOptimizeService.CleanupLegacyRobloxFlags();
             });
 
-            // 3. Reset preset indicator (kembali ke UI thread)
-            App.Settings.Prop.SelectedPerformancePreset = "None";
+            // 3. Reset preset indicator (kembali ke UI thread). A clean profile
+            // returns to Recommended rather than the legacy "None" state.
+            App.Settings.Prop.SelectedPerformancePreset = "AutoOptimize";
             App.Settings.Prop.ForceExtremeMode = false;
             OnPropertyChanged(nameof(ForceExtremeMode));
-            SelectedPreset = "None";
+            SelectedPreset = "AutoOptimize";
             RestorePresetGraphicsQuality();
 
             try { App.Settings.Save(); } catch { }
 
-            Notify($"✅ ClientAppSettings berhasil dibersihkan. Pilih preset untuk memulai ulang.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil dipulihkan." : "")}");
+            Notify($"✅ ClientAppSettings berhasil dibersihkan. Recommended siap diterapkan saat launch berikutnya.{(_presetGraphicsQualityWarning ? " Kualitas grafis Roblox belum berhasil dipulihkan." : "")}");
             _presetGraphicsQualityWarning = false;
             OnRequestPageReload();
         }

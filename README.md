@@ -53,15 +53,7 @@
 - **Bootstrapper Customization** — Multiple bootstrapper styles (Legacy 2008/2011, Vista, Classic, Glass, Fake Byfron), custom icons, and custom title
 
 ### ⚡ **Performance & Optimization**
-- **FastFlags Manager** — 5 preset performance profiles:
-  - 🤖 **Auto-Optimize** — Detects your hardware and applies the best settings automatically
-  - 🛡️ **Stable** — Prioritizes stability with network optimizations
-  - 🐌 **Ultra Low-Spec** — For old devices (2-core, 2-4GB RAM, Intel HD)
-  - 🥔 **Extreme Performance (Potato Mode)** — Maximum FPS with configurable FPS cap (24-60)
-  - ⚖️ **Balanced** — Middle ground between performance and visuals
-- **Fast Loading Toggle** — Accelerate asset loading by increasing texture compositor parallelism and thread limits (conditional: activates based on CPU core count)
-- **Smart Preset Combination** (v7.0.2+) — Presets stack safely: Force Extreme + HDD/low-end is now HDD-aware (keeps ultra-aggressive LOD & disk-friendly compositor jobs), Fast Loading keeps top priority on every launch, and only officially allowlisted flags are written to the client
-- **Turbo Mode** — One-click performance burst: applies the aggressive optimization path at launch without overwriting the user's Low-End or Force Extreme profile settings
+- **FastFlags Manager** — one safe **Recommended** profile plus a **Manual** editor for advanced users. Retired aggressive presets are migrated back to Recommended.
 - **HDD/SSD Auto-Detection** — 100% accurate detection via `DeviceIoControl` + `IOCTL_STORAGE_QUERY_PROPERTY`, with automatic HDD Balanced preset for low-end HDD systems
 - **Anti Not-Responding System** — 3-layer protection: FastFlags (Roblox allowlist-compliant since v7.0.2), process priority boost, and RAM trimming for low-end devices
 - **FPS Unlocker** — Independent toggle that detects your monitor's refresh rate and lifts the frame cap on high-Hz displays (120/144/240Hz)
@@ -72,7 +64,7 @@
 - **Server History Tracking** — Keep track of servers you've joined during the session, with one-click rejoin
 - **Auto-Reconnect After Crash** — Detects Roblox crashes via exit code, and offers a reconnect button to rejoin the exact same server (PlaceId + JobId), with automatic fallback to a new server if the old one is full
 - **Game Session Manager** — Approve individual background applications for per-session suspension while Roblox runs (Settings → Game Session Manager). New rules are disabled by default, critical/security processes are never touched, suspension is fail-safe when security detection is unavailable, and restore verifies process identity before resuming threads
-- **Smart Auto-Cache Cleaner** — Automatic cleanup at startup and optionally after Roblox exits; configurable max age and size, skips active Player/Studio sessions, and protects recently changed files
+- **Smart Auto-Cache Cleaner** — Cleanup after Roblox exits; configurable max age and size, skips active Player/Studio sessions, protects recently changed files, and preserves cache during the first launch after a Roblox update
 - **Quick Repair Shortcuts** — One-click verification and repair of Desktop & Start Menu shortcuts
 - **Battery Saver Mode** — Skips auto-wallpaper refresh when laptop is on battery (PC desktops without battery auto-hide the toggle)
 - **Roblox Studio Support** — Full bootstrapper support for Studio with channel management

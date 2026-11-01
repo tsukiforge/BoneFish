@@ -78,8 +78,9 @@ namespace Bloxstrap.Models.Persistable
         // Turbo Mode — override performa terpisah; tidak menimpa profil Optimize/Force.
         public bool EnableTurboMode { get; set; } = false;
 
-        // performance preset
-        public string SelectedPerformancePreset { get; set; } = "None";
+        // Recommended is the safe default. Extreme remains an explicit emergency
+        // option and is never selected automatically on a new installation.
+        public string SelectedPerformancePreset { get; set; } = "AutoOptimize";
         public bool PerformancePresetGraphicsQualityManaged { get; set; }
         public string? PerformancePresetPreviousGraphicsQuality { get; set; }
         public string? PerformancePresetAppliedGraphicsQuality { get; set; }
@@ -129,6 +130,12 @@ namespace Bloxstrap.Models.Persistable
         public int CacheCleanupMaxAgeDays { get; set; } = 14;
         public bool EnableCacheCleanupAfterRobloxExit { get; set; } = true;
         public int CacheCleanupMaxSizeMb { get; set; } = 512;
+
+        // Roblox rebuilds shader and asset caches after a client update. Keep the
+        // existing cache for the first session so the new client can warm it up
+        // instead of BoneFish deleting useful files immediately before launch.
+        public bool RobloxUpdateWarmupPending { get; set; } = false;
+        public string RobloxUpdateWarmupVersionGuid { get; set; } = "";
 
         // Battery saver untuk auto-wallpaper
         public bool EnableBatterySaverForWallpaper { get; set; } = true;

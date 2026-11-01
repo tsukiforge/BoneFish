@@ -102,7 +102,11 @@ namespace Bloxstrap.Integrations
             if (!IsAdaptiveMode)
                 return;
 
-            if (IsConservativeHardwareProfile)
+            // FPS cap is a launch-time setting. Rewriting GlobalBasicSettings while
+            // Roblox is rendering or recovering from a stall makes the game reload
+            // its user settings at the worst possible time. Adaptive mode remains
+            // accepted for backwards compatibility, but never raises the cap live.
+            if (IsConservativeHardwareProfile || IsRobloxRunning())
                 return;
 
             bool shouldRaise = false;
@@ -152,6 +156,12 @@ namespace Bloxstrap.Integrations
             if (!IsAdaptiveMode)
                 return;
 
+            // Do not write GlobalBasicSettings during a stall. The configured base
+            // cap is already applied on the next launch and is safer than a live
+            // 50/60 FPS oscillation while Roblox is unresponsive.
+            if (IsRobloxRunning())
+                return;
+
             bool shouldLower = false;
             lock (AdaptiveSync)
             {
@@ -194,6 +204,13 @@ namespace Bloxstrap.Integrations
                 $"Menerapkan FramerateCap={cap} reason={reason}" +
                 (refreshRate > 0 ? $" (refresh rate monitor={refreshRate} Hz)" : " (refresh rate monitor tidak terbaca)"));
 
+            if (IsRobloxRunning())
+            {
+                App.Logger.WriteLine(LOG_IDENT,
+                    "Roblox masih berjalan — cap FPS ditunda ke launch berikutnya; GlobalBasicSettings tidak ditulis saat sesi aktif.");
+                return new FpsUnlockerResult(true, true, cap);
+            }
+
             App.GlobalSettings.Load();
             if (App.GlobalSettings.Document is null)
             {
@@ -235,6 +252,39 @@ namespace Bloxstrap.Integrations
             lock (AdaptiveSync)
                 _adaptiveAppliedCap = cap;
             return new FpsUnlockerResult(true, false, cap);
+        }
+
+        private static bool IsRobloxRunning()
+        {
+            try
+            {
+                Process[] processes = Process.GetProcessesByName("RobloxPlayerBeta");
+                bool running = false;
+                foreach (Process process in processes)
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                            running = true;
+                    }
+                    catch
+                    {
+                        // An inaccessible process may still be the active client.
+                        running = true;
+                    }
+                    finally
+                    {
+                        process.Dispose();
+                    }
+                }
+                return running;
+            }
+            catch
+            {
+                // If process inspection is unavailable, prefer deferring a write
+                // over changing Roblox settings while a session may be active.
+                return true;
+            }
         }
 
         public static void Revert()

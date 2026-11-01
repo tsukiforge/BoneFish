@@ -601,7 +601,8 @@ namespace Bloxstrap
             // Titik paling aman untuk smart cleanup: sesi Roblox sudah selesai.
             // Service tetap mengecek Player/Studio lain agar multi-instance aman.
             if (App.Settings.Prop.EnableAutoCacheCleanup
-                && App.Settings.Prop.EnableCacheCleanupAfterRobloxExit)
+                && App.Settings.Prop.EnableCacheCleanupAfterRobloxExit
+                && !App.Settings.Prop.RobloxUpdateWarmupPending)
             {
                 try
                 {
@@ -615,6 +616,16 @@ namespace Bloxstrap
                 {
                     App.Logger.WriteLine(LOG_IDENT, $"Post-session cache cleanup failed (non-fatal): {ex.Message}");
                 }
+            }
+
+            // The first post-update session has now completed. Future sessions
+            // may use the normal age/size cleanup policy again.
+            if (App.Settings.Prop.RobloxUpdateWarmupPending)
+            {
+                App.Settings.Prop.RobloxUpdateWarmupPending = false;
+                App.Settings.Save();
+                App.Logger.WriteLine(LOG_IDENT,
+                    "Roblox update warmup session completed; normal cache cleanup re-enabled.");
             }
 
             // Restore a matching legacy session immediately after Roblox exits.

@@ -1,5 +1,15 @@
 # BoneFish Changelog
 
+## 8.0.3 — Recommended FastFlag profile and update-safe cache cleanup
+
+Release date: 2026-11-01
+
+- Remove the retired **Extreme Performance / Potato Mode** entry from the FastFlag UI. Existing legacy settings are migrated to **Recommended** and `ForceExtremeMode` is disabled.
+- Keep FastFlag workflows focused on one safe **Recommended** profile and an explicit **Manual** editor.
+- Stop startup cache cleanup from racing with Roblox update, download, shader compilation, or launch.
+- Preserve Roblox cache during the first Player session after a client update so shader and asset caches can warm up before normal post-exit cleanup resumes.
+- Keep FPS changes launch-only; BoneFish no longer rewrites `GlobalBasicSettings_13.xml` while Roblox is active.
+
 ## 8.0.2 — Stable adaptive FPS and Roblox cache diagnostics
 
 Release date: 2026-10-28

@@ -1397,6 +1397,18 @@ namespace Bloxstrap
 
             AppData.State.VersionGuid = _latestVersionGuid;
 
+            // Do not delete Roblox cache immediately after an update. The first
+            // launch must rebuild shader/asset caches; keeping the existing cache
+            // makes this warmup incremental and avoids an unnecessary cold start.
+            if (_launchMode == LaunchMode.Player)
+            {
+                App.Settings.Prop.RobloxUpdateWarmupPending = true;
+                App.Settings.Prop.RobloxUpdateWarmupVersionGuid = _latestVersionGuid;
+                App.Settings.Save();
+                App.Logger.WriteLine(LOG_IDENT,
+                    $"Roblox updated to {_latestVersionGuid}; preserving cache for first-session warmup.");
+            }
+
             AppData.State.PackageHashes.Clear();
 
             foreach (var package in _versionPackageManifest)

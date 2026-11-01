@@ -362,6 +362,50 @@ namespace Bloxstrap
 
                 Settings.Load();
 
+                // v8.1 safe-profile migration: blank and retired performance profiles
+                // now open as Recommended (AutoOptimize). ExtremePerformance and
+                // ForceExtreme are retained only as legacy JSON fields for compatibility;
+                // they are no longer selectable or activated by BoneFish.
+                bool performanceProfileChanged = false;
+                if (String.Equals(Settings.Prop.SelectedPerformancePreset, "None", StringComparison.OrdinalIgnoreCase))
+                {
+                    Settings.Prop.SelectedPerformancePreset = "AutoOptimize";
+                    performanceProfileChanged = true;
+                }
+
+                if (String.Equals(Settings.Prop.SelectedPerformancePreset, "ExtremePerformance", StringComparison.OrdinalIgnoreCase))
+                {
+                    Settings.Prop.SelectedPerformancePreset = "AutoOptimize";
+                    performanceProfileChanged = true;
+                }
+
+                if (Settings.Prop.ForceExtremeMode)
+                {
+                    Settings.Prop.ForceExtremeMode = false;
+                    performanceProfileChanged = true;
+                }
+
+                if (Settings.Prop.EnableTurboMode)
+                {
+                    Settings.Prop.EnableTurboMode = false;
+                    performanceProfileChanged = true;
+                }
+
+                if (Settings.Prop.EnableFastLoadingFlags)
+                {
+                    Settings.Prop.EnableFastLoadingFlags = false;
+                    performanceProfileChanged = true;
+                }
+
+                if (Settings.Prop.FpsUnlockerAdaptiveMode)
+                {
+                    Settings.Prop.FpsUnlockerAdaptiveMode = false;
+                    performanceProfileChanged = true;
+                }
+
+                if (performanceProfileChanged)
+                    Settings.Save();
+
                 // ── Legacy settings migration (FIX v7.4.0) ───────────────────────────
                 // Users with a Settings.json from before the rename to BoneFish may still
                 // have an old project name ("Fishstrap"/"Bloxstrap") persisted as their
@@ -375,23 +419,9 @@ namespace Bloxstrap
                 State.Load();
                 RobloxState.Load();
 
-                // ── Preset migration REMOVED in v5.0.0 ───────────────────────────────────────
-                // v4.5.0 punya blok migrasi yang auto-overwrite Settings.SelectedPerformancePreset
-                // dari "UltraLow" ke "ExtremePerformance" karena di v4.5.0 kedua preset tersebut
-                // digabung jadi satu. v5.0.0 merestrukturisasi UI kembali ke 2 preset terpisah
-                // (UltraLow + ExtremePerformance) — lihat CHANGELOG.md v5.0.0 dan
-                // FastFlagsViewModel.ApplyUltraLowSpecPreset().
-                //
-                // Blok migrasi lama akan jadi FOOTGUN di v5.0.0: setiap user yang klik tombol
-                // UltraLow dari UI (pilihan valid post-sync) akan di-overwrite ke
-                // "ExtremePerformance" tiap launch — membuat UltraLow button praktis tidak
-                // bisa dipakai. Karena itu blok dihapus seluruhnya di v5.0.0.
-                //
-                // Catatan untuk kontributor masa depan: JANGAN reintroduce migrasi UltraLow →
-                // ExtremePerformance tanpa re-check architecture preset saat ini.
-                // Daftar preset valid di v5.0.0: UltraLow, Balanced, Stable,
-                // ExtremePerformance, AutoOptimize, None — semuanya tidak di-overwrite
-                // oleh block mana pun di OnStartup().
+                // Retired preset migration is handled above. Keep the settings file
+                // readable for older BoneFish versions, but this build exposes only
+                // Recommended and Manual FastFlag workflows.
                 FastFlags.Load();
                 GlobalSettings.Load();
 
@@ -476,26 +506,9 @@ namespace Bloxstrap
                     }
                 });
 
-                // ★ AUTO CACHE CLEANUP (Fitur B) — non-blocking, jalan sekali per startup
-                if (App.Settings.Prop.EnableAutoCacheCleanup)
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            Logger.WriteLine(LOG_IDENT, "Running auto cache cleanup...");
-                            int deleted = await CacheCleanerService.CleanupOldCache(
-                                maxAgeDays: App.Settings.Prop.CacheCleanupMaxAgeDays,
-                                maxSizeBytes: Math.Clamp(App.Settings.Prop.CacheCleanupMaxSizeMb, 64, 10_240) * 1024L * 1024L);
-                            if (deleted > 0)
-                                Logger.WriteLine(LOG_IDENT, $"Auto cache cleanup removed {deleted} file(s)");
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.WriteLine(LOG_IDENT, $"Auto cache cleanup failed (non-fatal): {ex.Message}");
-                        }
-                    });
-                }
+                // Cache cleanup intentionally runs only after Roblox exits.
+                // Running it here races with update/download/startup work and can
+                // delete shader or asset cache files needed for the next launch.
 
                 WindowsRegistry.RegisterApis(); // we want to register those early on
                                                 // so we wont have any issues with bloxshade
